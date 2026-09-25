@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Smart Inventory Management System - Team 2 Supplier Dashboard">
+  <title>Supplier Dashboard - Smart Inventory Management System</title>
+  <link rel="stylesheet" href="css/supplier_dashboard.css">
+</head>
+
+<body>
+  <div class="app-layout">
+    <!-- ================================================================
+         SIDEBAR: Features & Modules Options
+         ================================================================ -->
+    <aside class="app-sidebar" id="appSidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-brand">
+          <div class="brand-logo" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path
+                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
+              </path>
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+              <line x1="12" y1="22.08" x2="12" y2="12"></line>
+            </svg>
+          </div>
+          <div class="brand-text">
+            <span class="brand-title">SIMS Portal</span>
+            <span class="brand-subtitle">Supplier Management</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation Menu -->
+      <nav class="sidebar-nav" aria-label="Module Navigation">
+        <div class="nav-group-title">PROCUREMENT MODULES</div>
+
+        <!-- 1. Dashboard (Active) -->
+        <a href="#" class="nav-item active" data-module="dashboard" id="navDashboard"
+          title="Supplier Dashboard Overview">
+          <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+          </svg>
+          <span class="nav-label">Dashboard</span>
+          <span class="nav-badge live">Live</span>
+        </a>
+
+        <!-- 2. Stock Requests -->
+        <a href="#" class="nav-item" data-module="Stock Requests" id="navStockRequests" title="Stock Requests Module">
+          <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+          <span class="nav-label">Stock Requests</span>
+        </a>
+
+        <!-- 3. Quotations -->
+        <a href="#" class="nav-item" data-module="Quotations" id="navQuotations" title="Quotations Module">
+          <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          <span class="nav-label">Quotations</span>
+        </a>
+
+        <!-- 4. Purchase Orders -->
+        <a href="#" class="nav-item" data-module="Purchase Orders" id="navPurchaseOrders"
+          title="Purchase Orders Module">
+          <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2">
+            <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <path d="M16 10a4 4 0 0 1-8 0"></path>
+          </svg>
+          <span class="nav-label">Purchase Orders</span>
+        </a>
+
+        <!-- 5. Shipments / Orders to Ship -->
+        <a href="#" class="nav-item" data-module="Shipments" id="navShipments" title="Shipments Module">
+          <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2">
+            <rect x="1" y="3" width="15" height="13"></rect>
+            <polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon>
+            <circle cx="5.5" cy="18.5" r="2.5"></circle>
+            <circle cx="18.5" cy="18.5" r="2.5"></circle>
+          </svg>
+          <span class="nav-label">Shipments</span>
+        </a>
+
+        <!-- 6. Order History -->
+        <a href="#" class="nav-item" data-module="Order History" id="navOrderHistory" title="Order History Module">
+          <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 14 14"></polyline>
+            <path d="M3.05 11a9 9 0 1 1 .5 4"></path>
+            <polyline points="3 16 3 11 8 11"></polyline>
+          </svg>
+          <span class="nav-label">Order History</span>
+        </a>
+
+        <div class="nav-group-title" style="margin-top: 14px;">ALERTS & PROFILE</div>
+
+        <!-- 7. Notifications -->
+        <a href="#headingNotifications" class="nav-item" data-module="Notifications" id="navNotifications"
+          title="Notifications">
+          <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+          </svg>
+          <span class="nav-label">Notifications</span>
+          <span class="nav-badge count" id="sidebarNotifBadge">0</span>
+        </a>
+
+        <!-- 8. Profile -->
+        <a href="#" class="nav-item" data-module="Supplier Profile" id="navProfile" title="Supplier Profile">
+          <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+          <span class="nav-label">Supplier Profile</span>
+        </a>
+      </nav>
+
+      <!-- Sidebar Bottom Supplier User Card -->
+      <div class="sidebar-user-card">
+        <div class="user-avatar" id="sidebarAvatar">S1</div>
+        <div class="user-details">
+          <div class="user-name" id="sidebarUserName">Supplier 1 Company</div>
+          <div class="user-role" id="sidebarUserRole">Supplier One &bull; Active</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ================================================================
+         MAIN CONTENT AREA
+         ================================================================ -->
+    <main class="app-main">
+      <div class="dashboard-wrapper">
+        <!-- Header -->
+        <header class="dashboard-header">
+          <div class="header-brand">
+            <!-- Mobile/Tablet Sidebar Toggle Button -->
+            <button id="sidebarToggleBtn" class="sidebar-toggle-btn" aria-label="Toggle Sidebar Navigation">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+              </svg>
+            </button>
+
+            <div class="header-icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+              </svg>
+            </div>
+            <div class="header-title-wrap">
+              <h1>Supplier Dashboard</h1>
+              <div class="header-subtitle">
+                <span>Welcome, <span id="supplierNameDisplay" class="supplier-name">Loading...</span></span>
+                <span>&bull;</span>
+                <span id="supplierContactDisplay" class="text-subtle">Authorized Portal</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="header-actions">
+            <!-- Supplier ID Selector / Verification (RBAC & Testing) -->
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <label for="supplierIdInput" style="font-size: 12px; color: var(--text-muted); font-weight: 500;">Supplier
+                ID:</label>
+              <input type="text" id="supplierIdInput" value="4"
+                style="padding: 6px 10px; font-size: 12px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); width: 90px; background: #fff;"
+                title="Active Supplier ID for authentication and data filtering">
+              <button id="applySupplierBtn" class="btn btn-outline" style="padding: 6px 12px; font-size: 12px;"
+                title="Switch authenticated supplier context">Switch</button>
+            </div>
+
+            <div id="dbStatusBadge" class="connection-badge" title="Live Supabase Database Connection">
+              <span id="dbStatusDot" class="connection-dot"></span>
+              <span id="dbStatusText">Checking DB...</span>
+            </div>
+
+            <button id="refreshDashboardBtn" class="btn btn-primary" title="Refresh all dashboard data">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+              Refresh
+            </button>
+          </div>
+        </header>
+
+        <!-- Supabase Status Banner -->
+        <div id="dbNoticeBanner" class="status-banner info" style="display: none;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <span id="dbNoticeMessage">Connected to live Supabase PostgreSQL database.</span>
+          </div>
+          <a href="#" onclick="DashboardApp.loadDashboard(); return false;"
+            style="font-size: 12px; font-weight: 600; color: inherit; text-decoration: underline;">Refresh Status</a>
+        </div>
+
+        <!-- 6 Dashboard Summary Cards Section -->
+        <section class="summary-cards-section" aria-label="Procurement Summary">
+          <div class="cards-grid">
+            <!-- 1. Pending Stock Requests -->
+            <div class="summary-card" id="cardPendingRequests">
+              <div class="summary-card-header">
+                <span class="card-title">Pending Requests</span>
+                <div class="card-icon-box pending-req">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="12" y1="18" x2="12" y2="12"></line>
+                    <line x1="9" y1="15" x2="15" y2="15"></line>
+                  </svg>
+                </div>
+              </div>
+              <div class="card-count" id="countPendingRequests">0</div>
+              <div class="card-desc">Awaiting review or quotation</div>
+            </div>
+
+            <!-- 2. Pending Quotations -->
+            <div class="summary-card" id="cardPendingQuotes">
+              <div class="summary-card-header">
+                <span class="card-title">Pending Quotes</span>
+                <div class="card-icon-box pending-quote">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                  </svg>
+                </div>
+              </div>
+              <div class="card-count" id="countPendingQuotes">0</div>
+              <div class="card-desc">Submitted & under evaluation</div>
+            </div>
+
+            <!-- 3. Pending Purchase Orders -->
+            <div class="summary-card" id="cardPendingPOs">
+              <div class="summary-card-header">
+                <span class="card-title">Pending POs</span>
+                <div class="card-icon-box pending-po">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <path d="M16 10a4 4 0 0 1-8 0"></path>
+                  </svg>
+                </div>
+              </div>
+              <div class="card-count" id="countPendingPOs">0</div>
+              <div class="card-desc">Awaiting confirmation/processing</div>
+            </div>
+
+            <!-- 4. Orders to Ship -->
+            <div class="summary-card" id="cardOrdersToShip">
+              <div class="summary-card-header">
+                <span class="card-title">Orders to Ship</span>
+                <div class="card-icon-box orders-to-ship">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="1" y="3" width="15" height="13"></rect>
+                    <polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon>
+                    <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                    <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                  </svg>
+                </div>
+              </div>
+              <div class="card-count" id="countOrdersToShip">0</div>
+              <div class="card-desc">Ready for fulfillment/dispatch</div>
+            </div>
+
+            <!-- 5. Shipped Orders -->
+            <div class="summary-card" id="cardShippedOrders">
+              <div class="summary-card-header">
+                <span class="card-title">Shipped Orders</span>
+                <div class="card-icon-box shipped">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M5 12h14M12 5l7 7-7 7"></path>
+                  </svg>
+                </div>
+              </div>
+              <div class="card-count" id="countShippedOrders">0</div>
+              <div class="card-desc">In-transit shipments</div>
+            </div>
+
+            <!-- 6. Delivered Orders -->
+            <div class="summary-card" id="cardDeliveredOrders">
+              <div class="summary-card-header">
+                <span class="card-title">Delivered Orders</span>
+                <div class="card-icon-box delivered">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                  </svg>
+                </div>
+              </div>
+              <div class="card-count" id="countDeliveredOrders">0</div>
+              <div class="card-desc">Successfully completed</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Main Dashboard Grid Layout -->
+        <div class="dashboard-grid">
+          <!-- Main Left Column -->
+          <div class="main-column">
+            <!-- Section: Recent Stock Requests -->
+            <section class="content-card" aria-labelledby="headingStockRequests">
+              <div class="card-header-bar">
+                <h2 id="headingStockRequests">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                  </svg>
+                  Recent Stock Requests
+                </h2>
+                <span class="badge-counter" id="badgeStockRequests">0 records</span>
+              </div>
+
+              <!-- Table Container -->
+              <div class="table-responsive">
+                <table class="data-table" id="tableStockRequests">
+                  <thead>
+                    <tr>
+                      <th>Request ID</th>
+                      <th>Date</th>
+                      <th>Product / Items</th>
+                      <th>Quantity</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbodyStockRequests">
+                    <!-- Dynamically populated via JS -->
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Section States -->
+              <div id="stateLoadingRequests" class="state-container" style="display: none;">
+                <div class="spinner"></div>
+                <div class="state-title">Loading stock requests...</div>
+              </div>
+
+              <div id="stateEmptyRequests" class="state-container" style="display: none;">
+                <div class="state-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="8" y1="12" x2="16" y2="12"></line>
+                  </svg>
+                </div>
+                <div class="state-title">No pending stock requests.</div>
+                <div class="state-desc">When inventory requests are routed to your organization, they will appear here.
+                </div>
+              </div>
+
+              <div id="stateErrorRequests" class="state-container error-container" style="display: none;">
+                <div class="state-title" style="color: var(--danger);">Unable to load stock requests.</div>
+                <div class="state-desc" id="errorMsgRequests">Please check connection and try again.</div>
+                <button class="btn btn-outline btn-retry" onclick="DashboardApp.loadStockRequests()">Retry</button>
+              </div>
+            </section>
+
+            <!-- Section: Recent Purchase Orders -->
+            <section class="content-card" aria-labelledby="headingPurchaseOrders">
+              <div class="card-header-bar">
+                <h2 id="headingPurchaseOrders">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                    <line x1="8" y1="21" x2="16" y2="21"></line>
+                    <line x1="12" y1="17" x2="12" y2="21"></line>
+                  </svg>
+                  Recent Purchase Orders
+                </h2>
+                <span class="badge-counter" id="badgePurchaseOrders">0 records</span>
+              </div>
+
+              <div class="table-responsive">
+                <table class="data-table" id="tablePurchaseOrders">
+                  <thead>
+                    <tr>
+                      <th>PO ID</th>
+                      <th>PO Date</th>
+                      <th>Total Amount</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbodyPurchaseOrders">
+                    <!-- Dynamically populated via JS -->
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Section States -->
+              <div id="stateLoadingPOs" class="state-container" style="display: none;">
+                <div class="spinner"></div>
+                <div class="state-title">Loading purchase orders...</div>
+              </div>
+
+              <div id="stateEmptyPOs" class="state-container" style="display: none;">
+                <div class="state-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                  </svg>
+                </div>
+                <div class="state-title">No recent purchase orders.</div>
+                <div class="state-desc">Confirmed purchase orders from the inventory system will be listed here.</div>
+              </div>
+
+              <div id="stateErrorPOs" class="state-container error-container" style="display: none;">
+                <div class="state-title" style="color: var(--danger);">Unable to load purchase orders.</div>
+                <div class="state-desc" id="errorMsgPOs">Please check connection and try again.</div>
+                <button class="btn btn-outline btn-retry" onclick="DashboardApp.loadPurchaseOrders()">Retry</button>
+              </div>
+            </section>
+          </div>
+
+          <!-- Right Side Column -->
+          <div class="side-column">
+            <!-- Section: Pending Shipments / Orders to Ship -->
+            <section class="content-card" aria-labelledby="headingShipments">
+              <div class="card-header-bar">
+                <h2 id="headingShipments">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="1" y="3" width="15" height="13"></rect>
+                    <polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon>
+                    <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                    <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                  </svg>
+                  Pending Shipments
+                </h2>
+                <span class="badge-counter" id="badgeShipments">0</span>
+              </div>
+
+              <div class="table-responsive">
+                <table class="data-table" id="tableShipments">
+                  <thead>
+                    <tr>
+                      <th>PO / Shipment</th>
+                      <th>Status</th>
+                      <th>Expected Delivery</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbodyShipments">
+                    <!-- Dynamically populated via JS -->
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Section States -->
+              <div id="stateLoadingShipments" class="state-container" style="display: none;">
+                <div class="spinner"></div>
+                <div class="state-title">Loading shipments...</div>
+              </div>
+
+              <div id="stateEmptyShipments" class="state-container" style="display: none;">
+                <div class="state-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="1" y="3" width="15" height="13"></rect>
+                    <polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon>
+                  </svg>
+                </div>
+                <div class="state-title">No pending shipments.</div>
+                <div class="state-desc">All current orders have been dispatched or fulfilled.</div>
+              </div>
+
+              <div id="stateErrorShipments" class="state-container error-container" style="display: none;">
+                <div class="state-title" style="color: var(--danger);">Unable to load shipments.</div>
+                <div class="state-desc" id="errorMsgShipments">Please check connection and try again.</div>
+                <button class="btn btn-outline btn-retry" onclick="DashboardApp.loadShipments()">Retry</button>
+              </div>
+            </section>
+
+            <!-- Section: Recent Notifications -->
+            <section class="content-card" aria-labelledby="headingNotifications">
+              <div class="card-header-bar">
+                <h2 id="headingNotifications">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                  </svg>
+                  Recent Notifications
+                </h2>
+                <span class="badge-counter" id="badgeNotifications">0</span>
+              </div>
+
+              <div class="notifications-list" id="notificationsList">
+                <!-- Dynamically populated via JS -->
+              </div>
+
+              <!-- Section States -->
+              <div id="stateLoadingNotifications" class="state-container" style="display: none;">
+                <div class="spinner"></div>
+                <div class="state-title">Loading notifications...</div>
+              </div>
+
+              <div id="stateEmptyNotifications" class="state-container" style="display: none;">
+                <div class="state-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                  </svg>
+                </div>
+                <div class="state-title">No new notifications.</div>
+                <div class="state-desc">You are completely up to date with procurement alerts.</div>
+              </div>
+
+              <div id="stateErrorNotifications" class="state-container error-container" style="display: none;">
+                <div class="state-title" style="color: var(--danger);">Unable to load notifications.</div>
+                <div class="state-desc" id="errorMsgNotifications">Please check connection and try again.</div>
+                <button class="btn btn-outline btn-retry" onclick="DashboardApp.loadNotifications()">Retry</button>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="dashboard-footer">
+          <p>Smart Inventory Management System &bull; (Supplier Management & Procurement)</p>
+        </footer>
+      </div>
+    </main>
+  </div>
+
+  <!-- Toast Notice for Modules -->
+  <div id="moduleToast" class="toast-notice">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
+      <circle cx="12" cy="12" r="10"></circle>
+      <line x1="12" y1="16" x2="12" y2="12"></line>
+      <line x1="12" y1="8" x2="12.01" y2="8"></line>
+    </svg>
+    <span id="moduleToastText">Notification message</span>
+  </div>
+
+  <!-- Vanilla JavaScript -->
+  <script src="js/supplier_dashboard.js"></script>
+</body>
+
+</html>
