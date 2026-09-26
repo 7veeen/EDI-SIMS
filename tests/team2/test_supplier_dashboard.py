@@ -151,3 +151,11 @@ def test_frontend_serving(client):
     response_team2 = client.get("/team2")
     assert response_team2.status_code == 200
     assert b"Supplier Dashboard" in response_team2.data
+
+    response_index = client.get("/index.html")
+    assert response_index.status_code == 200
+    assert b"Supplier Dashboard" in response_index.data
+
+    response_po_relative = client.get("/purchase-orders/index.html")
+    assert response_po_relative.status_code == 200
+    assert b"Supplier Dashboard" in response_po_relative.data

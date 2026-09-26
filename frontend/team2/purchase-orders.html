@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Smart Inventory Management System - Team 2 Supplier Purchase Orders">
+  <title>Purchase Orders - Supplier Portal</title>
+  <link rel="stylesheet" href="css/purchase-orders.css">
+</head>
+
+<body>
+  <div class="app-layout">
+    <!-- ================================================================
+         SIDEBAR: Module Navigation
+         ================================================================ -->
+    <aside class="app-sidebar" id="appSidebar">
+      <div class="sidebar-header">
+        <a href="/" class="sidebar-brand"
+          style="text-decoration:none; color:inherit; display:flex; align-items:center; gap:12px;">
+          <div class="brand-logo" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path
+                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
+              </path>
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+              <line x1="12" y1="22.08" x2="12" y2="12"></line>
+            </svg>
+          </div>
+          <div class="brand-text">
+            <span class="brand-title">SIMS Portal</span>
+            <span class="brand-subtitle">Supplier Management</span>
+          </div>
+        </a>
+      </div>
+
+      <!-- Navigation Menu -->
+      <nav class="sidebar-nav" aria-label="Module Navigation">
+        <div class="nav-group-title">PROCUREMENT MODULES</div>
+
+        <!-- 1. Dashboard -->
+        <a href="/" class="nav-item" id="navDashboard" title="Supplier Dashboard Overview">
+          <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+          </svg>
+          <span class="nav-label">Dashboard</span>
+        </a>
+
+        <!-- 2. Stock Requests -->
+        <a href="#" class="nav-item" data-module="Stock Requests" id="navStockRequests" title="Stock Requests Module">
+          <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+          <span class="nav-label">Stock Requests</span>
+        </a>
+
+        <!-- 3. Quotations -->
+        <a href="#" class="nav-item" data-module="Quotations" id="navQuotations" title="Quotations Module">
+          <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          <span class="nav-label">Quotations</span>
+        </a>
+
+        <!-- 4. Purchase Orders (ACTIVE) -->
+        <a href="purchase-orders.html" class="nav-item active" id="navPurchaseOrders" title="Purchase Orders">
+          <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2">
+            <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <path d="M16 10a4 4 0 0 1-8 0"></path>
+          </svg>
+          <span class="nav-label">Purchase Orders</span>
+          <span class="nav-badge live">Active</span>
+        </a>
+
+        <!-- 5. Shipments -->
+        <a href="#" class="nav-item" data-module="Shipments" id="navShipments" title="Shipments Module">
+          <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2">
+            <rect x="1" y="3" width="15" height="13"></rect>
+            <polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon>
+            <circle cx="5.5" cy="18.5" r="2.5"></circle>
+            <circle cx="18.5" cy="18.5" r="2.5"></circle>
+          </svg>
+          <span class="nav-label">Shipments</span>
+        </a>
+
+        <!-- 6. Order History -->
+        <a href="#" class="nav-item" data-module="Order History" id="navOrderHistory" title="Order History Module">
+          <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 14 14"></polyline>
+            <path d="M3.05 11a9 9 0 1 1 .5 4"></path>
+            <polyline points="3 16 3 11 8 11"></polyline>
+          </svg>
+          <span class="nav-label">Order History</span>
+        </a>
+
+        <div class="nav-group-title" style="margin-top: 14px;">ALERTS & PROFILE</div>
+
+        <!-- 7. Notifications -->
+        <a href="/#headingNotifications" class="nav-item" id="navNotifications" title="Notifications">
+          <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+          </svg>
+          <span class="nav-label">Notifications</span>
+        </a>
+
+        <!-- 8. Profile -->
+        <a href="#" class="nav-item" data-module="Supplier Profile" id="navProfile" title="Supplier Profile">
+          <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+          <span class="nav-label">Supplier Profile</span>
+        </a>
+      </nav>
+
+      <!-- Sidebar User Card -->
+      <div class="sidebar-user-card">
+        <div class="user-avatar" id="sidebarAvatar">S1</div>
+        <div class="user-details">
+          <div class="user-name" id="sidebarUserName">Supplier 1 Company</div>
+          <div class="user-role" id="sidebarUserRole">Supplier One &bull; Active</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ================================================================
+         MAIN CONTENT AREA
+         ================================================================ -->
+    <main class="app-main">
+      <div class="po-wrapper">
+        <!-- Header -->
+        <header class="po-header">
+          <div class="header-brand-wrap">
+            <button id="sidebarToggleBtn" class="sidebar-toggle-btn" aria-label="Toggle Sidebar Navigation">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+              </svg>
+            </button>
+
+            <div class="header-icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <path d="M16 10a4 4 0 0 1-8 0"></path>
+              </svg>
+            </div>
+            <div class="header-title-wrap">
+              <h1>Purchase Orders</h1>
+              <div class="header-subtitle">
+                <span>Welcome, <span id="supplierNameDisplay" class="font-medium">Loading...</span></span>
+                <span>&bull;</span>
+                <span id="supplierContactDisplay" class="text-subtle">Authorized Supplier Portal</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="header-actions">
+            <!-- Active Logged-in Supplier Indicator & Account Switcher -->
+            <div class="supplier-selector-box" style="display: flex; align-items: center; gap: 8px; background: #f8fafc; padding: 4px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+              <label for="supplierSelect" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 600;">Supplier:</label>
+              <select id="supplierSelect" class="supplier-select-dropdown" style="padding: 5px 8px; font-size: 12px; font-weight: 600; border: 1px solid var(--border-color); border-radius: 4px; background: #fff; cursor: pointer; color: var(--primary);" title="Logged-in Supplier Account">
+                <option value="4" selected>Supplier 1 Company (ID: 4)</option>
+                <option value="5">Demo Supplier Company (ID: 5)</option>
+              </select>
+            </div>
+
+            <div id="dbStatusBadge" class="connection-badge" title="Live Supabase Database Connection">
+              <span class="connection-dot"></span>
+              <span>Supabase Live</span>
+            </div>
+
+            <button id="refreshPOBtn" class="btn btn-primary" title="Refresh Purchase Orders">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+              Refresh
+            </button>
+          </div>
+        </header>
+
+        <!-- Search and Filter Toolbar -->
+        <section class="toolbar-card" aria-label="Search and Filter Controls">
+          <div class="filter-group">
+            <div class="search-box">
+              <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input type="text" id="searchInput" class="search-input" placeholder="Search by PO ID or Product...">
+            </div>
+
+            <!-- Status Filter -->
+            <select id="statusFilter" class="select-filter" aria-label="Filter by Status">
+              <option value="all">All Statuses</option>
+              <option value="Pending">Pending Response</option>
+              <option value="Accepted">Accepted</option>
+              <option value="Rejected">Rejected</option>
+            </select>
+          </div>
+
+          <button id="clearFiltersBtn" class="btn btn-outline" style="font-size: 12px;">Clear Filters</button>
+        </section>
+
+        <!-- Purchase Orders Table Card -->
+        <section class="content-card" aria-labelledby="headingPOTable">
+          <div class="card-header-bar">
+            <h2 id="headingPOTable">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+              </svg>
+              Assigned Purchase Orders
+            </h2>
+            <span class="badge-counter" id="badgePOCount">0 records</span>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table" id="poTable">
+              <thead>
+                <tr>
+                  <th>PO ID</th>
+                  <th>Order Date</th>
+                  <th>Category</th>
+                  <th>Items</th>
+                  <th>Original PO Total</th>
+                  <th>PO Status</th>
+                  <th>Supplier Response</th>
+                  <th style="text-align: right;">Action</th>
+                </tr>
+              </thead>
+              <tbody id="poTableBody">
+                <!-- Dynamically populated via JS -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Loading State -->
+          <div id="poLoadingState" class="state-container" style="display: none;">
+            <div class="spinner"></div>
+            <div class="state-title">Loading purchase orders...</div>
+          </div>
+
+          <!-- Empty State -->
+          <div id="poEmptyState" class="state-container" style="display: none;">
+            <div class="state-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+              </svg>
+            </div>
+            <div class="state-title">No purchase orders found.</div>
+            <div class="state-desc">When inventory managers issue purchase orders to your organization, they will appear
+              here.</div>
+          </div>
+
+          <!-- Error State -->
+          <div id="poErrorState" class="state-container error-container" style="display: none;">
+            <div class="state-title" style="color: var(--danger);">Unable to load purchase orders.</div>
+            <div class="state-desc" id="poErrorMsg">Please check your connection and try again.</div>
+            <button class="btn btn-outline" style="margin-top: 12px; font-size: 12px;"
+              onclick="POApp.loadOrders()">Retry</button>
+          </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="dashboard-footer"
+          style="margin-top: 36px; padding-top: 18px; border-top: 1px solid var(--border-color); text-align: center; font-size: 12px; color: var(--text-dim);">
+          <p>Smart Inventory Management System &bull; Supplier Management & Procurement</p>
+        </footer>
+      </div>
+    </main>
+  </div>
+
+  <!-- ================================================================
+       VIEW PO DETAILS MODAL / DRAWER
+       ================================================================ -->
+  <div id="poDetailsModal" class="modal-backdrop" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>
+          <span id="modalPoNumber">PO-0000</span>
+          <span id="modalPoStatusBadge"></span>
+        </h3>
+        <button id="closeModalBtn" class="modal-close-btn" aria-label="Close dialog">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Metadata Grid -->
+        <div class="po-details-grid">
+          <div class="po-meta-item">
+            <span class="po-meta-label">Order Date</span>
+            <span class="po-meta-val" id="modalOrderDate">-</span>
+          </div>
+          <div class="po-meta-item">
+            <span class="po-meta-label">Expected Delivery</span>
+            <span class="po-meta-val" id="modalExpectedDelivery">-</span>
+          </div>
+          <div class="po-meta-item">
+            <span class="po-meta-label">Created By (Manager)</span>
+            <span class="po-meta-val" id="modalManagerName">-</span>
+          </div>
+          <div class="po-meta-item">
+            <span class="po-meta-label">Supplier Org</span>
+            <span class="po-meta-val" id="modalSupplierName">-</span>
+          </div>
+          <div class="po-meta-item">
+            <span class="po-meta-label">Current Status</span>
+            <span class="po-meta-val" id="modalStatusText">-</span>
+          </div>
+          <div class="po-meta-item">
+            <span class="po-meta-label">Supplier Response</span>
+            <span class="po-meta-val" id="modalResponseText">-</span>
+          </div>
+        </div>
+
+        <!-- Original PO Total Banner (Read-only) -->
+        <div class="po-total-banner">
+          <div class="po-total-label">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="1" x2="12" y2="23"></line>
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+            </svg>
+            Original PO Total (Fixed by Manager)
+          </div>
+          <div class="po-total-amount" id="modalTotalAmount">₹0.00</div>
+        </div>
+
+        <!-- Rejection Reason Alert (Visible if Rejected) -->
+        <div id="modalRejectionAlert" class="rejection-alert-box" style="display: none;">
+          <strong>Rejection Reason:</strong> <span id="modalRejectionReasonText">None</span>
+        </div>
+
+        <!-- Readonly Notice -->
+        <div class="readonly-notice">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
+          Note: Line item quantities and prices are set by the Manager and are strictly read-only.
+        </div>
+
+        <!-- Line Items Table -->
+        <div>
+          <h4 style="font-size: 14px; font-weight: 600; margin-bottom: 10px; color: var(--text-main);">
+            Purchase Order Items (<span id="modalItemCount">0</span>)
+          </h4>
+          <div class="table-responsive" style="border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>SKU</th>
+                  <th>Category</th>
+                  <th>Required Qty</th>
+                  <th>Unit Price</th>
+                  <th>Subtotal</th>
+                </tr>
+              </thead>
+              <tbody id="modalItemsTableBody">
+                <!-- Dynamically populated via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer with Accept/Reject Actions -->
+      <div class="modal-footer">
+        <div id="modalResponseStatusNote" style="font-size: 13px; font-weight: 500; color: var(--text-muted);">
+          <!-- Dynamic response notice -->
+        </div>
+
+        <div class="modal-footer-actions">
+          <button id="modalCloseActionBtn" class="btn btn-outline">Close</button>
+          <button id="modalRejectBtn" class="btn btn-outline-danger">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+            Reject PO
+          </button>
+          <button id="modalAcceptBtn" class="btn btn-success">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Accept PO
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================
+       ACCEPT CONFIRMATION SUB-MODAL
+       ================================================================ -->
+  <div id="acceptConfirmModal" class="modal-backdrop" aria-hidden="true" role="dialog">
+    <div class="modal-dialog submodal-dialog">
+      <div class="modal-header">
+        <h3>Confirm PO Acceptance</h3>
+        <button id="closeAcceptConfirmBtn" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 14px; color: var(--text-main); line-height: 1.5;">
+          Are you sure you want to accept <strong id="acceptPoNumberDisplay">PO</strong> for a total value of <strong
+            id="acceptPoAmountDisplay">₹0.00</strong>?
+        </p>
+        <p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
+          By accepting, you confirm that your organization can fulfill all requested quantities within the specified
+          delivery timeframe.
+        </p>
+      </div>
+      <div class="modal-footer" style="justify-content: flex-end; gap: 10px;">
+        <button id="cancelAcceptBtn" class="btn btn-outline">Cancel</button>
+        <button id="confirmAcceptBtn" class="btn btn-success">Confirm Acceptance</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================
+       REJECT CONFIRMATION SUB-MODAL
+       ================================================================ -->
+  <div id="rejectConfirmModal" class="modal-backdrop" aria-hidden="true" role="dialog">
+    <div class="modal-dialog submodal-dialog">
+      <div class="modal-header">
+        <h3 style="color: var(--danger);">Decline Purchase Order</h3>
+        <button id="closeRejectConfirmBtn" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 14px; color: var(--text-main);">
+          Are you sure you want to reject <strong id="rejectPoNumberDisplay">PO</strong>?
+        </p>
+        <div class="form-group">
+          <label for="rejectionReasonInput">Reason for Rejection (Optional):</label>
+          <textarea id="rejectionReasonInput" class="form-textarea"
+            placeholder="e.g., Insufficient stock, delivery timeline conflict, or pricing discrepancy..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content: flex-end; gap: 10px;">
+        <button id="cancelRejectBtn" class="btn btn-outline">Cancel</button>
+        <button id="confirmRejectBtn" class="btn btn-danger">Confirm Rejection</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="poToast" class="toast-notice">
+    <span id="poToastText">Success notification</span>
+  </div>
+
+  <!-- Separate Vanilla JavaScript Controller -->
+  <script src="js/purchase-orders.js"></script>
+</body>
+
+</html>

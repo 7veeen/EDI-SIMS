@@ -15,9 +15,40 @@
     ? "http://localhost:5000/api/team2/supplier"
     : "/api/team2/supplier";
 
-  // Global State (Defaulting to live DB Supplier 4: 'Supplier 1 Company')
+  // Helper: Retrieve authenticated/logged-in supplier ID dynamically
+  function getLoggedInSupplierId() {
+    // Priority 1: URL query param (?supplier_id=5)
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlId = urlParams.get("supplier_id");
+    if (urlId && urlId.trim()) {
+      localStorage.setItem("sims_active_supplier_id", urlId.trim());
+      localStorage.setItem("supplier_id", urlId.trim());
+      return urlId.trim();
+    }
+
+    // Priority 2: Stored active supplier in localStorage
+    const storedId = localStorage.getItem("sims_active_supplier_id") || localStorage.getItem("supplier_id");
+    if (storedId && storedId.trim()) {
+      return storedId.trim();
+    }
+
+    // Priority 3: User object in storage (if set by authentication module)
+    try {
+      const userStr = localStorage.getItem("user") || sessionStorage.getItem("user") || localStorage.getItem("current_user");
+      if (userStr) {
+        const u = JSON.parse(userStr);
+        if (u.supplier_id) return String(u.supplier_id);
+        if (u.user_id) return String(u.user_id);
+      }
+    } catch (_) {}
+
+    // Priority 4: Default fallback
+    return "4";
+  }
+
+  // Global State
   const state = {
-    activeSupplierId: "4",
+    activeSupplierId: getLoggedInSupplierId(),
     isLoading: false,
     summaryCounts: {
       pending_requests: 0,
@@ -292,6 +323,24 @@
     try {
       const data = await apiFetch("/dashboard");
 
+      // Populate available suppliers dropdown
+      try {
+        const supList = await apiFetch("/suppliers");
+        const select = document.getElementById("supplierSelect");
+        if (select && Array.isArray(supList) && supList.length > 0) {
+          select.innerHTML = "";
+          supList.forEach((s) => {
+            const opt = document.createElement("option");
+            opt.value = String(s.supplier_id);
+            opt.textContent = `${s.company_name} (ID: ${s.supplier_id})`;
+            if (String(s.supplier_id) === String(state.activeSupplierId)) {
+              opt.selected = true;
+            }
+            select.appendChild(opt);
+          });
+        }
+      } catch (_) {}
+
       // Update Supplier Profile in Header and Sidebar
       if (data.supplier) {
         state.supplierInfo = data.supplier;
@@ -442,6 +491,12 @@
     const navItems = document.querySelectorAll(".sidebar-nav .nav-item");
     navItems.forEach((item) => {
       item.addEventListener("click", (e) => {
+        const href = item.getAttribute("href");
+        if (href && href !== "#" && !href.startsWith("#")) {
+          // Allow normal navigation for real page links (e.g. purchase-orders.html)
+          return;
+        }
+
         const moduleName = item.getAttribute("data-module");
         if (moduleName === "dashboard") {
           e.preventDefault();
@@ -454,7 +509,7 @@
           if (notifCard) {
             notifCard.scrollIntoView({ behavior: "smooth" });
           }
-        } else {
+        } else if (moduleName) {
           e.preventDefault();
           showToast(`The ${moduleName} module will be implemented separately as per project scope.`);
         }
@@ -494,7 +549,27 @@
       });
     }
 
-    // Apply Supplier Switcher
+    // Supplier Selector Dropdown
+    const supplierSelect = document.getElementById("supplierSelect");
+    if (supplierSelect) {
+      supplierSelect.addEventListener("change", (e) => {
+        const newId = e.target.value;
+        if (newId) {
+          state.activeSupplierId = String(newId);
+          localStorage.setItem("sims_active_supplier_id", String(newId));
+          localStorage.setItem("supplier_id", String(newId));
+
+          const url = new URL(window.location);
+          url.searchParams.set("supplier_id", newId);
+          window.history.replaceState({}, "", url);
+
+          showToast(`Switched active supplier account to ID ${newId}`);
+          loadDashboard();
+        }
+      });
+    }
+
+    // Apply Supplier Switcher (backward compatibility)
     const applyBtn = document.getElementById("applySupplierBtn");
     const supplierInput = document.getElementById("supplierIdInput");
     if (applyBtn && supplierInput) {
@@ -502,6 +577,8 @@
         const newId = supplierInput.value.trim();
         if (newId) {
           state.activeSupplierId = newId;
+          localStorage.setItem("sims_active_supplier_id", String(newId));
+          localStorage.setItem("supplier_id", String(newId));
           loadDashboard();
         }
       });

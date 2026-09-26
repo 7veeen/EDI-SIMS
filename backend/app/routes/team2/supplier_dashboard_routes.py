@@ -166,6 +166,27 @@ def get_supplier_profile(auth_data):
             status_code=500
         )
 
+@supplier_dashboard_bp.route("/suppliers", methods=["GET"])
+def get_dashboard_suppliers():
+    """
+    GET /api/team2/supplier/suppliers
+    Returns all registered active suppliers for user selection.
+    """
+    try:
+        from ...services.team2.supplier_po_service import SupplierPurchaseOrderService
+        suppliers = SupplierPurchaseOrderService.get_all_suppliers()
+        return success_response(
+            data=suppliers,
+            message="Suppliers retrieved successfully"
+        )
+    except Exception as e:
+        logger.error(f"Error in get_dashboard_suppliers: {e}")
+        return error_response(
+            message="Failed to retrieve suppliers",
+            error=str(e),
+            status_code=500
+        )
+
 @supplier_dashboard_bp.route("/health", methods=["GET"])
 def health_check():
     """
