@@ -54,3 +54,49 @@ class DashboardSummaryCounts:
     orders_to_ship: int = 0
     shipped_orders: int = 0
     delivered_orders: int = 0
+
+@dataclass
+class Shipment:
+    id: str
+    shipment_number: str
+    purchase_order_id: int
+    supplier_id: int
+    carrier: str
+    tracking_number: Optional[str] = None
+    shipping_method: str = "Standard Ground"
+    status: str = "Ready for Shipment"
+    package_count: int = 1
+    total_weight: Optional[float] = None
+    shipping_notes: Optional[str] = None
+    expected_delivery: Optional[str] = None
+    shipped_at: Optional[str] = None
+    delivered_at: Optional[str] = None
+    created_at: Optional[str] = None
+
+@dataclass
+class OrderStatusHistoryEntry:
+    history_id: int
+    purchase_order_id: int
+    shipment_id: Optional[int]
+    status: str
+    action: str
+    changed_by: str
+    created_at: str
+    previous_status: Optional[str] = None
+    location: Optional[str] = None
+    notes: Optional[str] = None
+
+@dataclass
+class QuotationHistoryItem:
+    quotation_id: int
+    supplier_id: int
+    product_id: int
+    product_name: str
+    sku: Optional[str]
+    quoted_price: float
+    quantity: int
+    total_amount: float
+    quotation_date: str
+    valid_until: Optional[str]
+    status: str
+

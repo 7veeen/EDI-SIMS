@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SIMS - Order & Status History, Previous Purchase Orders, Previous Quotations">
+  <title>Order History - Supplier Portal | SIMS Team 2</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/shipments.css">
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- SIDEBAR -->
+  <aside class="app-sidebar" id="appSidebar">
+    <div class="sidebar-header">
+      <a href="/" class="sidebar-brand" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:12px;">
+        <div class="brand-logo">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-title">SIMS Portal</span>
+          <span class="brand-subtitle">Supplier Management</span>
+        </div>
+      </a>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-group-title">PROCUREMENT MODULES</div>
+      <a href="/" class="nav-item" title="Dashboard">
+        <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span class="nav-label">Dashboard</span>
+      </a>
+      <a href="#" class="nav-item" title="Stock Requests">
+        <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span class="nav-label">Stock Requests</span>
+      </a>
+      <a href="#" class="nav-item" title="Quotations">
+        <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span class="nav-label">Quotations</span>
+      </a>
+      <a href="purchase-orders.html" class="nav-item" title="Purchase Orders">
+        <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/></svg>
+        <span class="nav-label">Purchase Orders</span>
+      </a>
+      <a href="shipments.html" class="nav-item" title="Shipments">
+        <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+        <span class="nav-label">Shipments</span>
+      </a>
+      <a href="order-history.html" class="nav-item active" title="Order History">
+        <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/><path d="M3.05 11a9 9 0 1 1 .5 4"/><polyline points="3 16 3 11 8 11"/></svg>
+        <span class="nav-label">Order History</span>
+        <span class="nav-badge live">Active</span>
+      </a>
+      <div class="nav-group-title" style="margin-top:14px;">ALERTS &amp; PROFILE</div>
+      <a href="/#headingNotifications" class="nav-item" title="Notifications">
+        <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="nav-label">Notifications</span>
+      </a>
+      <a href="#" class="nav-item" title="Supplier Profile">
+        <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span class="nav-label">Supplier Profile</span>
+      </a>
+    </nav>
+    <div class="sidebar-user-card">
+      <div class="user-avatar" id="sidebarAvatar">S1</div>
+      <div class="user-details">
+        <div class="user-name" id="sidebarUserName">Supplier Company</div>
+        <div class="user-role" id="sidebarUserRole">Supplier &bull; Active</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="app-main">
+    <div class="page-wrapper">
+
+      <!-- TOPBAR -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button class="sidebar-toggle-btn" id="sidebarToggleBtn" aria-label="Toggle Sidebar">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+          <div class="page-title-block">
+            <h1>Order &amp; Status History</h1>
+            <p>Previous purchase orders, quotations, and complete order lifecycle audit trail</p>
+          </div>
+        </div>
+        <div class="topbar-right">
+          <button class="btn btn-outline btn-sm" id="btnRefresh">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            Refresh
+          </button>
+        </div>
+      </header>
+
+      <!-- TABS -->
+      <div class="module-tabs">
+        <button class="tab-btn active" data-tab="pos">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/></svg>
+          Previous Purchase Orders <span class="tab-count" id="cntPOs">0</span>
+        </button>
+        <button class="tab-btn" data-tab="quotations">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Previous Quotations <span class="tab-count" id="cntQuotations">0</span>
+        </button>
+        <button class="tab-btn" data-tab="timeline">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+          Order/Status History <span class="tab-count" id="cntTimeline">0</span>
+        </button>
+      </div>
+
+      <!-- TOOLBAR -->
+      <div class="toolbar">
+        <div class="search-box">
+          <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="searchInput" placeholder="Search orders, products, quotations..." autocomplete="off">
+        </div>
+        <div class="filter-group">
+          <select class="filter-select" id="statusFilter">
+            <option value="all">All Statuses</option>
+            <option value="Accepted">Accepted</option>
+            <option value="Delivered">Delivered</option>
+            <option value="Rejected">Rejected</option>
+            <option value="Pending">Pending</option>
+            <option value="Expired">Expired</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- CONTENT -->
+      <div class="content-area">
+
+        <!-- PREVIOUS POs TAB -->
+        <div id="panelPOs" class="tab-panel">
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/></svg>
+                All Purchase Orders
+              </span>
+            </div>
+            <div id="posLoading" class="state-container"><div class="spinner"></div><div class="state-title">Loading purchase orders...</div></div>
+            <div id="posEmpty" class="state-container" style="display:none;">
+              <div class="state-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/></svg></div>
+              <div class="state-title">No purchase orders found</div>
+            </div>
+            <div class="table-responsive" id="posTableWrap" style="display:none;">
+              <table class="data-table">
+                <thead><tr><th>PO #</th><th>Order Date</th><th>Items</th><th>Amount</th><th>Expected Delivery</th><th>Status</th><th>Supplier Response</th><th>Shipment</th><th>Actions</th></tr></thead>
+                <tbody id="posTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- QUOTATIONS TAB -->
+        <div id="panelQuotations" class="tab-panel" style="display:none;">
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>
+                Previous Quotations
+              </span>
+            </div>
+            <div id="quotLoading" class="state-container"><div class="spinner"></div><div class="state-title">Loading quotations...</div></div>
+            <div id="quotEmpty" class="state-container" style="display:none;">
+              <div class="state-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg></div>
+              <div class="state-title">No quotations found</div>
+              <div class="state-desc">Previous quotations submitted by your organization will appear here.</div>
+            </div>
+            <div class="table-responsive" id="quotTableWrap" style="display:none;">
+              <table class="data-table">
+                <thead><tr><th>Quotation #</th><th>Product</th><th>SKU</th><th>Category</th><th>Unit Price</th><th>Quantity</th><th>Total</th><th>Date</th><th>Valid Until</th><th>Status</th></tr></thead>
+                <tbody id="quotTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- TIMELINE TAB -->
+        <div id="panelTimeline" class="tab-panel" style="display:none;">
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+                Order &amp; Status History Timeline
+              </span>
+              <div class="panel-actions">
+                <select class="filter-select" id="poFilter" style="font-size:12px;">
+                  <option value="">All Orders</option>
+                </select>
+              </div>
+            </div>
+            <div id="tlLoading" class="state-container"><div class="spinner"></div><div class="state-title">Loading history...</div></div>
+            <div id="tlEmpty" class="state-container" style="display:none;">
+              <div class="state-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/></svg></div>
+              <div class="state-title">No history events found</div>
+            </div>
+            <div id="tlContent" style="padding:20px 24px;display:none;">
+              <div class="timeline" id="timelineList"></div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /content-area -->
+    </div>
+  </main>
+</div>
+
+<!-- TOAST -->
+<div class="toast-notice" id="toast" role="alert"><span id="toastText"></span></div>
+
+<script src="js/order-history.js"></script>
+</body>
+</html>

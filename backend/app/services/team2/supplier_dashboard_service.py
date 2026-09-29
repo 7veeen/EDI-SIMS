@@ -334,12 +334,38 @@ class SupplierDashboardService:
         if conn:
             try:
                 cur = conn.cursor()
+                # Check Shipments table first
+                cur.execute(
+                    """
+                    SELECT s.shipment_id, s.purchase_order_id, s.status, s.expected_delivery, s.tracking_number, s.carrier
+                    FROM "Shipments" s
+                    WHERE (s.supplier_id = %s OR %s = -1)
+                      AND s.status NOT IN ('Delivered', 'Cancelled')
+                    ORDER BY s.expected_delivery ASC NULLS LAST
+                    LIMIT %s;
+                    """,
+                    (sid if isinstance(sid, int) else 4, sid if isinstance(sid, int) else 4, limit)
+                )
+                rows = cur.fetchall()
+                if rows:
+                    cur.close()
+                    conn.close()
+                    return [{
+                        "id": f"SHP-{r[0]:04d}" if isinstance(r[0], int) else str(r[0]),
+                        "po_number": f"PO-{r[1]:04d}" if isinstance(r[1], int) else str(r[1]),
+                        "status": r[2] or "Ready for Shipment",
+                        "expected_delivery": r[3].isoformat() if r[3] else "",
+                        "tracking_number": r[4] or "Pending",
+                        "carrier": r[5] or "Standard Courier"
+                    } for r in rows]
+
+                # Fallback to PurchaseOrders
                 cur.execute(
                     """
                     SELECT purchase_order_id, status, expected_delivery
                     FROM "PurchaseOrders"
                     WHERE (supplier_id = %s OR %s = -1)
-                      AND (status ILIKE '%%progress%%' OR status ILIKE '%%ship%%' OR status ILIKE '%%approved%%')
+                      AND (status ILIKE '%%progress%%' OR status ILIKE '%%ship%%' OR status ILIKE '%%approved%%' OR supplier_response = 'Accepted')
                     ORDER BY expected_delivery ASC NULLS LAST
                     LIMIT %s;
                     """,

@@ -5,6 +5,7 @@ from flask_cors import CORS
 from .config.config import Config
 from .routes.team2.supplier_dashboard_routes import supplier_dashboard_bp
 from .routes.team2.supplier_po_routes import supplier_po_bp
+from .routes.team2.supplier_shipment_routes import supplier_shipment_bp
 
 def create_app(config_class=Config) -> Flask:
     """Flask application factory."""
@@ -23,6 +24,7 @@ def create_app(config_class=Config) -> Flask:
     # Register Team 2 Blueprints
     app.register_blueprint(supplier_dashboard_bp)
     app.register_blueprint(supplier_po_bp)
+    app.register_blueprint(supplier_shipment_bp)
 
     # Serve Supplier Dashboard Frontend at root and /team2
     @app.route("/")
@@ -44,6 +46,26 @@ def create_app(config_class=Config) -> Flask:
     def serve_purchase_orders():
         return send_from_directory(str(frontend_dir), "purchase-orders.html")
 
+    # Serve Shipments Frontend
+    @app.route("/shipments")
+    @app.route("/shipments/")
+    @app.route("/team2/shipments")
+    @app.route("/shipments.html")
+    @app.route("/team2/shipments.html")
+    def serve_shipments():
+        return send_from_directory(str(frontend_dir), "shipments.html")
+
+    # Serve Order & Status History Frontend
+    @app.route("/order-history")
+    @app.route("/order-history/")
+    @app.route("/history")
+    @app.route("/history/")
+    @app.route("/team2/order-history")
+    @app.route("/order-history.html")
+    @app.route("/team2/order-history.html")
+    def serve_order_history():
+        return send_from_directory(str(frontend_dir), "order-history.html")
+
     # Serve static assets from frontend/team2
     @app.route("/purchase-orders.css")
     def serve_po_css_root():
@@ -52,6 +74,23 @@ def create_app(config_class=Config) -> Flask:
     @app.route("/purchase-orders.js")
     def serve_po_js_root():
         return send_from_directory(str(frontend_dir), "purchase-orders.js")
+
+    @app.route("/shipments.css")
+    def serve_shipments_css_root():
+        return send_from_directory(str(frontend_dir), "shipments.css")
+
+    @app.route("/shipments.js")
+    def serve_shipments_js_root():
+        return send_from_directory(str(frontend_dir), "shipments.js")
+
+    @app.route("/order-history.css")
+    def serve_order_history_css_root():
+        return send_from_directory(str(frontend_dir), "order-history.css")
+
+    @app.route("/order-history.js")
+    def serve_order_history_js_root():
+        return send_from_directory(str(frontend_dir), "order-history.js")
+
 
     # Serve static assets from frontend/team2
     @app.route("/css/<path:path>")
