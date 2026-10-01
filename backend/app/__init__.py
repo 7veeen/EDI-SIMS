@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, request, make_response
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 
@@ -11,6 +11,7 @@ from app.routes.team3.dashboard import dashboard_bp
 from app.routes.team3.notifications import notifications_bp
 from app.routes.team3.audit_logs import audit_logs_bp
 from app.routes.team3.backups import backups_bp
+from app.routes.team3.status import status_bp
 
 
 def create_app():
@@ -25,10 +26,20 @@ def create_app():
                 "origins": [
                     "http://localhost:8000",
                     "http://127.0.0.1:8000"
-                ]
+                ],
+                "allow_headers": ["Content-Type", "Authorization"],
+                "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+                "expose_headers": ["Content-Disposition"]
             }
         }
     )
+
+    @app.before_request
+    def handle_options_preflight():
+        if request.method == "OPTIONS":
+            response = make_response()
+            response.status_code = 200
+            return response
 
     JWTManager(app)
 
@@ -36,10 +47,17 @@ def create_app():
     app.register_blueprint(users_bp)
     app.register_blueprint(categories_bp)
 
+    try:
+        from app.routes.team1.products import products_bp
+        app.register_blueprint(products_bp)
+    except (ImportError, AttributeError):
+        pass
+
     app.register_blueprint(reports_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(notifications_bp)
     app.register_blueprint(audit_logs_bp)
     app.register_blueprint(backups_bp)
+    app.register_blueprint(status_bp)
 
     return app
