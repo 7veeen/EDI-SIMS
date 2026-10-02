@@ -1,10 +1,10 @@
 // api.js
 
-const API_BASE_URL = 'http://localhost:5000/api'; // Or 8000 depending on backend port, but usually Flask runs on 5000
+const API_BASE_URL = 'http://127.0.0.1:5000/api';
 
 const Api = {
     async request(endpoint, options = {}) {
-        const token = localStorage.getItem('sims_token');
+        const token = localStorage.getItem('sims_token') || localStorage.getItem('sims_access_token');
         
         const headers = {
             'Content-Type': 'application/json',

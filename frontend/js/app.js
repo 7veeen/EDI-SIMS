@@ -17,12 +17,22 @@ const App = {
         { path: 'stock-transactions', icon: 'bx-transfer', label: 'Stock Transactions', roles: ['Owner', 'Manager', 'Employee'] },
         { path: 'payments', icon: 'bx-money', label: 'Payments', roles: ['Supplier'] },
         { path: 'reports', icon: 'bx-bar-chart-alt-2', label: 'Reports', roles: ['Owner', 'Manager'] },
+        { path: 'system-status', icon: 'bx-pulse', label: 'System Health', roles: ['Owner', 'Manager'] },
         { path: 'notifications', icon: 'bx-bell', label: 'Notifications', roles: ['Owner', 'Manager', 'Employee', 'Supplier'] },
         { path: 'audit-logs', icon: 'bx-history', label: 'Audit Logs', roles: ['Owner'] },
         { path: 'backups', icon: 'bx-data', label: 'Backup & Restore', roles: ['Owner'] }
     ],
 
     init() {
+        this.initTheme();
+
+        const loginThemeBtn = document.getElementById('loginThemeToggle');
+        if (loginThemeBtn) {
+            loginThemeBtn.addEventListener('click', () => {
+                this.toggleTheme();
+            });
+        }
+
         if (!Auth.isAuthenticated()) {
             document.getElementById('login-container').classList.remove('hidden');
             return;
@@ -36,6 +46,39 @@ const App = {
         // Initial route
         const hash = window.location.hash.replace('#', '') || 'dashboard';
         this.navigate(hash);
+    },
+
+    initTheme() {
+        const savedTheme = localStorage.getItem('sims_theme') || localStorage.getItem('theme') || localStorage.getItem('supplierTheme');
+        const isDark = savedTheme === 'dark';
+        if (isDark) {
+            document.body.classList.add('dark');
+            document.body.classList.add('dark-theme');
+        } else {
+            document.body.classList.remove('dark');
+            document.body.classList.remove('dark-theme');
+        }
+        this.updateThemeIcon();
+    },
+
+    updateThemeIcon() {
+        const themeBtns = [document.getElementById('themeToggle'), document.getElementById('loginThemeToggle')];
+        const isDark = document.body.classList.contains('dark') || document.body.classList.contains('dark-theme');
+        themeBtns.forEach(themeBtn => {
+            if (!themeBtn) return;
+            const i = themeBtn.querySelector('i');
+            if (i) {
+                i.className = isDark ? 'bx bx-sun' : 'bx bx-moon';
+            }
+            themeBtn.title = isDark ? 'Switch to light mode' : 'Switch to dark mode';
+        });
+    },
+
+    toggleTheme() {
+        const isDark = document.body.classList.toggle('dark');
+        document.body.classList.toggle('dark-theme', isDark);
+        localStorage.setItem('sims_theme', isDark ? 'dark' : 'light');
+        this.updateThemeIcon();
     },
 
     setupSidebar() {
@@ -94,14 +137,9 @@ const App = {
         // Theme toggle
         const themeBtn = document.getElementById('themeToggle');
         if (themeBtn) {
+            this.updateThemeIcon();
             themeBtn.addEventListener('click', () => {
-                document.body.classList.toggle('dark-theme');
-                const i = themeBtn.querySelector('i');
-                if (document.body.classList.contains('dark-theme')) {
-                    i.className = 'bx bx-sun';
-                } else {
-                    i.className = 'bx bx-moon';
-                }
+                this.toggleTheme();
             });
         }
 

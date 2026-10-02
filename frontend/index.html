@@ -8,7 +8,7 @@
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Boxicons for modern icons -->
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
     <style>
@@ -20,36 +20,161 @@
     <!-- Notification Toast Container -->
     <div id="toast-container" class="toast-container"></div>
 
-    <!-- Login Page Container -->
-    <div id="login-container" class="login-container" style="display: flex; align-items: center; justify-content: center; min-height: 100vh; background: var(--bg);">
-        <div class="login-box" style="background: var(--white); padding: 40px; border-radius: var(--radius); box-shadow: var(--shadow-lg); width: 100%; max-width: 400px; text-align: center;">
-            <div class="logo" style="margin-bottom: 20px;">
-                <div class="brand-logo" style="margin: 0 auto 10px;">SI</div>
-                <h2 style="font-weight: 800; font-size: 24px; color: var(--text);">Smart Inventory</h2>
-            </div>
-            
-            <form id="login-form" style="text-align: left;">
-                <div class="form-group" style="margin-bottom: 20px;">
-                    <label for="username" style="display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px;">Username</label>
-                    <div style="position: relative;">
-                        <i class='bx bx-user' style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--text-light);"></i>
-                        <input type="text" id="username" required placeholder="Enter username" style="width: 100%; padding: 12px 15px 12px 40px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--bg);">
-                    </div>
-                </div>
-                <div class="form-group" style="margin-bottom: 20px;">
-                    <label for="password" style="display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px;">Password</label>
-                    <div style="position: relative;">
-                        <i class='bx bx-lock-alt' style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--text-light);"></i>
-                        <input type="password" id="password" required placeholder="Enter password" style="width: 100%; padding: 12px 40px 12px 40px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--bg);">
-                        <i class='bx bx-show' id="toggle-password" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: var(--text-light); cursor: pointer;"></i>
-                    </div>
-                </div>
-                <div id="login-error" class="hidden" style="color: var(--red); font-size: 13px; margin-bottom: 15px; text-align: center;"></div>
-                <button type="submit" class="btn primary" style="width: 100%; justify-content: center; padding: 12px; font-size: 15px;">
-                    Sign in <i class='bx bx-right-arrow-alt'></i>
-                </button>
-            </form>
+    <!-- Login Page Container: Reference-Matched Redesign -->
+    <div id="login-container" class="login-page-root">
+        <!-- Background Decorative Elements -->
+        <div class="login-bg-circle" aria-hidden="true"></div>
+        <div class="login-dot-grid" aria-hidden="true">
+            <span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span>
         </div>
+
+        <!-- Flowing Bottom Wave -->
+        <div class="login-bg-wave" aria-hidden="true">
+            <svg viewBox="0 0 1440 260" fill="none" preserveAspectRatio="none">
+                <path d="M0,130 C280,210 520,70 820,120 C1120,170 1310,95 1440,110 L1440,260 L0,260 Z" class="wave-layer-back"/>
+                <path d="M0,170 C260,240 580,110 880,160 C1180,200 1350,150 1440,160 L1440,260 L0,260 Z" class="wave-layer-front"/>
+            </svg>
+        </div>
+
+        <!-- Corner Foliage Leaves -->
+        <div class="login-bg-leaves" aria-hidden="true">
+            <svg viewBox="0 0 220 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- Leaf 1 (center large) -->
+                <path d="M0,220 C20,150 70,80 150,50 C130,100 100,160 0,220 Z" class="leaf-primary"/>
+                <path d="M0,220 C45,170 85,120 150,50" class="leaf-spine" stroke-width="2"/>
+                <path d="M40,175 C55,160 70,165 75,170" class="leaf-spine" stroke-width="1.5"/>
+                <path d="M70,140 C90,130 105,135 110,140" class="leaf-spine" stroke-width="1.5"/>
+                <path d="M100,105 C120,95 130,100 135,105" class="leaf-spine" stroke-width="1.5"/>
+                <!-- Leaf 2 (upright) -->
+                <path d="M0,220 C10,140 25,60 70,10 C75,70 50,150 0,220 Z" class="leaf-secondary"/>
+                <path d="M0,220 C20,155 35,95 70,10" class="leaf-spine-sec" stroke-width="2"/>
+                <!-- Leaf 3 (broad right) -->
+                <path d="M0,220 C60,190 130,170 210,170 C160,200 90,215 0,220 Z" class="leaf-tertiary"/>
+                <path d="M0,220 C75,195 140,185 210,170" class="leaf-spine" stroke-width="2"/>
+                <!-- Leaf 4 (accent) -->
+                <path d="M0,220 C40,160 90,130 140,130 C100,170 60,200 0,220 Z" class="leaf-accent"/>
+            </svg>
+        </div>
+
+        <!-- Top Header -->
+        <header class="login-header">
+            <div class="login-brand">
+                <div class="login-brand-combo">
+                    <div class="login-badge-tech" title="SIMS Technology"><i class='bx bx-brain'></i></div>
+                    <div class="login-badge-si">SI</div>
+                </div>
+                <div class="login-brand-text">
+                    <h2 class="login-brand-title">Smart Inventory</h2>
+                    <span class="login-brand-tagline">Smarter Stock &bull; Better Business</span>
+                </div>
+            </div>
+
+            <div class="login-header-right">
+                <span class="login-header-pillars">Track &bull; Manage &bull; Grow</span>
+                <button type="button" class="login-theme-btn" id="loginThemeToggle" title="Toggle dark mode">
+                    <i class='bx bx-moon'></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main 3-Column Content Layout -->
+        <main class="login-main-grid">
+            <!-- Left Column: Marketing Copy & Warehouse Scene -->
+            <section class="login-left-col">
+                <div class="login-left-copy">
+                    <h1 class="login-left-heading">Smarter Inventory<br>for a Stronger Tomorrow</h1>
+                    <p class="login-left-sub">Real-time tracking. Better decisions.<br>Greater efficiency.</p>
+                </div>
+
+                <div class="login-illustration-frame">
+                    <img src="assets/warehouse_illustration.jpg" alt="Smart Inventory Warehouse Operations with Manager and Stock Shelving" class="login-warehouse-img">
+                    <div class="illustration-blend-curve" aria-hidden="true">
+                        <svg viewBox="0 0 500 90" fill="none" preserveAspectRatio="none">
+                            <path d="M0,90 C120,40 320,60 500,20 L500,90 L0,90 Z" class="blend-fill"/>
+                        </svg>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Center Column: Centered Login Card -->
+            <section class="login-center-col">
+                <div class="login-card">
+                    <div class="login-card-header">
+                        <div class="login-card-logo">SI</div>
+                        <h2 class="login-card-title">Smart Inventory</h2>
+                        <p class="login-card-subtitle">Sign in to manage your inventory and keep your business running smoothly.</p>
+                    </div>
+
+                    <form id="login-form" class="login-form">
+                        <div class="login-field-group">
+                            <label for="username" class="login-field-label">Username</label>
+                            <div class="login-input-box">
+                                <i class='bx bx-user login-icon-left'></i>
+                                <input type="text" id="username" name="username" required placeholder="owner" autocomplete="username">
+                            </div>
+                        </div>
+
+                        <div class="login-field-group">
+                            <label for="password" class="login-field-label">Password</label>
+                            <div class="login-input-box">
+                                <i class='bx bx-lock-alt login-icon-left'></i>
+                                <input type="password" id="password" name="password" required placeholder="••••••••••••" autocomplete="current-password">
+                                <i class='bx bx-show login-icon-toggle' id="toggle-password" title="Toggle password visibility"></i>
+                            </div>
+                        </div>
+
+                        <div id="login-error" class="login-error-box hidden"></div>
+
+                        <button type="submit" class="login-submit-btn">
+                            <span>Sign in</span> <i class='bx bx-right-arrow-alt'></i>
+                        </button>
+
+                        <div class="login-divider-row">
+                            <span class="secure-access-badge">
+                                <i class='bx bx-lock-alt'></i> Secure Access
+                            </span>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Right Column: Feature Highlights & Slogan -->
+            <aside class="login-right-col">
+                <div class="login-features-list">
+                    <div class="login-feature-item">
+                        <div class="feature-icon-bubble">
+                            <i class='bx bx-package'></i>
+                        </div>
+                        <div class="feature-content">
+                            <h3 class="feature-heading">Real-time<br>Stock Tracking</h3>
+                            <p class="feature-desc">Know what you have, when you need it.</p>
+                        </div>
+                    </div>
+
+                    <div class="login-feature-item">
+                        <div class="feature-icon-bubble">
+                            <i class='bx bx-shield-quarter'></i>
+                        </div>
+                        <div class="feature-content">
+                            <h3 class="feature-heading">Secure &amp;<br>Reliable</h3>
+                            <p class="feature-desc">Your data, always protected.</p>
+                        </div>
+                    </div>
+
+                    <div class="login-feature-item">
+                        <div class="feature-icon-bubble">
+                            <i class='bx bx-bar-chart-alt-2'></i>
+                        </div>
+                        <div class="feature-content">
+                            <h3 class="feature-heading">Better<br>Decisions</h3>
+                            <p class="feature-desc">Turn inventory data into business growth.</p>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </main>
     </div>
 
     <!-- Main App Container -->
@@ -155,6 +280,7 @@
     <script src="js/pages/notifications.js?v=8"></script>
     <script src="js/pages/audit-logs.js?v=2"></script>
     <script src="js/pages/backups.js?v=9"></script>
+    <script src="js/pages/system-status.js?v=1"></script>
     
     <!-- Skeleton Page Scripts -->
     <script src="js/pages/products.js?v=10"></script>

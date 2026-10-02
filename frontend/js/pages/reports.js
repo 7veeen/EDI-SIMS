@@ -4,13 +4,18 @@ App.pages['reports'] = {
     render() {
         const container = document.createElement('div');
         container.innerHTML = `
-            <div class="actions-bar glass-panel" style="padding: 1rem; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+            <div class="actions-bar glass-panel" style="padding: 1rem; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;">
                 <div id="inventory-status" style="display:flex; align-items:center; gap: 0.5rem">
                     <span class="status-badge status-pending">Checking Inventory Status...</span>
                 </div>
-                <button class="btn btn-primary" id="btn-generate-report">
-                    <i class='bx bx-file'></i> Generate Inventory Report
-                </button>
+                <div style="display: flex; gap: 0.75rem; align-items: center;">
+                    <button class="btn btn-secondary" id="btn-export-csv" title="Download current live inventory balance as CSV">
+                        <i class='bx bx-download'></i> Export CSV (Current Balance)
+                    </button>
+                    <button class="btn btn-primary" id="btn-generate-report">
+                        <i class='bx bx-file'></i> Generate Inventory Report
+                    </button>
+                </div>
             </div>
             
             <div class="glass-panel table-container">
@@ -37,8 +42,12 @@ App.pages['reports'] = {
         this.checkInventoryStatus();
         this.loadReports();
 
-        document.getElementById('btn-generate-report').addEventListener('click', () => {
+        document.getElementById('btn-generate-report')?.addEventListener('click', () => {
             this.generateReport();
+        });
+
+        document.getElementById('btn-export-csv')?.addEventListener('click', () => {
+            this.exportCsv();
         });
     },
 
@@ -95,8 +104,10 @@ App.pages['reports'] = {
         };
 
         const btn = document.getElementById('btn-generate-report');
-        btn.disabled = true;
-        btn.innerHTML = `<i class='bx bx-loader-alt bx-spin'></i> Generating...`;
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = `<i class='bx bx-loader-alt bx-spin'></i> Generating...`;
+        }
 
         try {
             const data = await Api.post('/reports/generate', payload);
@@ -109,8 +120,84 @@ App.pages['reports'] = {
                 Utils.showToast(error.message || "Failed to generate report", "error");
             }
         } finally {
-            btn.disabled = false;
-            btn.innerHTML = `<i class='bx bx-file'></i> Generate Inventory Report`;
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = `<i class='bx bx-file'></i> Generate Inventory Report`;
+            }
+        }
+    },
+
+    async exportCsv() {
+        const btn = document.getElementById('btn-export-csv');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = `<i class='bx bx-loader-alt bx-spin'></i> Exporting...`;
+        }
+
+        try {
+            const token = localStorage.getItem('sims_token') || localStorage.getItem('sims_access_token');
+            const headers = {};
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            const response = await fetch(`${API_BASE_URL}/reports/export?report_type=Inventory`, {
+                headers
+            });
+
+            if (response.status === 401) {
+                Auth.logout();
+                Utils.showToast("Session expired. Please login again.", "error");
+                return;
+            }
+
+            if (response.status === 403) {
+                Utils.showToast("Access denied: You do not have permission to export reports.", "error");
+                return;
+            }
+
+            if (response.status === 423) {
+                const errData = await response.json().catch(() => ({}));
+                Utils.showToast(errData.message || "Report export is locked while inventory is being updated.", "warning");
+                return;
+            }
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.error || `Export failed with status ${response.status}`);
+            }
+
+            const blob = await response.blob();
+            
+            // Extract filename from Content-Disposition header if available
+            let filename = `current_inventory_report_${new Date().toISOString().slice(0, 10)}.csv`;
+            const disposition = response.headers.get('Content-Disposition');
+            if (disposition && disposition.includes('filename=')) {
+                const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                if (match && match[1]) {
+                    filename = match[1].replace(/['"]/g, '').trim();
+                }
+            }
+
+            // Create download link and trigger download
+            const blobUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = blobUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(blobUrl);
+            a.remove();
+
+            Utils.showToast("Current inventory report CSV downloaded successfully.", "success");
+        } catch (error) {
+            Utils.showToast(error.message || "Failed to export report CSV", "error");
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = `<i class='bx bx-download'></i> Export CSV (Current Balance)`;
+            }
         }
     }
 };

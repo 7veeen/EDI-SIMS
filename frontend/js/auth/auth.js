@@ -2,7 +2,7 @@
 
 const Auth = {
     isAuthenticated() {
-        return !!localStorage.getItem('sims_token');
+        return !!(localStorage.getItem('sims_token') || localStorage.getItem('sims_access_token'));
     },
 
     getUser() {
@@ -25,6 +25,7 @@ const Auth = {
             const data = await Api.post('/auth/login', { username, password });
             if (data.access_token) {
                 localStorage.setItem('sims_token', data.access_token);
+                localStorage.setItem('sims_access_token', data.access_token);
                 
                 const userData = data.user || {};
                 
@@ -43,6 +44,7 @@ const Auth = {
 
     logout() {
         localStorage.removeItem('sims_token');
+        localStorage.removeItem('sims_access_token');
         localStorage.removeItem('sims_user');
         window.location.reload();
     },

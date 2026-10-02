@@ -38,6 +38,7 @@ def supplier_dashboard():
 @role_required("Manager")
 def manager_dashboard():
     dashboard_data = get_manager_dashboard()
+
     return jsonify(dashboard_data), 200
 
 
@@ -45,4 +46,5 @@ def manager_dashboard():
 @role_required("Owner")
 def owner_dashboard():
     dashboard_data = get_owner_dashboard()
-    return jsonify(dashboard_data), 200
+
+    return jsonify(dashboard_data), 200

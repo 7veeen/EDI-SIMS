@@ -42,9 +42,15 @@ App.pages['dashboard'] = {
                 </div>
             </div>
             <div class="card" style="background: var(--white); padding: 24px; border-radius: var(--radius); border: 1px solid var(--border);">
-                <div style="display: flex; gap: 1rem; align-items: center;">
-                    <input type="text" id="new-username-input" class="input" placeholder="New Username" style="max-width: 300px; padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border); width: 100%;">
-                    <button class="btn primary" id="btn-change-username" style="padding: 12px 24px;">Change Username</button>
+                <div style="display: flex; flex-direction: column; gap: 0.85rem;">
+                    <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                        <input type="text" id="new-username-input" class="input" value="${Utils.escapeHtml(user.username || '')}" placeholder="Current Username" disabled style="max-width: 300px; padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border); width: 100%; background: #f8fafc; color: var(--text-secondary); cursor: not-allowed;">
+                        <button class="btn" id="btn-change-username" disabled style="padding: 12px 24px; opacity: 0.6; cursor: not-allowed;">Change Username</button>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--text-secondary);">
+                        <i class='bx bx-info-circle' style="color: var(--primary); font-size: 1.1rem; flex-shrink: 0;"></i>
+                        <span>Username changes are currently managed by an administrator. Please contact your administrator for assistance.</span>
+                    </div>
                 </div>
             </div>
         `;
@@ -467,37 +473,12 @@ App.pages['dashboard'] = {
             } catch (err) {}
         }
 
-        // Attach event listener for change username
+        // Attach event listener for change username (informational advisory; API managed by admin)
         const btnChangeUsername = document.getElementById('btn-change-username');
         if (btnChangeUsername) {
-            btnChangeUsername.addEventListener('click', async () => {
-                const newUsername = document.getElementById('new-username-input').value;
-                if (!newUsername) {
-                    Utils.showToast("Please enter a new username", "error");
-                    return;
-                }
-
-                btnChangeUsername.disabled = true;
-                btnChangeUsername.innerHTML = "Updating...";
-
-                try {
-                    const res = await Api.put('/users/me/username', { username: newUsername });
-                    
-                    const storedUser = Auth.getUser();
-                    storedUser.username = res.user.username;
-                    localStorage.setItem('sims_user', JSON.stringify(storedUser));
-                    
-                    Utils.showToast(res.message, "success");
-                    
-                    if (App && typeof App.setupSidebar === 'function') {
-                        App.setupSidebar();
-                    }
-                } catch (err) {
-                    Utils.showToast(err.message || "Failed to update username", "error");
-                } finally {
-                    btnChangeUsername.disabled = false;
-                    btnChangeUsername.innerHTML = "Change Username";
-                }
+            btnChangeUsername.addEventListener('click', (e) => {
+                e.preventDefault();
+                Utils.showToast("Username changes are currently managed by an administrator. Please contact your administrator for assistance.", "info");
             });
         }
     }
