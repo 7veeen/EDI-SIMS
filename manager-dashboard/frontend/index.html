@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manager Dashboard | Smart Inventory Management System</title>
+  <!-- Google Fonts: Outfit & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="css/manager-dashboard.css">
+</head>
+<body>
+
+  <div class="app-container">
+
+    <!-- 1. SIDEBAR NAVIGATION -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="brand-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+            <line x1="12" y1="22.08" x2="12" y2="12"></line>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h2>SIMS Core</h2>
+          <span>Manager Console</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section-title">Core Operations</div>
+        
+        <a class="nav-item active" href="#dashboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+          Dashboard
+        </a>
+
+        <a class="nav-item" href="#employees" onclick="handleQuickAction('Employee Management')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          Employee Management
+        </a>
+
+        <a class="nav-item" href="#products" onclick="handleQuickAction('Products')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+          Products
+        </a>
+
+        <a class="nav-item" href="#categories" onclick="handleQuickAction('Categories')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+          Categories
+        </a>
+
+        <a class="nav-item" href="#inventory" onclick="handleQuickAction('Inventory')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+          Inventory
+        </a>
+
+        <a class="nav-item" href="#suppliers" onclick="handleQuickAction('Suppliers')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+          Suppliers
+        </a>
+
+        <div class="nav-section-title">Procurement</div>
+
+        <a class="nav-item" href="#stock-requests" onclick="handleQuickAction('Stock Requests')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+          Stock Requests
+        </a>
+
+        <a class="nav-item" href="#quotations" onclick="handleQuickAction('Quotations')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          Quotations
+        </a>
+
+        <a class="nav-item" href="#purchase-orders" onclick="handleQuickAction('Purchase Orders')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+          Purchase Orders
+        </a>
+
+        <a class="nav-item" href="#transactions" onclick="handleQuickAction('Stock Transactions')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+          Stock Transactions
+        </a>
+
+        <div class="nav-section-title">System & Insights</div>
+
+        <a class="nav-item" href="#reports" onclick="handleQuickAction('Reports')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+          Reports
+        </a>
+
+        <a class="nav-item" href="#notifications" onclick="toggleNotificationModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+          Notifications
+        </a>
+
+        <a class="nav-item" href="#profile" onclick="handleQuickAction('Profile')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          Profile
+        </a>
+
+        <a class="nav-item" href="#logout" onclick="handleQuickAction('Logout')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          Logout
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-profile-widget">
+          <div class="avatar">M</div>
+          <div class="user-meta">
+            <h4>Manager Account</h4>
+            <p><span class="status-dot"></span> Active Session</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 2. MAIN APPLICATION CONTENT -->
+    <main class="main-wrapper">
+      
+      <!-- TOP HEADER -->
+      <header class="top-header">
+        <div class="header-left">
+          <h1>Manager Dashboard</h1>
+          <p>Real-Time Operations, Inventory Monitoring & Procurement Control</p>
+        </div>
+
+        <div class="header-right">
+          <div class="live-sync-indicator">
+            <span class="pulse-dot"></span>
+            <span>Live DB: <strong id="lastSyncTime">Syncing...</strong></span>
+          </div>
+
+          <!-- Refresh Button -->
+          <button class="btn-icon" id="refreshBtn" title="Refresh live data from Supabase">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+          </button>
+
+          <!-- Notification Bell -->
+          <button class="btn-icon" onclick="toggleNotificationModal()" title="View Notifications">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+            <span class="badge-counter" id="notifBadgeCounter" style="display: none;">0</span>
+          </button>
+
+          <button class="btn-primary" onclick="handleQuickAction('Create PO')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <span>Quick Action</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- DASHBOARD BODY CONTENT -->
+      <div class="dashboard-content">
+
+        <!-- QUICK ACTIONS BAR -->
+        <section class="quick-actions-bar">
+          <button class="quick-action-btn" onclick="handleQuickAction('Add Employee')">
+            <span>👤 Add Employee</span>
+          </button>
+          <button class="quick-action-btn" onclick="handleQuickAction('Add Product')">
+            <span>📦 Add Product</span>
+          </button>
+          <button class="quick-action-btn" onclick="handleQuickAction('Create Stock Request')">
+            <span>📝 Create Stock Request</span>
+          </button>
+          <button class="quick-action-btn" onclick="handleQuickAction('View Quotations')">
+            <span>📑 View Quotations</span>
+          </button>
+          <button class="quick-action-btn" onclick="handleQuickAction('View Purchase Orders')">
+            <span>🛒 View Purchase Orders</span>
+          </button>
+          <button class="quick-action-btn" onclick="handleQuickAction('View Low Stock')">
+            <span>⚠️ View Low Stock</span>
+          </button>
+          <button class="quick-action-btn" onclick="handleQuickAction('Generate Report')">
+            <span>📊 Generate Report</span>
+          </button>
+        </section>
+
+        <!-- 8 DYNAMIC METRIC SUMMARY CARDS -->
+        <section class="metrics-grid">
+          <!-- Card 1: Total Products -->
+          <div class="metric-card card-primary">
+            <div class="metric-header">
+              <span class="metric-title">Total Products</span>
+              <div class="metric-icon" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path></svg>
+              </div>
+            </div>
+            <div class="metric-value" id="metric-total-products">0</div>
+            <div class="metric-footer">Catalog items in Supabase</div>
+          </div>
+
+          <!-- Card 2: Low Stock Products -->
+          <div class="metric-card card-warning">
+            <div class="metric-header">
+              <span class="metric-title">Low Stock</span>
+              <div class="metric-icon" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              </div>
+            </div>
+            <div class="metric-value" id="metric-low-stock">0</div>
+            <div class="metric-footer">Quantity &le; Reorder Level</div>
+          </div>
+
+          <!-- Card 3: Out-of-Stock Products -->
+          <div class="metric-card card-danger">
+            <div class="metric-header">
+              <span class="metric-title">Out of Stock</span>
+              <div class="metric-icon" style="background: rgba(239, 68, 68, 0.15); color: #f87171;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+              </div>
+            </div>
+            <div class="metric-value" id="metric-out-stock">0</div>
+            <div class="metric-footer">Available quantity is 0</div>
+          </div>
+
+          <!-- Card 4: Pending Stock Requests -->
+          <div class="metric-card card-info">
+            <div class="metric-header">
+              <span class="metric-title">Pending Requests</span>
+              <div class="metric-icon" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+              </div>
+            </div>
+            <div class="metric-value" id="metric-pending-requests">0</div>
+            <div class="metric-footer">Awaiting Manager approval</div>
+          </div>
+
+          <!-- Card 5: Pending Quotations -->
+          <div class="metric-card card-purple">
+            <div class="metric-header">
+              <span class="metric-title">Pending Quotations</span>
+              <div class="metric-icon" style="background: rgba(168, 85, 247, 0.15); color: #c084fc;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+              </div>
+            </div>
+            <div class="metric-value" id="metric-pending-quotations">0</div>
+            <div class="metric-footer">Submitted by suppliers</div>
+          </div>
+
+          <!-- Card 6: Pending Purchase Orders -->
+          <div class="metric-card card-warning">
+            <div class="metric-header">
+              <span class="metric-title">Pending POs</span>
+              <div class="metric-icon" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+              </div>
+            </div>
+            <div class="metric-value" id="metric-pending-pos">0</div>
+            <div class="metric-footer">Orders awaiting action</div>
+          </div>
+
+          <!-- Card 7: Orders in Transit -->
+          <div class="metric-card card-info">
+            <div class="metric-header">
+              <span class="metric-title">Orders In Transit</span>
+              <div class="metric-icon" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+              </div>
+            </div>
+            <div class="metric-value" id="metric-in-transit">0</div>
+            <div class="metric-footer">Shipped by suppliers</div>
+          </div>
+
+          <!-- Card 8: Total Active Employees -->
+          <div class="metric-card card-success">
+            <div class="metric-header">
+              <span class="metric-title">Total Employees</span>
+              <div class="metric-icon" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>
+              </div>
+            </div>
+            <div class="metric-value" id="metric-total-employees">0</div>
+            <div class="metric-footer">Active warehouse staff</div>
+          </div>
+        </section>
+
+        <!-- TWO-COLUMN ANALYTICS: INVENTORY OVERVIEW & PROCUREMENT FUNNEL -->
+        <section class="dashboard-grid-2">
+          
+          <!-- Inventory Overview Card -->
+          <div class="dashboard-card">
+            <div class="card-title-row">
+              <h3>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--primary-light)" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+                Inventory Health Breakdown
+              </h3>
+              <span class="badge badge-info">Real-time DB</span>
+            </div>
+
+            <div class="chart-container">
+              <!-- SVG Donut Chart -->
+              <div class="donut-wrapper">
+                <svg width="140" height="140" viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="45" fill="transparent" stroke="rgba(255,255,255,0.06)" stroke-width="10"></circle>
+                  <!-- In Stock -->
+                  <circle id="donutSegmentInStock" cx="50" cy="50" r="45" fill="transparent" stroke="#10b981" stroke-width="10" stroke-dasharray="0 283" stroke-linecap="round"></circle>
+                  <!-- Low Stock -->
+                  <circle id="donutSegmentLowStock" cx="50" cy="50" r="45" fill="transparent" stroke="#f59e0b" stroke-width="10" stroke-dasharray="0 283"></circle>
+                  <!-- Out of Stock -->
+                  <circle id="donutSegmentOutStock" cx="50" cy="50" r="45" fill="transparent" stroke="#ef4444" stroke-width="10" stroke-dasharray="0 283"></circle>
+                </svg>
+                <div class="donut-center-text">
+                  <span class="total-num" id="donutTotalNum">0</span>
+                  <span class="total-label">SKUs</span>
+                </div>
+              </div>
+
+              <!-- Legend -->
+              <div class="chart-legend">
+                <div class="legend-item">
+                  <div class="legend-key">
+                    <span class="legend-dot" style="background: #10b981;"></span>
+                    <span>Available / Normal</span>
+                  </div>
+                  <span class="legend-val" id="legendInStockVal">0</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-key">
+                    <span class="legend-dot" style="background: #f59e0b;"></span>
+                    <span>Low Stock Warning</span>
+                  </div>
+                  <span class="legend-val" id="legendLowStockVal">0</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-key">
+                    <span class="legend-dot" style="background: #ef4444;"></span>
+                    <span>Out of Stock</span>
+                  </div>
+                  <span class="legend-val" id="legendOutStockVal">0</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Category Distribution Progress -->
+            <div style="margin-top: 10px;">
+              <h4 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; margin-bottom: 8px;">Top Categories</h4>
+              <div class="category-bars" id="categoryBarsContainer">
+                <div class="state-container" style="padding: 12px;">
+                  <p>Loading categories...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Procurement Pipeline Funnel -->
+          <div class="dashboard-card">
+            <div class="card-title-row">
+              <h3>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--secondary)" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                Procurement Pipeline Funnel
+              </h3>
+              <span class="badge badge-purple">Workflow Stages</span>
+            </div>
+
+            <div class="procurement-funnel">
+              <div class="funnel-stage">
+                <span class="stage-name">Stock Requests</span>
+                <span class="stage-count" id="funnelStockRequests">0</span>
+                <span class="stage-status">Pending</span>
+              </div>
+              <div class="funnel-stage">
+                <span class="stage-name">Quotations</span>
+                <span class="stage-count" id="funnelQuotations">0</span>
+                <span class="stage-status">Pending Review</span>
+              </div>
+              <div class="funnel-stage">
+                <span class="stage-name">POs Created</span>
+                <span class="stage-count" id="funnelPOPending">0</span>
+                <span class="stage-status">Pending</span>
+              </div>
+              <div class="funnel-stage">
+                <span class="stage-name">Accepted</span>
+                <span class="stage-count" id="funnelPOAccepted">0</span>
+                <span class="stage-status">Supplier Ack</span>
+              </div>
+              <div class="funnel-stage">
+                <span class="stage-name">In Transit</span>
+                <span class="stage-count" id="funnelPOShipped">0</span>
+                <span class="stage-status">Shipped</span>
+              </div>
+              <div class="funnel-stage">
+                <span class="stage-name">Delivered</span>
+                <span class="stage-count" id="funnelPODelivered">0</span>
+                <span class="stage-status">Completed</span>
+              </div>
+            </div>
+
+            <!-- Employee & Supplier Quick Snapshot -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px;">
+              <div style="background: var(--bg-surface); padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">ACTIVE EMPLOYEES</span>
+                  <button class="btn-action-sm" onclick="handleQuickAction('Manage Employees')">Manage</button>
+                </div>
+                <div style="font-size: 1.4rem; font-weight: 700; margin-top: 6px;" id="employeeActiveCount">0</div>
+                <div style="font-size: 0.72rem; color: var(--text-muted);">Out of <span id="employeeTotalCount">0</span> total staff</div>
+              </div>
+
+              <div style="background: var(--bg-surface); padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">ACTIVE SUPPLIERS</span>
+                  <button class="btn-action-sm" onclick="handleQuickAction('View Suppliers')">View</button>
+                </div>
+                <div style="font-size: 1.4rem; font-weight: 700; margin-top: 6px;" id="supplierActiveCount">0</div>
+                <div style="font-size: 0.72rem; color: var(--text-muted);">Out of <span id="supplierTotalCount">0</span> registered vendors</div>
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- PENDING ACTIONS PRIORITY CENTER -->
+        <section class="dashboard-card">
+          <div class="card-title-row">
+            <h3>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 14 14"></polyline></svg>
+              Pending Actions Center
+            </h3>
+            <span class="badge badge-warning">Requires Manager Decision</span>
+          </div>
+
+          <div class="pending-actions-list" id="pendingActionsContainer">
+            <div class="state-container">
+              <p>Loading pending manager actions...</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- REAL LOW STOCK ALERT TABLE -->
+        <section class="dashboard-card">
+          <div class="card-title-row">
+            <h3>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              Critical Low Stock Items (Quantity &le; Reorder Level)
+            </h3>
+            <span class="badge badge-danger">Live Supabase Products</span>
+          </div>
+
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>SKU</th>
+                  <th>Category</th>
+                  <th>Current Stock</th>
+                  <th>Reorder Level</th>
+                  <th>Stock Ratio</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="lowStockTableBody">
+                <tr>
+                  <td colspan="7">
+                    <div class="state-container">
+                      <p>Scanning database for low stock records...</p>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- SPLIT VIEW: RECENT PURCHASE ORDERS & STOCK MOVEMENTS -->
+        <section class="dashboard-grid-2">
+          
+          <!-- Recent Purchase Orders Table -->
+          <div class="dashboard-card">
+            <div class="card-title-row">
+              <h3>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--info)" stroke-width="2"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+                Recent Purchase Orders
+              </h3>
+              <button class="btn-action-sm" onclick="handleQuickAction('View All POs')">View All</button>
+            </div>
+
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>PO ID</th>
+                    <th>Supplier</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody id="recentPOTableBody">
+                  <tr>
+                    <td colspan="5">
+                      <div class="state-container">
+                        <p>Loading purchase orders...</p>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Recent Stock Movements Table -->
+          <div class="dashboard-card">
+            <div class="card-title-row">
+              <h3>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+                Recent Stock Movements
+              </h3>
+              <button class="btn-action-sm" onclick="handleQuickAction('View All Transactions')">View All</button>
+            </div>
+
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Tx ID</th>
+                    <th>Product</th>
+                    <th>Type</th>
+                    <th>Quantity</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody id="recentTxTableBody">
+                  <tr>
+                    <td colspan="5">
+                      <div class="state-container">
+                        <p>Loading stock movements...</p>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </section>
+
+      </div>
+    </main>
+
+  </div>
+
+  <!-- NOTIFICATION MODAL / DRAWER -->
+  <div class="modal-backdrop" id="notificationModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Manager Notifications</h3>
+        <button class="btn-icon" onclick="toggleNotificationModal()">✕</button>
+      </div>
+      <div class="modal-body" id="notificationList">
+        <div class="state-container">
+          <p>Loading notifications...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Main Application Script (ES Module) -->
+  <script type="module" src="js/manager-dashboard.js"></script>
+</body>
+</html>

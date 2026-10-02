@@ -186,3 +186,42 @@ def change_user_status(user_id):
         "message": "User status updated successfully",
         "user": updated_user
     }), 200
+
+from app.services.team1.user_service import update_username
+from flask_jwt_extended import jwt_required
+
+@users_bp.route("/me/username", methods=["PUT"])
+@jwt_required()
+def change_own_username():
+    data = request.get_json()
+
+    if not data:
+        return jsonify({
+            "error": "Request body is required"
+        }), 400
+
+    new_username = data.get("username")
+
+    if not new_username:
+        return jsonify({
+            "error": "New username is required"
+        }), 400
+
+    current_user_id = int(get_jwt()["sub"])
+
+    updated_user, error = update_username(current_user_id, new_username)
+
+    if error:
+        if error == "Username already taken":
+            return jsonify({
+                "error": error
+            }), 409
+        
+        return jsonify({
+            "error": error
+        }), 500
+
+    return jsonify({
+        "message": "Username updated successfully",
+        "user": updated_user
+    }), 200

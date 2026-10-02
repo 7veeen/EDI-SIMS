@@ -263,3 +263,60 @@ def update_user_status(user_id, status):
 
         if conn:
             conn.close()
+
+def update_username(user_id, new_username):
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Check if username already exists
+        cursor.execute(
+            '''
+            SELECT user_id
+            FROM public."Users"
+            WHERE username = %s AND user_id != %s
+            ''',
+            (new_username, user_id)
+        )
+
+        if cursor.fetchone():
+            return None, "Username already taken"
+
+        cursor.execute(
+            '''
+            UPDATE public."Users"
+            SET username = %s
+            WHERE user_id = %s
+            RETURNING user_id, username, email, role_id, status
+            ''',
+            (new_username, user_id)
+        )
+
+        updated_user = cursor.fetchone()
+
+        if updated_user is None:
+            return None, "User not found"
+
+        conn.commit()
+
+        return {
+            "user_id": updated_user[0],
+            "username": updated_user[1],
+            "email": updated_user[2],
+            "role_id": updated_user[3],
+            "status": updated_user[4]
+        }, None
+
+    except Error:
+        if conn:
+            conn.rollback()
+        return None, "Database error"
+
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
