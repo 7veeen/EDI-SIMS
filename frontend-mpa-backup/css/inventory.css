@@ -1,0 +1,10 @@
+/* Page CSS for Inventory Stock Levels */
+/* Inventory Stock Levels Specific Styles */
+.search-field {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  margin-bottom: 16px;
+  width: 250px;
+}

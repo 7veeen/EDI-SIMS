@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SIMS — Executive Owner Command Center</title>
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/sidebar.css">
+  <link rel="stylesheet" href="../css/topbar.css">
+  <link rel="stylesheet" href="../css/owner-dashboard.css">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- ==================== SIDEBAR ==================== -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="owner-dashboard.html" class="brand-box">
+          <div class="brand-icon">S</div>
+          <div>
+            <div class="brand-title">SIMS</div>
+            <div class="brand-sub">Inventory OS</div>
+          </div>
+        </a>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-group">
+          <div class="nav-group-title">🏠 Command Center</div>
+          <ul class="nav-list">
+            <li><a href="owner-dashboard.html" class="nav-link active">Owner Dashboard</a></li>
+            <li><a href="dashboard.html" class="nav-link">Standard Dashboard</a></li>
+          </ul>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-group-title">📦 Inventory</div>
+          <ul class="nav-list">
+            <li><a href="inventory.html" class="nav-link">Inventory</a></li>
+            <li><a href="products.html" class="nav-link">Products</a></li>
+            <li><a href="categories.html" class="nav-link">Categories</a></li>
+          </ul>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-group-title">🛒 Procurement</div>
+          <ul class="nav-list">
+            <li><a href="suppliers.html" class="nav-link">Suppliers</a></li>
+            <li><a href="purchase-orders.html" class="nav-link">Purchase Orders</a></li>
+            <li><a href="quotations.html" class="nav-link">Quotations</a></li>
+          </ul>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-group-title">🔄 Operations</div>
+          <ul class="nav-list">
+            <li><a href="stock-transactions.html" class="nav-link">Stock Transactions</a></li>
+          </ul>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-group-title">📊 Insights</div>
+          <ul class="nav-list">
+            <li><a href="reports.html" class="nav-link">Reports</a></li>
+            <li><a href="notifications.html" class="nav-link">Notifications</a></li>
+          </ul>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-group-title">🛡️ System</div>
+          <ul class="nav-list">
+            <li><a href="audit-logs.html" class="nav-link">Audit Logs</a></li>
+            <li><a href="backup.html" class="nav-link">Backup Center</a></li>
+            <li><a href="system-status.html" class="nav-link">System Status</a></li>
+            <li><a href="users-roles.html" class="nav-link">Users & Roles</a></li>
+            <li><a href="settings.html" class="nav-link">Settings</a></li>
+          </ul>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-avatar-circle" id="sidebar-user-avatar">O</div>
+        <div class="user-info-text">
+          <span class="user-display-name" id="sidebar-user-name">Owner</span>
+          <span class="user-display-role" id="sidebar-user-role">Owner Authority</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ==================== MAIN CONTENT WRAPPER ==================== -->
+    <div class="main-wrapper">
+      <!-- Shared Topbar Component -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <div class="executive-pill">EXECUTIVE CONSOLE</div>
+          <h1 class="page-headline">SIMS Command Center</h1>
+        </div>
+        <div class="topbar-right">
+          <div class="topbar-health-indicator" id="topbar-health-badge">
+            <span class="pulse-indicator" id="topbar-pulse"></span>
+            <span id="topbar-status-text">CONNECTING...</span>
+          </div>
+          <a href="notifications.html" class="topbar-notif-link" title="Notifications">
+            <span class="notif-icon">🔔</span>
+            <span class="notif-badge" id="topbar-notif-count">0</span>
+          </a>
+          <button class="logout-btn" id="topbar-logout-btn">Logout</button>
+        </div>
+      </header>
+
+      <!-- Main Dashboard Canvas -->
+      <main class="page-content owner-canvas">
+        <!-- Live Connection Notice (Only shown if offline/restricted) -->
+        <div class="connection-banner hidden" id="connection-banner">
+          <span class="banner-icon">ℹ️</span>
+          <span class="banner-msg" id="banner-message">Backend service status: checking connection to Flask REST API...</span>
+          <button class="banner-dismiss" id="btn-banner-retry">Retry Sync</button>
+        </div>
+
+        <!-- 1. EXECUTIVE HEADER SECTION -->
+        <section class="owner-hero-card">
+          <div class="hero-left">
+            <div class="hero-role-tag">
+              <span class="shield-icon">🛡️</span>
+              <span id="owner-role-indicator">OWNER AUTHORITY</span>
+            </div>
+            <h2 class="hero-title" id="owner-greeting">Good day, Owner</h2>
+            <p class="hero-subtitle">Here's your organization overview.</p>
+          </div>
+          <div class="hero-right">
+            <div class="hero-timestamp" id="hero-timestamp">System Time: --:--:--</div>
+            <div class="hero-actions">
+              <button class="btn-sync-action" id="btn-sync-dashboard">
+                <span class="btn-icon">↻</span> Sync Realtime Data
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. QUICK ACCESS ACTION BAR -->
+        <section class="quick-access-section">
+          <div class="quick-access-label">QUICK ACTIONS</div>
+          <div class="quick-access-grid">
+            <a href="products.html" class="quick-access-card">
+              <span class="qa-icon">➕</span>
+              <span class="qa-text">Add Product</span>
+            </a>
+            <a href="inventory.html" class="quick-access-card">
+              <span class="qa-icon">📦</span>
+              <span class="qa-text">View Inventory</span>
+            </a>
+            <a href="purchase-orders.html" class="quick-access-card">
+              <span class="qa-icon">🛒</span>
+              <span class="qa-text">Purchase Orders</span>
+            </a>
+            <a href="reports.html" class="quick-access-card">
+              <span class="qa-icon">📊</span>
+              <span class="qa-text">View Reports</span>
+            </a>
+            <a href="notifications.html" class="quick-access-card">
+              <span class="qa-icon">🔔</span>
+              <span class="qa-text">Notifications</span>
+            </a>
+            <a href="audit-logs.html" class="quick-access-card">
+              <span class="qa-icon">🛡️</span>
+              <span class="qa-text">Audit Trail</span>
+            </a>
+          </div>
+        </section>
+
+        <!-- 3. TOP STRATEGIC KPI CARDS (REAL BACKEND METRICS ONLY) -->
+        <section class="strategic-kpi-grid">
+          <!-- KPI 1: Total Catalog Products -->
+          <div class="kpi-card navy-accent">
+            <div class="kpi-top">
+              <span class="kpi-title">Total Catalog Products</span>
+              <span class="kpi-tag">Catalog</span>
+            </div>
+            <div class="kpi-value-row">
+              <div class="kpi-main-number" id="kpi-total-products">--</div>
+            </div>
+            <div class="kpi-meta">
+              <span>Verified SKUs in database</span>
+            </div>
+          </div>
+
+          <!-- KPI 2: Available Stock Units -->
+          <div class="kpi-card saffron-accent">
+            <div class="kpi-top">
+              <span class="kpi-title">Available Stock Units</span>
+              <span class="kpi-tag">Warehouse</span>
+            </div>
+            <div class="kpi-value-row">
+              <div class="kpi-main-number" id="kpi-total-stock">--</div>
+            </div>
+            <div class="kpi-meta">
+              <span>Physical units currently available</span>
+            </div>
+          </div>
+
+          <!-- KPI 3: Total Stock Inward -->
+          <div class="kpi-card">
+            <div class="kpi-top">
+              <span class="kpi-title">Total Stock Inward</span>
+              <span class="kpi-tag green">Transactions</span>
+            </div>
+            <div class="kpi-value-row">
+              <div class="kpi-main-number" id="kpi-stock-in">--</div>
+            </div>
+            <div class="kpi-meta">
+              <span>Received units from Stock In</span>
+            </div>
+          </div>
+
+          <!-- KPI 4: Low Stock Risks -->
+          <div class="kpi-card danger-accent">
+            <div class="kpi-top">
+              <span class="kpi-title">Low Stock Items</span>
+              <span class="kpi-tag red" id="kpi-low-stock-badge">Threshold &le; 10</span>
+            </div>
+            <div class="kpi-value-row">
+              <div class="kpi-main-number alert-number" id="kpi-low-stock">--</div>
+            </div>
+            <div class="kpi-meta">
+              <span>Items needing replenishment</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. STRATEGIC DASHBOARD BODY: 2-COLUMN STRATEGIC GRID -->
+        <div class="strategic-body-grid">
+          <!-- ================= LEFT COLUMN: INVENTORY, FLOW & ATTENTION ================= -->
+          <div class="column-primary">
+            <!-- 4A. INVENTORY HEALTH CENTERPIECE -->
+            <div class="content-card centerpiece-card">
+              <div class="card-header">
+                <div class="card-title">
+                  <h2>Inventory Health & Distribution</h2>
+                  <p>Operational health ratio derived from real stock thresholds</p>
+                </div>
+                <div class="health-meta-badge" id="health-summary-badge">Analyzing...</div>
+              </div>
+              <div class="card-body">
+                <!-- Visual Multi-segment Health Bar -->
+                <div class="health-visual-container">
+                  <div class="health-bar-track">
+                    <div class="health-segment healthy" id="bar-healthy" style="width: 100%;" title="Adequate Stock"></div>
+                    <div class="health-segment low" id="bar-low" style="width: 0%;" title="Low Stock"></div>
+                    <div class="health-segment out" id="bar-out" style="width: 0%;" title="Out of Stock"></div>
+                  </div>
+                  <div class="health-legend">
+                    <div class="legend-item">
+                      <span class="legend-dot dot-healthy"></span>
+                      <span class="legend-text">Adequate Stock (> 10 units): <strong id="health-count-adequate">--</strong></span>
+                    </div>
+                    <div class="legend-item">
+                      <span class="legend-dot dot-low"></span>
+                      <span class="legend-text">Low Stock (1-10 units): <strong id="health-count-low">--</strong></span>
+                    </div>
+                    <div class="legend-item">
+                      <span class="legend-dot dot-out"></span>
+                      <span class="legend-text">Zero Stock (0 units): <strong id="health-count-zero">--</strong></span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Strategic Summary Metrics Strip -->
+                <div class="health-metrics-strip">
+                  <div class="strip-box">
+                    <span class="strip-label">Warehouse Status</span>
+                    <span class="strip-val" id="strip-warehouse-status">Verified Active</span>
+                  </div>
+                  <div class="strip-box">
+                    <span class="strip-label">Catalog Registered</span>
+                    <span class="strip-val" id="strip-catalog-count">-- SKUs</span>
+                  </div>
+                  <div class="strip-box">
+                    <span class="strip-label">Safety Stock Standard</span>
+                    <span class="strip-val">10 Units</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 4B. STOCK MOVEMENT VISUAL COMPARISON -->
+            <div class="content-card">
+              <div class="card-header">
+                <div class="card-title">
+                  <h2>Stock Movement Flow</h2>
+                  <p>Aggregate physical inventory inward vs outward transactions</p>
+                </div>
+                <a href="stock-transactions.html" class="card-action-link">View Transactions &rarr;</a>
+              </div>
+              <div class="card-body">
+                <div class="movement-comparison-box">
+                  <div class="movement-flow-row">
+                    <!-- Inward Side -->
+                    <div class="flow-side in-side">
+                      <div class="flow-header">
+                        <span class="flow-direction-icon">⬇</span>
+                        <span class="flow-label">STOCK IN (INWARD)</span>
+                      </div>
+                      <div class="flow-value" id="movement-stock-in">--</div>
+                      <span class="flow-sub">Accumulated inward units</span>
+                    </div>
+
+                    <!-- Flow Balance Divider -->
+                    <div class="flow-divider">
+                      <span class="flow-divider-badge">NET BALANCE</span>
+                      <div class="flow-net-number" id="movement-net-delta">--</div>
+                    </div>
+
+                    <!-- Outward Side -->
+                    <div class="flow-side out-side">
+                      <div class="flow-header">
+                        <span class="flow-direction-icon">⬆</span>
+                        <span class="flow-label">STOCK OUT (OUTWARD)</span>
+                      </div>
+                      <div class="flow-value" id="movement-stock-out">--</div>
+                      <span class="flow-sub">Accumulated outward units</span>
+                    </div>
+                  </div>
+
+                  <!-- Visual Progress Track -->
+                  <div class="movement-bar-wrapper">
+                    <div class="movement-bar-header">
+                      <span>Flow Distribution Ratio</span>
+                      <span id="movement-ratio-label">--% In / --% Out</span>
+                    </div>
+                    <div class="movement-track">
+                      <div class="movement-fill-in" id="movement-fill-in" style="width: 50%;"></div>
+                      <div class="movement-fill-out" id="movement-fill-out" style="width: 50%;"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 4C. CRITICAL ATTENTION PANEL -->
+            <div class="content-card attention-panel-card">
+              <div class="card-header">
+                <div class="card-title">
+                  <h2>Needs Your Attention</h2>
+                  <p>Operational alerts and inventory risks requiring Owner oversight</p>
+                </div>
+                <span class="attention-counter-badge" id="attention-total-badge">0 Alerts</span>
+              </div>
+              <div class="card-body">
+                <div class="attention-list" id="attention-items-container">
+                  <div class="empty-state-notice">
+                    <span class="empty-state-icon">🛡️</span>
+                    <p class="empty-state-title">Checking operational logs...</p>
+                    <p class="empty-state-desc">Loading live alerts from backend inventory and notification systems.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ================= RIGHT COLUMN: PROCUREMENT, SYSTEM & AUDIT ================= -->
+          <div class="column-secondary">
+            <!-- 4D. PROCUREMENT & SOURCING OVERVIEW -->
+            <div class="content-card">
+              <div class="card-header">
+                <div class="card-title">
+                  <h2>Procurement & Quotations</h2>
+                  <p>Orders and vendor quotation tracking</p>
+                </div>
+                <a href="purchase-orders.html" class="card-action-link">View Orders &rarr;</a>
+              </div>
+              <div class="card-body">
+                <div class="procurement-grid">
+                  <div class="proc-mini-card">
+                    <span class="proc-mini-label">Purchase Orders</span>
+                    <div class="proc-mini-val" id="proc-total-po">--</div>
+                    <div class="proc-mini-sub" id="proc-po-sub">Registered orders</div>
+                  </div>
+                  <div class="proc-mini-card">
+                    <span class="proc-mini-label">Quotations</span>
+                    <div class="proc-mini-val" id="proc-total-quotes">--</div>
+                    <div class="proc-mini-sub" id="proc-quotes-sub">Vendor quotes</div>
+                  </div>
+                  <div class="proc-mini-card">
+                    <span class="proc-mini-label">Product Categories</span>
+                    <div class="proc-mini-val" id="proc-total-categories">--</div>
+                    <div class="proc-mini-sub"><a href="categories.html" class="sub-link">Catalog classes</a></div>
+                  </div>
+                  <div class="proc-mini-card">
+                    <span class="proc-mini-label">Registered Suppliers</span>
+                    <div class="proc-mini-val" id="proc-total-suppliers">--</div>
+                    <div class="proc-mini-sub"><a href="suppliers.html" class="sub-link">Vendor directory</a></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 4E. SYSTEM HEALTH & MODULE INTEGRITY -->
+            <div class="content-card">
+              <div class="card-header">
+                <div class="card-title">
+                  <h2>System Health Monitor</h2>
+                  <p>Real-time availability of core SIMS subsystems</p>
+                </div>
+                <a href="system-status.html" class="card-action-link">Status Center &rarr;</a>
+              </div>
+              <div class="card-body">
+                <div class="health-module-list">
+                  <div class="module-row">
+                    <div class="module-info">
+                      <span class="module-icon">📦</span>
+                      <div>
+                        <div class="module-name">Inventory Engine</div>
+                        <div class="module-detail" id="health-inventory-detail">Live stock & threshold verification</div>
+                      </div>
+                    </div>
+                    <span class="status-pill ready" id="health-inventory-pill">READY</span>
+                  </div>
+
+                  <div class="module-row">
+                    <div class="module-info">
+                      <span class="module-icon">📊</span>
+                      <div>
+                        <div class="module-name">Reports Engine</div>
+                        <div class="module-detail">Automated reporting and data exports</div>
+                      </div>
+                    </div>
+                    <span class="status-pill ready" id="health-reports-pill">READY</span>
+                  </div>
+
+                  <div class="module-row">
+                    <div class="module-info">
+                      <span class="module-icon">🔐</span>
+                      <div>
+                        <div class="module-name">Authentication & RBAC</div>
+                        <div class="module-detail">JWT validation & role-based gatekeeper</div>
+                      </div>
+                    </div>
+                    <span class="status-pill ready" id="health-auth-pill">READY</span>
+                  </div>
+
+                  <div class="module-row">
+                    <div class="module-info">
+                      <span class="module-icon">🔔</span>
+                      <div>
+                        <div class="module-name">Notification Subsystem</div>
+                        <div class="module-detail">Alert dispatching & unread queue</div>
+                      </div>
+                    </div>
+                    <span class="status-pill ready" id="health-notif-pill">READY</span>
+                  </div>
+
+                  <div class="module-row">
+                    <div class="module-info">
+                      <span class="module-icon">🗄️</span>
+                      <div>
+                        <div class="module-name">Database Storage</div>
+                        <div class="module-detail">PostgreSQL relational repository</div>
+                      </div>
+                    </div>
+                    <span class="status-pill ready" id="health-db-pill">READY</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 4F. RECENT ACTIVITY (REAL AUDIT TRAIL DATA) -->
+            <div class="content-card">
+              <div class="card-header">
+                <div class="card-title">
+                  <h2>Recent Organization Activity</h2>
+                  <p>Chronological audit log events recorded by SIMS</p>
+                </div>
+                <a href="audit-logs.html" class="card-action-link">View All Logs &rarr;</a>
+              </div>
+              <div class="card-body">
+                <div class="activity-stream" id="recent-activity-container">
+                  <div class="empty-state-notice">
+                    <span class="empty-state-icon">📋</span>
+                    <p class="empty-state-title">Loading audit logs...</p>
+                    <p class="empty-state-desc">Fetching recent administrative actions from the system.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Shared Scripts & Controller -->
+  <script src="../js/api.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/sidebar.js"></script>
+  <script src="../js/topbar.js"></script>
+  <script src="../js/owner-dashboard.js"></script>
+</body>
+</html>
+

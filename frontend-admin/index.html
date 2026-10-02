@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SIMS - Smart Inventory Management System</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/sidebar.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- ==================== LEFT SIDEBAR ==================== -->
+    <aside class="sidebar">
+      <!-- Brand Logo Header -->
+      <div class="sidebar-header">
+        <a href="#dashboard" class="brand-wrapper">
+          <div class="brand-logo-icon">S</div>
+          <div class="brand-info">
+            <span class="brand-name">SIMS</span>
+            <span class="brand-tagline">Inventory OS</span>
+          </div>
+        </a>
+      </div>
+
+      <!-- Navigation Tree -->
+      <nav class="sidebar-nav">
+        <!-- Section: COMMAND CENTER -->
+        <div class="nav-section">
+          <div class="nav-section-title">🏠 Command Center</div>
+          <ul class="nav-list">
+            <li class="nav-item active" data-route="dashboard">
+              <a href="#dashboard">
+                <span class="nav-item-icon" id="icon-dash"></span>
+                <span class="nav-item-label">Dashboard</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Section: INVENTORY -->
+        <div class="nav-section">
+          <div class="nav-section-title">📦 Inventory</div>
+          <ul class="nav-list">
+            <li class="nav-item" data-route="inventory">
+              <a href="#inventory">
+                <span class="nav-item-icon" id="icon-inv"></span>
+                <span class="nav-item-label">Inventory</span>
+              </a>
+            </li>
+            <li class="nav-item" data-route="products">
+              <a href="#products">
+                <span class="nav-item-icon" id="icon-prod"></span>
+                <span class="nav-item-label">Products</span>
+              </a>
+            </li>
+            <li class="nav-item" data-route="categories">
+              <a href="#categories">
+                <span class="nav-item-icon" id="icon-cat"></span>
+                <span class="nav-item-label">Categories</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Section: PROCUREMENT -->
+        <div class="nav-section">
+          <div class="nav-section-title">🛒 Procurement</div>
+          <ul class="nav-list">
+            <li class="nav-item" data-route="suppliers">
+              <a href="#suppliers">
+                <span class="nav-item-icon" id="icon-supp"></span>
+                <span class="nav-item-label">Suppliers</span>
+              </a>
+            </li>
+            <li class="nav-item" data-route="purchase-orders">
+              <a href="#purchase-orders">
+                <span class="nav-item-icon" id="icon-po"></span>
+                <span class="nav-item-label">Purchase Orders</span>
+              </a>
+            </li>
+            <li class="nav-item" data-route="quotations">
+              <a href="#quotations">
+                <span class="nav-item-icon" id="icon-quote"></span>
+                <span class="nav-item-label">Quotations</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Section: OPERATIONS -->
+        <div class="nav-section">
+          <div class="nav-section-title">🔄 Operations</div>
+          <ul class="nav-list">
+            <li class="nav-item" data-route="stock-transactions">
+              <a href="#stock-transactions">
+                <span class="nav-item-icon" id="icon-trx"></span>
+                <span class="nav-item-label">Stock Transactions</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Section: INSIGHTS -->
+        <div class="nav-section">
+          <div class="nav-section-title">📊 Insights</div>
+          <ul class="nav-list">
+            <li class="nav-item" data-route="reports">
+              <a href="#reports">
+                <span class="nav-item-icon" id="icon-rep"></span>
+                <span class="nav-item-label">Reports</span>
+              </a>
+            </li>
+            <li class="nav-item" data-route="notifications">
+              <a href="#notifications">
+                <span class="nav-item-icon" id="icon-notif"></span>
+                <span class="nav-item-label">Notifications</span>
+                <span class="nav-badge" id="sidebar-notif-badge">2</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Section: SYSTEM -->
+        <div class="nav-section">
+          <div class="nav-section-title">🛡️ System</div>
+          <ul class="nav-list">
+            <li class="nav-item" data-route="audit-logs">
+              <a href="#audit-logs">
+                <span class="nav-item-icon" id="icon-audit"></span>
+                <span class="nav-item-label">Audit Logs</span>
+              </a>
+            </li>
+            <li class="nav-item" data-route="backups">
+              <a href="#backups">
+                <span class="nav-item-icon" id="icon-back"></span>
+                <span class="nav-item-label">Backup Center</span>
+              </a>
+            </li>
+            <li class="nav-item" data-route="system-status">
+              <a href="#system-status">
+                <span class="nav-item-icon" id="icon-status"></span>
+                <span class="nav-item-label">System Status</span>
+              </a>
+            </li>
+            <li class="nav-item" data-route="users-roles">
+              <a href="#users-roles">
+                <span class="nav-item-icon" id="icon-users"></span>
+                <span class="nav-item-label">Users & Roles</span>
+              </a>
+            </li>
+            <li class="nav-item" data-route="settings">
+              <a href="#settings">
+                <span class="nav-item-icon" id="icon-sett"></span>
+                <span class="nav-item-label">Settings</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </nav>
+
+      <!-- Sidebar User Profile Footer (Matching Mockup) -->
+      <div class="sidebar-footer">
+        <div class="user-profile-widget">
+          <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80" alt="Avatar" class="user-avatar" />
+          <div class="user-details">
+            <span class="user-name">Mrugadni</span>
+            <span class="user-email">mrugadni@inventory.com</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ==================== MAIN CONTENT ==================== -->
+    <main class="main-content">
+      <!-- Topbar Header (Matching Mockup) -->
+      <header class="topbar">
+        <div class="topbar-greeting">
+          <span id="header-sun-icon"></span>
+          <span>Hello, Mrugadni!</span>
+        </div>
+
+        <div class="topbar-right">
+          <!-- Global Search Box -->
+          <div class="search-wrapper">
+            <span class="search-icon-left" id="icon-search-top"></span>
+            <input type="text" id="global-search" class="search-input" placeholder="Search anything..." oninput="App.handleGlobalSearch(this)" />
+            <span class="search-shortcut">⌘F</span>
+          </div>
+
+          <!-- Calendar Icon -->
+          <button class="icon-btn" title="Calendar" id="btn-cal"></button>
+
+          <!-- Notification Bell -->
+          <button class="icon-btn" title="Notifications" onclick="App.navigate('notifications')" id="btn-bell">
+            <span class="badge-dot" id="notif-badge"></span>
+          </button>
+
+          <!-- Live System Status Indicator -->
+          <div class="system-status-pill">
+            <span class="pulse-dot"></span>
+            <span>READY</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Dynamic View Container -->
+      <div class="content-body" id="view-container">
+        <!-- Rendered by App.handleRouting() -->
+      </div>
+    </main>
+  </div>
+
+  <!-- ==================== MODALS ==================== -->
+  <!-- Modal: Add Product -->
+  <div class="modal-overlay" id="modal-add-product">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 class="modal-title">Add New Product to Catalog</h3>
+        <button class="action-icon-btn" onclick="App.closeModal('modal-add-product')">✕</button>
+      </div>
+      <form onsubmit="App.saveNewProduct(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Product Name</label>
+            <input type="text" id="new-prod-name" class="form-control" placeholder="e.g. Logitech MX Master 3" required />
+          </div>
+          <div class="form-group">
+            <label>SKU Code</label>
+            <input type="text" id="new-prod-sku" class="form-control" placeholder="e.g. ELEC-LOG-002" required />
+          </div>
+          <div class="form-group">
+            <label>Category</label>
+            <select id="new-prod-cat" class="form-control">
+              <option value="1">Electronics</option>
+              <option value="2">Stationery</option>
+              <option value="3">Furniture</option>
+              <option value="4">Cables & Adapters</option>
+            </select>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label>Selling Price (₹)</label>
+              <input type="number" id="new-prod-price" class="form-control" placeholder="999.00" step="0.01" required />
+            </div>
+            <div class="form-group">
+              <label>Safety Reorder Limit</label>
+              <input type="number" id="new-prod-reorder" class="form-control" value="10" required />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Initial In-Stock Quantity</label>
+            <input type="number" id="new-prod-stock" class="form-control" value="50" required />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="App.closeModal('modal-add-product')">Cancel</button>
+          <button type="submit" class="btn-primary">Save Product</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Add Category -->
+  <div class="modal-overlay" id="modal-add-category">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 class="modal-title">Create New Category</h3>
+        <button class="action-icon-btn" onclick="App.closeModal('modal-add-category')">✕</button>
+      </div>
+      <form onsubmit="App.saveNewCategory(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Category Name</label>
+            <input type="text" id="new-cat-name" class="form-control" placeholder="e.g. Storage Devices" required />
+          </div>
+          <div class="form-group">
+            <label>Description</label>
+            <textarea id="new-cat-desc" class="form-control" rows="3" placeholder="Description of this category..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="App.closeModal('modal-add-category')">Cancel</button>
+          <button type="submit" class="btn-primary">Save Category</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Add Supplier -->
+  <div class="modal-overlay" id="modal-add-supplier">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 class="modal-title">Register New Supplier</h3>
+        <button class="action-icon-btn" onclick="App.closeModal('modal-add-supplier')">✕</button>
+      </div>
+      <form onsubmit="App.saveNewSupplier(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Company / Supplier Name</label>
+            <input type="text" id="new-sup-name" class="form-control" placeholder="e.g. Metro Supplies Ltd" required />
+          </div>
+          <div class="form-group">
+            <label>Contact Person</label>
+            <input type="text" id="new-sup-contact" class="form-control" placeholder="e.g. Suresh Deshmukh" required />
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label>Work Phone</label>
+              <input type="tel" id="new-sup-phone" class="form-control" placeholder="+91 98220 12345" required />
+            </div>
+            <div class="form-group">
+              <label>Email Address</label>
+              <input type="email" id="new-sup-email" class="form-control" placeholder="vendor@metro.com" required />
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="App.closeModal('modal-add-supplier')">Cancel</button>
+          <button type="submit" class="btn-primary">Save Supplier</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Create Purchase Order -->
+  <div class="modal-overlay" id="modal-create-po">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 class="modal-title">Create Purchase Order</h3>
+        <button class="action-icon-btn" onclick="App.closeModal('modal-create-po')">✕</button>
+      </div>
+      <form onsubmit="App.saveNewPO(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Select Supplier</label>
+            <select id="po-supplier" class="form-control">
+              <option value="1">TechWorld Suppliers</option>
+              <option value="2">OfficeMart Pvt Ltd</option>
+              <option value="3">Global Electronics</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Expected Delivery Date</label>
+            <input type="date" id="po-delivery" class="form-control" required />
+          </div>
+          <div class="form-group">
+            <label>Total Order Amount (₹)</label>
+            <input type="number" id="po-amount" class="form-control" placeholder="18500.00" step="0.01" required />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="App.closeModal('modal-create-po')">Cancel</button>
+          <button type="submit" class="btn-primary">Issue PO</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Record Stock Transaction -->
+  <div class="modal-overlay" id="modal-record-transaction">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 class="modal-title">Record Stock Movement</h3>
+        <button class="action-icon-btn" onclick="App.closeModal('modal-record-transaction')">✕</button>
+      </div>
+      <form onsubmit="App.saveTransaction(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Select Product</label>
+            <select id="trx-prod" class="form-control">
+              <option value="1">Dell Wireless Mouse (ELEC-MOU-001)</option>
+              <option value="2">HP Keyboard Pro (ELEC-KEY-001)</option>
+              <option value="3">A4 Executive Notebook (STAT-NOT-001)</option>
+              <option value="4">Ergonomic Office Chair (FURN-CHA-001)</option>
+              <option value="5">USB Type-C Fast Cable (COMP-CAB-001)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Transaction Movement Type</label>
+            <select id="trx-type" class="form-control">
+              <option value="STOCK_IN">STOCK_IN (Receiving Shipment / Restock)</option>
+              <option value="STOCK_OUT">STOCK_OUT (Order Dispatch / Consumption)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Units Quantity</label>
+            <input type="number" id="trx-qty" class="form-control" min="1" value="20" required />
+          </div>
+          <div class="form-group">
+            <label>Reference Note / PO Number</label>
+            <input type="text" id="trx-ref" class="form-control" placeholder="e.g. PO-2026-001 or Dispatch #482" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="App.closeModal('modal-record-transaction')">Cancel</button>
+          <button type="submit" class="btn-primary">Record Movement</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Generate Report -->
+  <div class="modal-overlay" id="modal-generate-report">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 class="modal-title">Generate Inventory Audit Report</h3>
+        <button class="action-icon-btn" onclick="App.triggerReportGeneration(event)">✕</button>
+      </div>
+      <form onsubmit="App.triggerReportGeneration(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Report Name</label>
+            <input type="text" id="report-name" class="form-control" value="Weekly Inventory Balance" required />
+          </div>
+          <div class="form-group">
+            <label>Report Type</label>
+            <select id="report-type" class="form-control">
+              <option value="Inventory">Inventory Status & Reorder Report</option>
+              <option value="Valuation">Stock Valuation Summary</option>
+              <option value="Dispatches">Movement & Dispatch Audit</option>
+            </select>
+          </div>
+          <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 10px 14px; font-size: 12px; color: #166534;">
+            ✓ SystemStatus check passed: Inventory module is in <strong>READY</strong> state.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="App.closeModal('modal-generate-report')">Cancel</button>
+          <button type="submit" class="btn-primary">Generate Report Now</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== SCRIPTS ==================== -->
+  <script src="assets/icons.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/views/dashboard.js"></script>
+  <script src="js/views/inventory.js"></script>
+  <script src="js/views/procurement.js"></script>
+  <script src="js/views/operations.js"></script>
+  <script src="js/views/insights.js"></script>
+  <script src="js/views/system.js"></script>
+  <script src="js/app.js"></script>
+
+  <!-- Inject Icons into Static Elements -->
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("icon-dash").innerHTML = Icons.dashboard;
+      document.getElementById("icon-inv").innerHTML = Icons.inventory;
+      document.getElementById("icon-prod").innerHTML = Icons.products;
+      document.getElementById("icon-cat").innerHTML = Icons.categories;
+      document.getElementById("icon-supp").innerHTML = Icons.suppliers;
+      document.getElementById("icon-po").innerHTML = Icons.orders;
+      document.getElementById("icon-quote").innerHTML = Icons.quotations;
+      document.getElementById("icon-trx").innerHTML = Icons.transactions;
+      document.getElementById("icon-rep").innerHTML = Icons.reports;
+      document.getElementById("icon-notif").innerHTML = Icons.notifications;
+      document.getElementById("icon-audit").innerHTML = Icons.audit;
+      document.getElementById("icon-back").innerHTML = Icons.backups;
+      document.getElementById("icon-status").innerHTML = Icons.status;
+      document.getElementById("icon-users").innerHTML = Icons.users;
+      document.getElementById("icon-sett").innerHTML = Icons.settings;
+
+      document.getElementById("header-sun-icon").innerHTML = Icons.sun;
+      document.getElementById("icon-search-top").innerHTML = Icons.search;
+      document.getElementById("btn-cal").innerHTML = Icons.calendar;
+      document.getElementById("btn-bell").innerHTML = Icons.notifications + '<span class="badge-dot" id="notif-badge"></span>';
+    });
+  </script>
+</body>
+</html>
+

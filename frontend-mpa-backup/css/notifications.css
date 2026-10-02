@@ -1,0 +1,36 @@
+/* Page CSS for Notifications & Alerts */
+/* Notifications-specific Styles */
+.notifications-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.notif-card {
+  padding: 14px 18px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background-color: #ffffff;
+}
+.notif-card.unread {
+  background-color: #f0fdf4;
+  border-color: #bbf7d0;
+}
+.notif-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.notif-title {
+  font-weight: 700;
+  color: var(--text-main);
+}
+.notif-body {
+  color: #475569;
+  font-size: 13px;
+}
+.notif-time {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 4px;
+}
