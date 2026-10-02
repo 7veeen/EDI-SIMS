@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SIMS — Sign In | Smart Inventory Management System</title>
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/login.css">
+</head>
+<body class="login-body">
+  <div class="login-container">
+    <!-- ==================== LEFT BRANDING PANEL ==================== -->
+    <div class="login-brand-panel">
+      <div class="brand-panel-content">
+        <div class="brand-badge-row">
+          <span class="edi-badge">🎓 EDI COLLEGE PROJECT</span>
+          <span class="version-badge">v2.0 ENTERPRISE</span>
+        </div>
+
+        <div class="brand-logo-area">
+          <div class="brand-logo-icon">S</div>
+          <div>
+            <h1 class="brand-logo-title">SIMS</h1>
+            <p class="brand-logo-sub">Smart Inventory Management System</p>
+          </div>
+        </div>
+
+        <div class="brand-pitch">
+          <h2>Precision Control Over Electronics Inventory & Sourcing.</h2>
+          <p>
+            An integrated warehouse management platform engineered for real-time tracking,
+            threshold alerting, automated procurement workflows, and multi-tier role authorization.
+          </p>
+        </div>
+
+        <div class="brand-feature-list">
+          <div class="feature-item">
+            <span class="feature-icon">🛡️</span>
+            <div>
+              <strong>Multi-Tier Role Governance</strong>
+              <p>Tailored consoles for Owner, Manager, Employee, and Supplier roles.</p>
+            </div>
+          </div>
+          <div class="feature-item">
+            <span class="feature-icon">⚡</span>
+            <div>
+              <strong>Real-Time Stock Thresholds</strong>
+              <p>Instant detection of low-stock and stockout conditions across all SKUs.</p>
+            </div>
+          </div>
+          <div class="feature-item">
+            <span class="feature-icon">📋</span>
+            <div>
+              <strong>Audit & Transaction Integrity</strong>
+              <p>Continuous cryptographic-grade logging of every inward and outward movement.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="brand-footer-note">
+          <span>Electronics Engineering &bull; Department of Information Technology</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== RIGHT LOGIN FORM PANEL ==================== -->
+    <div class="login-form-panel">
+      <div class="form-wrapper">
+        <!-- Form Header -->
+        <div class="form-header">
+          <div class="mobile-brand-icon">S</div>
+          <h2 class="form-title">Welcome Back</h2>
+          <p class="form-subtitle">Sign in with your organizational credentials to access your SIMS console.</p>
+        </div>
+
+        <!-- Alert / Error Message Area -->
+        <div class="login-alert hidden" id="login-alert" role="alert">
+          <span class="alert-icon" id="alert-icon">⚠️</span>
+          <span class="alert-text" id="alert-text">Error message text</span>
+        </div>
+
+        <!-- Login Form -->
+        <form class="login-form" id="login-form" novalidate>
+          <!-- Username Field -->
+          <div class="form-group">
+            <label for="username" class="form-label">Username or Corporate Email</label>
+            <div class="input-wrapper">
+              <span class="input-icon">👤</span>
+              <input
+                type="text"
+                id="username"
+                name="username"
+                class="form-input"
+                placeholder="e.g. admin or mrugadni"
+                autocomplete="username"
+                required
+              />
+            </div>
+          </div>
+
+          <!-- Password Field with Show/Hide -->
+          <div class="form-group">
+            <div class="label-row">
+              <label for="password" class="form-label">Password</label>
+              <button type="button" class="btn-forgot-link" id="btn-forgot-password">
+                Forgot password?
+              </button>
+            </div>
+            <div class="input-wrapper">
+              <span class="input-icon">🔒</span>
+              <input
+                type="password"
+                id="password"
+                name="password"
+                class="form-input"
+                placeholder="Enter your security password"
+                autocomplete="current-password"
+                required
+              />
+              <button
+                type="button"
+                class="btn-toggle-password"
+                id="btn-toggle-password"
+                title="Show or hide password"
+                aria-label="Show password"
+              >
+                <span class="eye-icon" id="eye-icon">👁️</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Security Notice -->
+          <div class="security-badge-row">
+            <span class="sec-dot"></span>
+            <span>Secured with Flask JWT &bull; Role-Based Access Control</span>
+          </div>
+
+          <!-- Submit Button with Loading State -->
+          <div class="form-action">
+            <button type="submit" class="btn-submit-login" id="btn-submit-login">
+              <span class="btn-text" id="btn-text">Sign In to SIMS</span>
+              <span class="btn-spinner hidden" id="btn-spinner"></span>
+            </button>
+          </div>
+        </form>
+
+        <!-- Informational Modal / Notice (UI Only) -->
+        <div class="info-card-notice hidden" id="info-card-notice">
+          <div class="info-notice-header">
+            <strong>Password Recovery Assistance</strong>
+            <button type="button" class="btn-close-notice" id="btn-close-notice">&times;</button>
+          </div>
+          <p>
+            User credentials are managed directly by your SIMS System Owner or Administrator.
+            Please submit a request to your system administrator to generate a temporary reset key.
+          </p>
+        </div>
+
+        <!-- Form Footer -->
+        <div class="form-footer">
+          <p>
+            Authorized access only. All sessions, IP addresses, and actions are logged
+            to the SIMS system audit repository.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shared Scripts & Dedicated Login Controller -->
+  <script src="../js/api.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/login.js"></script>
+</body>
+</html>
+

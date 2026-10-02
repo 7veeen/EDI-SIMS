@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SIMS - Command Center Dashboard</title>
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/sidebar.css">
+  <link rel="stylesheet" href="../css/topbar.css">
+  <link rel="stylesheet" href="../css/dashboard.css">
+</head>
+<body>
+  <div class="app-layout">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="dashboard.html" class="brand-box">
+          <div class="brand-icon">S</div>
+          <div>
+            <div class="brand-title">SIMS</div>
+            <div class="brand-sub">Inventory OS</div>
+          </div>
+        </a>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-group">
+          <div class="nav-group-title">🏠 Command Center</div>
+          <ul class="nav-list">
+            <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
+          </ul>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-group-title">📦 Inventory</div>
+          <ul class="nav-list">
+            <li><a href="inventory.html" class="nav-link">Inventory</a></li>
+            <li><a href="products.html" class="nav-link">Products</a></li>
+            <li><a href="categories.html" class="nav-link">Categories</a></li>
+          </ul>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-group-title">🛒 Procurement</div>
+          <ul class="nav-list">
+            <li><a href="suppliers.html" class="nav-link">Suppliers</a></li>
+            <li><a href="purchase-orders.html" class="nav-link">Purchase Orders</a></li>
+            <li><a href="quotations.html" class="nav-link">Quotations</a></li>
+          </ul>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-group-title">🔄 Operations</div>
+          <ul class="nav-list">
+            <li><a href="stock-transactions.html" class="nav-link">Stock Transactions</a></li>
+          </ul>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-group-title">📊 Insights</div>
+          <ul class="nav-list">
+            <li><a href="reports.html" class="nav-link">Reports</a></li>
+            <li><a href="notifications.html" class="nav-link">Notifications</a></li>
+          </ul>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-group-title">🛡️ System</div>
+          <ul class="nav-list">
+            <li><a href="audit-logs.html" class="nav-link">Audit Logs</a></li>
+            <li><a href="backup.html" class="nav-link">Backup Center</a></li>
+            <li><a href="system-status.html" class="nav-link">System Status</a></li>
+            <li><a href="users-roles.html" class="nav-link">Users & Roles</a></li>
+            <li><a href="settings.html" class="nav-link">Settings</a></li>
+          </ul>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-avatar-circle" id="sidebar-user-avatar">A</div>
+        <div class="user-info-text">
+          <span class="user-display-name" id="sidebar-user-name">Administrator</span>
+          <span class="user-display-role" id="sidebar-user-role">Owner</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="main-wrapper">
+      <header class="topbar">
+        <div class="topbar-left">
+          <h1 class="page-headline">Command Center Dashboard</h1>
+        </div>
+        <div class="topbar-right">
+          <div class="status-badge-live">
+            <span class="pulse-circle"></span>
+            <span>SYSTEM READY</span>
+          </div>
+          <button class="logout-btn" id="topbar-logout-btn">Logout</button>
+        </div>
+      </header>
+
+      <main class="page-content">
+        <!-- KPI Metric Cards -->
+        <div class="dashboard-kpi-grid">
+          <div class="kpi-box">
+            <div class="kpi-label">Available Stock Units</div>
+            <div class="kpi-number" id="metric-stock">--</div>
+            <div class="kpi-trend positive">Live from inventory module</div>
+          </div>
+          <div class="kpi-box">
+            <div class="kpi-label">Total Catalog Products</div>
+            <div class="kpi-number" id="metric-products">--</div>
+            <div class="kpi-trend positive">Active catalog items</div>
+          </div>
+          <div class="kpi-box">
+            <div class="kpi-label">Stock Inward (Units)</div>
+            <div class="kpi-number" id="metric-stock-in">--</div>
+            <div class="kpi-trend">Received from POs</div>
+          </div>
+          <div class="kpi-box">
+            <div class="kpi-label">Low Stock Alerts</div>
+            <div class="kpi-number alert" id="metric-low-stock">--</div>
+            <div class="kpi-trend negative">Items <= 10 units</div>
+          </div>
+        </div>
+
+        <div class="content-card">
+          <div class="card-header">
+            <div class="card-title">
+              <h2>Critical Stock Monitoring</h2>
+              <p>Items reaching or falling below safety reorder threshold</p>
+            </div>
+            <button class="btn-primary" id="btn-refresh-dash">Refresh Data</button>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="data-table" id="dash-low-stock-table">
+                <thead>
+                  <tr>
+                    <th>Product ID</th>
+                    <th>Product Name</th>
+                    <th>Available Units</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="dash-low-stock-tbody">
+                  <tr><td colspan="4" style="text-align: center; color: #64748b;">Loading metrics from backend API...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/sidebar.js"></script>
+  <script src="../js/topbar.js"></script>
+  <script src="../js/dashboard.js"></script>
+</body>
+</html>

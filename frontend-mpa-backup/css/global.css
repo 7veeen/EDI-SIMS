@@ -1,0 +1,218 @@
+/* SIMS - Global Reusable Styles */
+:root {
+  --primary-color: #10b981;
+  --primary-hover: #059669;
+  --primary-light: rgba(16, 185, 129, 0.12);
+
+  --sidebar-bg: #121816;
+  --sidebar-border: #1f2923;
+  --sidebar-text: #94a3b8;
+  --sidebar-text-active: #ffffff;
+  --sidebar-hover: #1a231f;
+
+  --bg-main: #f8fafc;
+  --bg-card: #ffffff;
+  --border-color: #e2e8f0;
+  --border-light: #f1f5f9;
+
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --text-sub: #94a3b8;
+
+  --status-success-bg: #dcfce7;
+  --status-success-text: #15803d;
+  --status-warning-bg: #fef3c7;
+  --status-warning-text: #b45309;
+  --status-danger-bg: #ffe4e6;
+  --status-danger-text: #be123c;
+  --status-info-bg: #eff6ff;
+  --status-info-text: #1d4ed8;
+
+  --sidebar-width: 260px;
+  --topbar-height: 70px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-full: 9999px;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  line-height: 1.5;
+  font-size: 14px;
+  overflow-x: hidden;
+  height: 100vh;
+}
+
+.app-layout {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.main-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow-y: auto;
+  background-color: var(--bg-main);
+}
+
+.page-content {
+  padding: 24px 32px 48px 32px;
+  flex: 1;
+}
+
+/* Common Card */
+.content-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+.card-header {
+  padding: 18px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-light);
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.card-title h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.card-title p {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.card-body {
+  padding: 24px;
+}
+
+/* Common Buttons */
+.btn-primary {
+  background-color: var(--primary-color);
+  color: #ffffff;
+  border: none;
+  padding: 9px 18px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-hover);
+}
+
+.btn-secondary {
+  background-color: #ffffff;
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+}
+
+.btn-secondary:hover {
+  background-color: var(--bg-main);
+}
+
+/* Common Data Tables */
+.table-responsive {
+  overflow-x: auto;
+}
+
+table.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+table.data-table th {
+  background-color: #f8fafc;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+table.data-table td {
+  padding: 14px 20px;
+  font-size: 13px;
+  color: var(--text-main);
+  border-bottom: 1px solid var(--border-light);
+  vertical-align: middle;
+}
+
+table.data-table tr:hover td {
+  background-color: #fafbfc;
+}
+
+/* Status Pills */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.status-pill.success {
+  background-color: var(--status-success-bg);
+  color: var(--status-success-text);
+}
+
+.status-pill.warning {
+  background-color: var(--status-warning-bg);
+  color: var(--status-warning-text);
+}
+
+.status-pill.danger {
+  background-color: var(--status-danger-bg);
+  color: var(--status-danger-text);
+}
+
+.status-pill.neutral {
+  background-color: #f1f5f9;
+  color: #334155;
+  border: 1px solid #e2e8f0;
+}
+

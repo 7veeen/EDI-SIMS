@@ -1,0 +1,100 @@
+/* SIMS Admin Dashboard - Core Styles & Theme Variables */
+:root {
+  /* Brand Accents */
+  --primary: #10b981;
+  --primary-hover: #059669;
+  --primary-light: rgba(16, 185, 129, 0.12);
+  --primary-border: #a7f3d0;
+
+  /* Dark Sidebar */
+  --sidebar-bg: #121816;
+  --sidebar-border: #1f2923;
+  --sidebar-text: #94a3b8;
+  --sidebar-text-active: #ffffff;
+  --sidebar-hover: #1a231f;
+  --sidebar-header: #4b5563;
+
+  /* Light Theme Surfaces (Matching Mockup) */
+  --bg-main: #f8fafc;
+  --bg-card: #ffffff;
+  --border-color: #e2e8f0;
+  --border-light: #f1f5f9;
+
+  /* Typography Colors */
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --text-sub: #94a3b8;
+
+  /* Status Colors */
+  --status-success-bg: #dcfce7;
+  --status-success-text: #15803d;
+  --status-warning-bg: #fef3c7;
+  --status-warning-text: #b45309;
+  --status-danger-bg: #ffe4e6;
+  --status-danger-text: #be123c;
+  --status-info-bg: #eff6ff;
+  --status-info-text: #1d4ed8;
+
+  /* Metrics / Dimensions */
+  --sidebar-width: 260px;
+  --topbar-height: 70px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-dropdown: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  --shadow-modal: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  line-height: 1.5;
+  font-size: 14px;
+  overflow-x: hidden;
+  height: 100vh;
+}
+
+.app-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+/* Main Content Area */
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow-y: auto;
+  background-color: var(--bg-main);
+}
+
+.content-body {
+  padding: 24px 32px 48px 32px;
+  flex: 1;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.view-section {
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+

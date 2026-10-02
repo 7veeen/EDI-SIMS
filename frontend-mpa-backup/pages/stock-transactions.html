@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SIMS - Stock Transactions</title>
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/sidebar.css">
+  <link rel="stylesheet" href="../css/topbar.css">
+  <link rel="stylesheet" href="../css/stock-transactions.css">
+</head>
+<body>
+  <div class="app-layout">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="dashboard.html" class="brand-box">
+          <div class="brand-icon">S</div>
+          <div>
+            <div class="brand-title">SIMS</div>
+            <div class="brand-sub">Inventory OS</div>
+          </div>
+        </a>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-group">
+          <div class="nav-group-title">🏠 Command Center</div>
+          <ul class="nav-list">
+            <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
+          </ul>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-group-title">📦 Inventory</div>
+          <ul class="nav-list">
+            <li><a href="inventory.html" class="nav-link">Inventory</a></li>
+            <li><a href="products.html" class="nav-link">Products</a></li>
+            <li><a href="categories.html" class="nav-link">Categories</a></li>
+          </ul>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-group-title">🛒 Procurement</div>
+          <ul class="nav-list">
+            <li><a href="suppliers.html" class="nav-link">Suppliers</a></li>
+            <li><a href="purchase-orders.html" class="nav-link">Purchase Orders</a></li>
+            <li><a href="quotations.html" class="nav-link">Quotations</a></li>
+          </ul>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-group-title">🔄 Operations</div>
+          <ul class="nav-list">
+            <li><a href="stock-transactions.html" class="nav-link">Stock Transactions</a></li>
+          </ul>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-group-title">📊 Insights</div>
+          <ul class="nav-list">
+            <li><a href="reports.html" class="nav-link">Reports</a></li>
+            <li><a href="notifications.html" class="nav-link">Notifications</a></li>
+          </ul>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-group-title">🛡️ System</div>
+          <ul class="nav-list">
+            <li><a href="audit-logs.html" class="nav-link">Audit Logs</a></li>
+            <li><a href="backup.html" class="nav-link">Backup Center</a></li>
+            <li><a href="system-status.html" class="nav-link">System Status</a></li>
+            <li><a href="users-roles.html" class="nav-link">Users & Roles</a></li>
+            <li><a href="settings.html" class="nav-link">Settings</a></li>
+          </ul>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-avatar-circle" id="sidebar-user-avatar">A</div>
+        <div class="user-info-text">
+          <span class="user-display-name" id="sidebar-user-name">Administrator</span>
+          <span class="user-display-role" id="sidebar-user-role">Owner</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="main-wrapper">
+      <header class="topbar">
+        <div class="topbar-left">
+          <h1 class="page-headline">Stock Transactions</h1>
+        </div>
+        <div class="topbar-right">
+          <div class="status-badge-live">
+            <span class="pulse-circle"></span>
+            <span>SYSTEM READY</span>
+          </div>
+          <button class="logout-btn" id="topbar-logout-btn">Logout</button>
+        </div>
+      </header>
+
+      <main class="page-content">
+        <div class="content-card">
+          <div class="card-header">
+            <div class="card-title">
+              <h2>Stock Movement Ledger</h2>
+              <p>Audit trail of incoming shipments and outgoing inventory dispatches</p>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="data-table" id="transactions-table">
+                <thead>
+                  <tr>
+                    <th>Transaction ID</th>
+                    <th>Product Name</th>
+                    <th>Movement Type</th>
+                    <th>Quantity</th>
+                    <th>Handled By</th>
+                    <th>Timestamp</th>
+                  </tr>
+                </thead>
+                <tbody id="transactions-tbody">
+                  <tr><td colspan="6" style="text-align: center; color: #64748b;">Loading stock transaction records...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/sidebar.js"></script>
+  <script src="../js/topbar.js"></script>
+  <script src="../js/stock-transactions.js"></script>
+</body>
+</html>

@@ -1,0 +1,68 @@
+/* SIMS - Shared Topbar Styles */
+.topbar {
+  height: var(--topbar-height);
+  background-color: var(--bg-card);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.page-headline {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.status-badge-live {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background-color: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  color: #065f46;
+}
+
+.pulse-circle {
+  width: 8px;
+  height: 8px;
+  background-color: #10b981;
+  border-radius: 50%;
+}
+
+.logout-btn {
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.logout-btn:hover {
+  background-color: #f1f5f9;
+  color: var(--text-main);
+}
+

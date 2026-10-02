@@ -1,0 +1,22 @@
+/* Page CSS for System Status & Telemetry */
+/* System Status-specific Styles */
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+.status-module-card {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  background-color: #ffffff;
+}
+.status-module-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+@media (max-width: 800px) {
+  .status-grid { grid-template-columns: 1fr; }
+}
