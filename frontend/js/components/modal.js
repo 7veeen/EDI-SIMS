@@ -43,6 +43,52 @@ const Modal = {
         if (onOpen) onOpen(overlay, closeModal);
         
         return closeModal;
+    },
+
+    show(options) {
+        const { title, content, onSave, saveText = 'Save', onClose } = options;
+        const footer = `
+            <div style="display: flex; justify-content: flex-end; gap: 10px; width: 100%;">
+                <button type="button" class="btn btn-outline cancel-modal-btn">Cancel</button>
+                <button type="button" class="btn btn-primary save-modal-btn">${saveText}</button>
+            </div>
+        `;
+        return this.create({
+            id: 'modal-' + Date.now(),
+            title,
+            content,
+            footer,
+            onOpen: (modalEl, closeModal) => {
+                const cancelBtn = modalEl.querySelector('.cancel-modal-btn');
+                if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+
+                const saveBtn = modalEl.querySelector('.save-modal-btn');
+                if (saveBtn && onSave) {
+                    saveBtn.addEventListener('click', async () => {
+                        try {
+                            saveBtn.disabled = true;
+                            const originalText = saveBtn.innerHTML;
+                            saveBtn.innerHTML = 'Saving...';
+                            await onSave(modalEl);
+                            closeModal();
+                        } catch (err) {
+                            Utils.showToast(err.message || 'Error saving changes', 'error');
+                        } finally {
+                            saveBtn.disabled = false;
+                            saveBtn.innerHTML = saveText;
+                        }
+                    });
+                }
+            },
+            onClose
+        });
+    },
+
+    closeAll() {
+        document.querySelectorAll('.modal-overlay').forEach(el => {
+            el.classList.remove('active');
+            setTimeout(() => el.remove(), 200);
+        });
     }
 };
 

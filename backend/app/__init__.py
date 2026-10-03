@@ -53,6 +53,36 @@ def create_app():
     except (ImportError, AttributeError):
         pass
 
+    try:
+        from app.routes.team1.inventory import inventory_bp
+        app.register_blueprint(inventory_bp)
+    except (ImportError, AttributeError):
+        pass
+
+    try:
+        from app.routes.team2.suppliers import suppliers_bp
+        app.register_blueprint(suppliers_bp)
+    except (ImportError, AttributeError):
+        pass
+
+    try:
+        from app.routes.team2.purchase_orders import purchase_orders_bp
+        app.register_blueprint(purchase_orders_bp)
+    except (ImportError, AttributeError):
+        pass
+
+    try:
+        from app.routes.team2.quotations import quotations_bp
+        app.register_blueprint(quotations_bp)
+    except (ImportError, AttributeError):
+        pass
+
+    try:
+        from app.routes.team2.shipments import shipments_bp
+        app.register_blueprint(shipments_bp)
+    except (ImportError, AttributeError):
+        pass
+
     app.register_blueprint(reports_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(notifications_bp)

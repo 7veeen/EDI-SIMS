@@ -119,8 +119,9 @@ App.pages['products'] = {
     async loadCategoriesForSelect(selectElement, selectedId = null) {
         try {
             const data = await Api.get('/categories/');
+            const categories = Array.isArray(data) ? data : (data.categories || []);
             selectElement.innerHTML = '<option value="">Select Category</option>' + 
-                data.map(c => `<option value="${c.category_id}" ${c.category_id === selectedId ? 'selected' : ''}>${Utils.escapeHtml(c.category_name)}</option>`).join('');
+                categories.map(c => `<option value="${c.category_id}" ${c.category_id === selectedId ? 'selected' : ''}>${Utils.escapeHtml(c.category_name)}</option>`).join('');
         } catch (e) {
             selectElement.innerHTML = '<option value="">Failed to load categories</option>';
         }
@@ -129,11 +130,13 @@ App.pages['products'] = {
     async showProductModal(productId = null) {
         let product = null;
         if (productId) {
-            // we can fetch or just get from DOM, but let's fetch to be safe, wait there's no GET /products/:id 
-            // I'll quickly fetch all and find it
-            const data = await Api.get('/products/');
-            product = data.products.find(p => p.product_id === productId);
-            if (!product) return;
+            try {
+                const data = await Api.get(`/products/${productId}`);
+                product = data.product;
+            } catch (err) {
+                Utils.showToast("Failed to load product details", "error");
+                return;
+            }
         }
 
         const modalHtml = `
