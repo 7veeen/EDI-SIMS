@@ -3,6 +3,8 @@
 App.pages['products'] = {
     render() {
         const container = document.createElement('div');
+        const user = Auth.getUser();
+        const canAdd = user && ['Owner', 'Manager'].includes(user.role);
         
         container.innerHTML = `
             <div class="page-header">
@@ -16,9 +18,11 @@ App.pages['products'] = {
                         <i class='bx bx-search'></i>
                         <input type="text" id="product-search" placeholder="Search products..." style="background: transparent;">
                     </div>
-                    <button class="btn primary" id="btn-add-product">
-                        <i class='bx bx-plus'></i> Add Product
-                    </button>
+                    ${canAdd ? `
+                        <button class="btn primary" id="btn-add-product">
+                            <i class='bx bx-plus'></i> Add Product
+                        </button>
+                    ` : ''}
                 </div>
             </div>
             
@@ -64,9 +68,9 @@ App.pages['products'] = {
                 this.showProductModal();
             });
             
-            // Hide add button if supplier
+            // Show add button only for Owner and Manager (hidden for Supplier and Employee)
             const user = Auth.getUser();
-            if (user && user.role === 'Supplier') {
+            if (!user || !['Owner', 'Manager'].includes(user.role)) {
                 addBtn.style.display = 'none';
             }
         }
@@ -87,7 +91,7 @@ App.pages['products'] = {
             }
 
             const user = Auth.getUser();
-            const canEdit = user && ['Owner', 'Manager', 'Employee'].includes(user.role);
+            const canEdit = user && ['Owner', 'Manager'].includes(user.role);
             const canDelete = user && ['Owner', 'Manager'].includes(user.role);
 
             tbody.innerHTML = data.products.map(p => `
@@ -103,10 +107,14 @@ App.pages['products'] = {
                         </span>
                     </td>
                     <td>
-                        <div class="action-buttons">
-                            ${canEdit ? `<button class="btn-icon text-primary" onclick="App.pages['products'].showProductModal(${p.product_id})" title="Edit"><i class='bx bx-edit'></i></button>` : ''}
-                            ${canDelete ? `<button class="btn-icon text-danger" onclick="App.pages['products'].deleteProduct(${p.product_id})" title="Delete"><i class='bx bx-trash'></i></button>` : ''}
-                        </div>
+                        ${(canEdit || canDelete) ? `
+                            <div class="action-buttons">
+                                ${canEdit ? `<button class="btn-icon text-primary" onclick="App.pages['products'].showProductModal(${p.product_id})" title="Edit"><i class='bx bx-edit'></i></button>` : ''}
+                                ${canDelete ? `<button class="btn-icon text-danger" onclick="App.pages['products'].deleteProduct(${p.product_id})" title="Delete"><i class='bx bx-trash'></i></button>` : ''}
+                            </div>
+                        ` : `
+                            <span class="badge" style="background: #f1f5f9; color: #64748b; font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 500;">Read-Only</span>
+                        `}
                     </td>
                 </tr>
             `).join('');

@@ -140,6 +140,7 @@ App.pages['shipments'] = {
     },
 
     async init(container) {
+        container = container || document.getElementById('content-area') || document;
         const refreshBtn = container.querySelector('#btn-refresh-shipments');
         if (refreshBtn) refreshBtn.addEventListener('click', () => this.loadShipments());
 
