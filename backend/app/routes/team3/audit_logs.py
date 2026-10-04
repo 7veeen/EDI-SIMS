@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify
 
 from app.extensions import get_db_connection
+from app.middleware.team1_auth import role_required
 
 
 audit_logs_bp = Blueprint(
@@ -11,6 +12,7 @@ audit_logs_bp = Blueprint(
 
 
 @audit_logs_bp.route("/", methods=["GET"])
+@role_required("Owner")
 def get_audit_logs():
     conn = get_db_connection()
     cursor = conn.cursor()

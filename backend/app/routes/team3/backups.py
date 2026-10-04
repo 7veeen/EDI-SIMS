@@ -4,9 +4,11 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from flask import Blueprint, jsonify, request
+from flask_jwt_extended import get_jwt_identity
 from psycopg2 import sql
 
 from app.extensions import get_db_connection
+from app.middleware.team1_auth import role_required
 
 
 backups_bp = Blueprint(
@@ -27,6 +29,7 @@ def json_serializer(value):
 
 
 @backups_bp.route("/", methods=["GET"])
+@role_required("Owner")
 def get_backups():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -68,13 +71,15 @@ def get_backups():
 
 
 @backups_bp.route("/", methods=["POST"])
+@role_required("Owner")
 def create_backup():
     conn = get_db_connection()
     cursor = conn.cursor()
 
     try:
+        jwt_user_id = get_jwt_identity()
         data = request.get_json(silent=True) or {}
-        created_by = data.get("created_by")
+        created_by = data.get("created_by") or jwt_user_id
 
         if created_by is None:
             return jsonify({

@@ -1711,93 +1711,493 @@ App.pages['dashboard'] = {
                 `;
             }
         } else if (user.role === 'Owner') {
+            // Personalize executive page header
+            const pageHeaderTitle = document.querySelector('.page-header h1');
+            const pageHeaderSub = document.querySelector('.page-header p');
+            const pageHeaderEyebrow = document.querySelector('.page-header .eyebrow');
+            if (pageHeaderEyebrow) {
+                pageHeaderEyebrow.textContent = 'EXECUTIVE COMMAND CENTER';
+            }
+            if (pageHeaderTitle) {
+                pageHeaderTitle.innerHTML = `Welcome back, ${Utils.escapeHtml(user.username)} 👑`;
+            }
+            if (pageHeaderSub) {
+                pageHeaderSub.textContent = "Organization-wide overview of inventory, procurement, financials & system health.";
+            }
+
+            // Loading state
+            statsContainer.style.gridTemplateColumns = 'repeat(auto-fit, minmax(220px, 1fr))';
+            statsContainer.innerHTML = `
+                <div class="card" style="padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border); background: var(--white); min-height: 90px; display: flex; align-items: center; justify-content: center; grid-column: 1 / -1;">
+                    <div style="display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 13.5px;">
+                        <i class='bx bx-loader-alt bx-spin' style="font-size: 20px; color: var(--primary);"></i> Loading executive command center...
+                    </div>
+                </div>
+            `;
+            contentContainer.innerHTML = `
+                <div style="display: flex; justify-content: center; align-items: center; padding: 40px; color: var(--text-secondary); gap: 10px;">
+                    <i class='bx bx-loader-alt bx-spin' style="font-size: 24px; color: var(--primary);"></i>
+                    <span>Loading enterprise workspace...</span>
+                </div>
+            `;
+
             try {
                 const data = await Api.get('/dashboard/owner');
-                
-                statsContainer.style.gridTemplateColumns = 'repeat(4, 1fr)';
+
+                const totalInventoryVal = Number(data.total_inventory_value || 0);
+                const activePos = data.active_pos_count || 0;
+                const activePosVal = Number(data.active_pos_value || 0);
+                const pendingQuotes = data.pending_quotations_count || 0;
+                const lowStockCount = data.low_stock_count || 0;
+                const activeUsers = data.active_users_count || 0;
+                const totalUsers = data.total_users || 0;
+                const totalSuppliers = data.total_suppliers || 0;
+                const attentionItems = data.attention_items || [];
+                const recentOrders = data.recent_orders || [];
+                const shipmentStats = data.shipment_stats || {};
+                const invHealth = data.inventory_health || {};
+                const usersByRole = data.users_by_role || {};
+                const poBreakdown = data.po_status_breakdown || {};
+                const latestBackup = data.latest_backup || null;
+                const recentAudits = data.recent_audits || [];
+
+                // ==========================================
+                // 1. TOP 5 PRIMARY EXECUTIVE KPI CARDS
+                // ==========================================
+                statsContainer.style.gridTemplateColumns = 'repeat(auto-fit, minmax(220px, 1fr))';
                 statsContainer.innerHTML = `
-                    <div class="card" style="padding: 1.5rem;">
-                        <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 5px;">Total Users</div>
-                        <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+                    <!-- 1. Total Inventory Value -->
+                    <div class="card stat-card" style="padding: 1.5rem; cursor: pointer; border-radius: 12px; border: 1px solid var(--border); background: var(--card-bg, #ffffff); transition: transform 0.15s, box-shadow 0.15s;" onclick="App.navigate('inventory')">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                             <div>
-                                <div style="font-size: 28px; font-weight: 700;">${data.total_users || 0}</div>
-                                <div style="font-size: 12px; color: var(--blue);"><i class='bx bx-group'></i> Active Accounts</div>
+                                <span style="font-size: 13px; font-weight: 500; color: var(--text-secondary); display: block; margin-bottom: 6px;">Total Inventory Value</span>
+                                <div style="font-size: 28px; font-weight: 700; color: var(--text);">₹${totalInventoryVal.toLocaleString('en-IN')}</div>
+                                <div style="font-size: 12px; color: var(--green); margin-top: 4px; display: flex; align-items: center; gap: 4px;">
+                                    <i class='bx bx-check-shield'></i> ${invHealth.total_products || data.total_products || 0} products (${invHealth.total_units || 0} units)
+                                </div>
                             </div>
-                            <div style="width: 40px; height: 40px; border-radius: 8px; background: var(--blue-light); color: var(--blue); display: flex; align-items: center; justify-content: center;"><i class='bx bx-user-pin'></i></div>
+                            <div style="width: 44px; height: 44px; border-radius: 10px; background: rgba(16, 185, 129, 0.12); color: #10b981; display: flex; align-items: center; justify-content: center; font-size: 22px;">
+                                <i class='bx bx-rupee'></i>
+                            </div>
                         </div>
                     </div>
-                    <div class="card" style="padding: 1.5rem;">
-                        <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 5px;">Registered Suppliers</div>
-                        <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+
+                    <!-- 2. Active Purchase Orders -->
+                    <div class="card stat-card" style="padding: 1.5rem; cursor: pointer; border-radius: 12px; border: 1px solid var(--border); background: var(--card-bg, #ffffff); transition: transform 0.15s, box-shadow 0.15s;" onclick="App.navigate('purchase-orders')">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                             <div>
-                                <div style="font-size: 28px; font-weight: 700;">${data.total_suppliers || 0}</div>
-                                <div style="font-size: 12px; color: var(--green);"><i class='bx bx-buildings'></i> Network Partners</div>
+                                <span style="font-size: 13px; font-weight: 500; color: var(--text-secondary); display: block; margin-bottom: 6px;">Active Purchase Orders</span>
+                                <div style="font-size: 28px; font-weight: 700; color: var(--text);">${String(activePos).padStart(2, '0')}</div>
+                                <div style="font-size: 12px; color: var(--blue); margin-top: 4px; display: flex; align-items: center; gap: 4px;">
+                                    <i class='bx bx-time'></i> ₹${activePosVal.toLocaleString('en-IN')} committed
+                                </div>
                             </div>
-                            <div style="width: 40px; height: 40px; border-radius: 8px; background: var(--green-light); color: var(--green); display: flex; align-items: center; justify-content: center;"><i class='bx bx-network-chart'></i></div>
+                            <div style="width: 44px; height: 44px; border-radius: 10px; background: rgba(59, 130, 246, 0.12); color: #2563eb; display: flex; align-items: center; justify-content: center; font-size: 22px;">
+                                <i class='bx bx-briefcase'></i>
+                            </div>
                         </div>
                     </div>
-                    <div class="card" style="padding: 1.5rem;">
-                        <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 5px;">Total Products</div>
-                        <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+
+                    <!-- 3. Pending Quotations -->
+                    <div class="card stat-card" style="padding: 1.5rem; cursor: pointer; border-radius: 12px; border: 1px solid var(--border); background: var(--card-bg, #ffffff); transition: transform 0.15s, box-shadow 0.15s;" onclick="App.navigate('quotations')">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                             <div>
-                                <div style="font-size: 28px; font-weight: 700;">${data.total_products || 0}</div>
-                                <div style="font-size: 12px; color: var(--purple);"><i class='bx bx-category'></i> Catalog Size</div>
+                                <span style="font-size: 13px; font-weight: 500; color: var(--text-secondary); display: block; margin-bottom: 6px;">Pending Quotations</span>
+                                <div style="font-size: 28px; font-weight: 700; color: var(--text);">${String(pendingQuotes).padStart(2, '0')}</div>
+                                <div style="font-size: 12px; color: ${pendingQuotes > 0 ? '#d97706' : 'var(--green)'}; margin-top: 4px; display: flex; align-items: center; gap: 4px;">
+                                    <i class='bx ${pendingQuotes > 0 ? 'bx-bell' : 'bx-check'}'></i> ${pendingQuotes > 0 ? 'Requires Owner review' : 'All resolved'}
+                                </div>
                             </div>
-                            <div style="width: 40px; height: 40px; border-radius: 8px; background: var(--purple-light); color: var(--purple); display: flex; align-items: center; justify-content: center;"><i class='bx bx-category-alt'></i></div>
+                            <div style="width: 44px; height: 44px; border-radius: 10px; background: rgba(245, 158, 11, 0.12); color: #d97706; display: flex; align-items: center; justify-content: center; font-size: 22px;">
+                                <i class='bx bx-file'></i>
+                            </div>
                         </div>
                     </div>
-                    <div class="card" style="padding: 1.5rem;">
-                        <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 5px;">Inventory Value</div>
-                        <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+
+                    <!-- 4. Low Stock Alerts -->
+                    <div class="card stat-card" style="padding: 1.5rem; cursor: pointer; border-radius: 12px; border: 1px solid var(--border); background: var(--card-bg, #ffffff); transition: transform 0.15s, box-shadow 0.15s;" onclick="App.navigate('inventory')">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                             <div>
-                                <div style="font-size: 28px; font-weight: 700;">₹${data.total_inventory_value ? data.total_inventory_value.toLocaleString() : '0'}</div>
-                                <div style="font-size: 12px; color: var(--yellow);"><i class='bx bx-line-chart'></i> Current Asset Worth</div>
+                                <span style="font-size: 13px; font-weight: 500; color: var(--text-secondary); display: block; margin-bottom: 6px;">Inventory Alerts</span>
+                                <div style="font-size: 28px; font-weight: 700; color: var(--text);">${String(lowStockCount).padStart(2, '0')}</div>
+                                <div style="font-size: 12px; color: ${lowStockCount > 0 ? 'var(--red)' : 'var(--green)'}; margin-top: 4px; display: flex; align-items: center; gap: 4px;">
+                                    <i class='bx ${lowStockCount > 0 ? 'bx-error-circle' : 'bx-check-circle'}'></i> ${lowStockCount > 0 ? 'Items below reorder point' : 'Inventory healthy'}
+                                </div>
                             </div>
-                            <div style="width: 40px; height: 40px; border-radius: 8px; background: var(--yellow-light); color: var(--yellow); display: flex; align-items: center; justify-content: center;"><i class='bx bx-rupee'></i></div>
+                            <div style="width: 44px; height: 44px; border-radius: 10px; background: rgba(239, 68, 68, 0.12); color: #dc2626; display: flex; align-items: center; justify-content: center; font-size: 22px;">
+                                <i class='bx bx-package'></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 5. Organization Users -->
+                    <div class="card stat-card" style="padding: 1.5rem; cursor: pointer; border-radius: 12px; border: 1px solid var(--border); background: var(--card-bg, #ffffff); transition: transform 0.15s, box-shadow 0.15s;" onclick="App.navigate('users')">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div>
+                                <span style="font-size: 13px; font-weight: 500; color: var(--text-secondary); display: block; margin-bottom: 6px;">Organization Users</span>
+                                <div style="font-size: 28px; font-weight: 700; color: var(--text);">${String(activeUsers).padStart(2, '0')}</div>
+                                <div style="font-size: 12px; color: var(--purple); margin-top: 4px; display: flex; align-items: center; gap: 4px;">
+                                    <i class='bx bx-user-check'></i> ${totalUsers} accounts (${totalSuppliers} suppliers)
+                                </div>
+                            </div>
+                            <div style="width: 44px; height: 44px; border-radius: 10px; background: rgba(139, 92, 246, 0.12); color: #7c3aed; display: flex; align-items: center; justify-content: center; font-size: 22px;">
+                                <i class='bx bx-group'></i>
+                            </div>
                         </div>
                     </div>
                 `;
 
+                // ==========================================
+                // 2. MAIN EXECUTIVE CONTENT
+                // ==========================================
                 contentContainer.innerHTML = `
-                    <div class="section-title">
-                        <div>
-                            <h3>Recent System Audit Logs</h3>
-                            <p>Global security and activity monitoring</p>
+                    <!-- Needs Your Attention Section -->
+                    <div class="card" style="padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border); background: var(--card-bg, #ffffff); margin-bottom: 2rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+                            <div>
+                                <h3 style="font-size: 17px; font-weight: 700; margin: 0 0 4px 0; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                                    <i class='bx bx-error-circle' style="color: #ea580c; font-size: 20px;"></i> Needs Your Attention
+                                </h3>
+                                <p style="font-size: 13px; color: var(--text-secondary); margin: 0;">Urgent items requiring Owner review, authorization, or restocking decisions.</p>
+                            </div>
+                            ${attentionItems.length > 0 ? `<span class="badge" style="background: #fff7ed; color: #c2410c; border: 1px solid #ffedd5; font-size: 12px; padding: 4px 10px; border-radius: 6px; font-weight: 600;">${attentionItems.length} action item${attentionItems.length > 1 ? 's' : ''}</span>` : ''}
+                        </div>
+
+                        ${attentionItems.length > 0 ? `
+                            <div style="display: flex; flex-direction: column; gap: 10px;">
+                                ${attentionItems.map(item => `
+                                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-radius: 8px; background: var(--surface, #f8fafc); border: 1px solid var(--border); flex-wrap: wrap; gap: 10px;">
+                                        <div style="display: flex; align-items: center; gap: 12px;">
+                                            <div style="width: 38px; height: 38px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; ${item.type === 'quotation' ? 'background: #fef3c7; color: #b45309;' : item.type === 'low_stock' ? 'background: #fee2e2; color: #dc2626;' : 'background: #e0f2fe; color: #0284c7;'}">
+                                                <i class='bx ${item.type === 'quotation' ? 'bx-file' : item.type === 'low_stock' ? 'bx-box' : 'bx-briefcase'}'></i>
+                                            </div>
+                                            <div>
+                                                <div style="font-weight: 600; font-size: 13.5px; color: var(--text-primary);">${Utils.escapeHtml(item.title)}</div>
+                                                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">${Utils.escapeHtml(item.subtitle)}</div>
+                                            </div>
+                                        </div>
+                                        <div style="display: flex; align-items: center; gap: 12px;">
+                                            <span style="font-size: 11.5px; font-weight: 600; padding: 3px 8px; border-radius: 4px; ${item.badge_color === 'danger' ? 'background: #fee2e2; color: #dc2626;' : item.badge_color === 'warning' ? 'background: #fef3c7; color: #b45309;' : 'background: #e0f2fe; color: #0369a1;'}">${item.badge}</span>
+                                            <button class="btn btn-sm btn-primary" onclick="App.navigate('${item.action_route}')" style="display: inline-flex; align-items: center; gap: 4px; padding: 6px 14px; font-size: 12px; font-weight: 600; border-radius: 6px;">
+                                                ${item.action_label}
+                                            </button>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : `
+                            <div style="text-align: center; padding: 28px; color: var(--text-secondary);">
+                                <i class='bx bx-check-double' style="font-size: 34px; color: var(--green); display: block; margin-bottom: 6px;"></i>
+                                <strong style="font-size: 14px; color: var(--text-primary);">You're all caught up. 🎉</strong>
+                                <div style="font-size: 12.5px; margin-top: 2px;">All quotations, orders, and inventory are in good standing.</div>
+                            </div>
+                        `}
+                    </div>
+
+                    <!-- Executive Quick Actions -->
+                    <div class="card" style="padding: 1.25rem; border-radius: 12px; border: 1px solid var(--border); background: var(--card-bg, #ffffff); margin-bottom: 2rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                            <span style="font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);">Executive Quick Actions</span>
+                            <span style="font-size: 12px; color: var(--text-secondary);"><i class='bx bx-shield-quarter'></i> Authorized Admin Tools</span>
+                        </div>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <button class="btn btn-secondary" onclick="App.navigate('users')" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; font-size: 13px; font-weight: 600; border-radius: 8px;">
+                                <i class='bx bx-user-plus'></i> Manage Users
+                            </button>
+                            <button class="btn btn-secondary" onclick="App.navigate('products')" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; font-size: 13px; font-weight: 600; border-radius: 8px;">
+                                <i class='bx bx-package'></i> Catalog
+                            </button>
+                            <button class="btn btn-secondary" onclick="App.navigate('quotations')" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; font-size: 13px; font-weight: 600; border-radius: 8px;">
+                                <i class='bx bx-file'></i> Quotations
+                            </button>
+                            <button class="btn btn-secondary" onclick="App.navigate('purchase-orders')" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; font-size: 13px; font-weight: 600; border-radius: 8px;">
+                                <i class='bx bx-receipt'></i> Purchase Orders
+                            </button>
+                            <button class="btn btn-secondary" onclick="App.navigate('inventory')" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; font-size: 13px; font-weight: 600; border-radius: 8px;">
+                                <i class='bx bx-box'></i> Inventory
+                            </button>
+                            <button class="btn btn-secondary" onclick="App.navigate('reports')" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; font-size: 13px; font-weight: 600; border-radius: 8px;">
+                                <i class='bx bx-bar-chart-alt-2'></i> Reports
+                            </button>
+                            <button class="btn btn-secondary" onclick="App.navigate('system-status')" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; font-size: 13px; font-weight: 600; border-radius: 8px;">
+                                <i class='bx bx-pulse'></i> System Health
+                            </button>
+                            <button class="btn btn-secondary" onclick="App.navigate('backups')" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; font-size: 13px; font-weight: 600; border-radius: 8px;">
+                                <i class='bx bx-data'></i> Backups
+                            </button>
                         </div>
                     </div>
-                    <div style="background: var(--white); border-radius: var(--radius); border: 1px solid var(--border); overflow: hidden; margin-bottom: 2rem;">
-                        <table style="width: 100%; text-align: left; border-collapse: collapse;">
-                            <thead>
-                                <tr style="background: #f7faf9; border-bottom: 1px solid var(--border);">
-                                    <th style="padding: 16px; font-weight: 600; font-size: 13px; color: var(--text-secondary);">USER</th>
-                                    <th style="padding: 16px; font-weight: 600; font-size: 13px; color: var(--text-secondary);">ACTION</th>
-                                    <th style="padding: 16px; font-weight: 600; font-size: 13px; color: var(--text-secondary);">DETAILS</th>
-                                    <th style="padding: 16px; font-weight: 600; font-size: 13px; color: var(--text-secondary);">TIME</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${data.recent_audits && data.recent_audits.length > 0 
-                                    ? data.recent_audits.map(a => `
-                                        <tr style="border-bottom: 1px solid #edf0ef;">
-                                            <td style="padding: 16px; font-weight: 600;">
+
+                    <!-- Executive Overview Grid: Procurement & Inventory Health -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+                        
+                        <!-- 1. Procurement & PO Status -->
+                        <div class="card" style="padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border); background: var(--card-bg, #ffffff);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <div>
+                                    <h4 style="margin: 0; font-size: 15px; font-weight: 700; color: var(--text-primary);"><i class='bx bx-shopping-bag' style="color: var(--primary);"></i> Procurement Overview</h4>
+                                    <span style="font-size: 12px; color: var(--text-secondary);">${data.total_pos_count || 0} Total Purchase Orders in System</span>
+                                </div>
+                                <button class="btn-link" onclick="App.navigate('purchase-orders')" style="font-size: 12px; color: var(--primary); font-weight: 600; background: none; border: none; cursor: pointer;">View All Orders →</button>
+                            </div>
+
+                            <!-- PO Status Pills -->
+                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 1.25rem;">
+                                <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 8px 10px; border-radius: 8px; text-align: center;">
+                                    <span style="font-size: 11px; color: #15803d; font-weight: 600; display: block;">Accepted</span>
+                                    <span style="font-size: 16px; font-weight: 700; color: #15803d;">${poBreakdown.Accepted?.count || 0}</span>
+                                </div>
+                                <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 8px 10px; border-radius: 8px; text-align: center;">
+                                    <span style="font-size: 11px; color: #1d4ed8; font-weight: 600; display: block;">Delivered</span>
+                                    <span style="font-size: 16px; font-weight: 700; color: #1d4ed8;">${poBreakdown.Delivered?.count || 0}</span>
+                                </div>
+                                <div style="background: #fffbeb; border: 1px solid #fde68a; padding: 8px 10px; border-radius: 8px; text-align: center;">
+                                    <span style="font-size: 11px; color: #b45309; font-weight: 600; display: block;">Pending</span>
+                                    <span style="font-size: 16px; font-weight: 700; color: #b45309;">${poBreakdown.Pending?.count || 0}</span>
+                                </div>
+                                <div style="background: #fef2f2; border: 1px solid #fecaca; padding: 8px 10px; border-radius: 8px; text-align: center;">
+                                    <span style="font-size: 11px; color: #b91c1c; font-weight: 600; display: block;">Rejected</span>
+                                    <span style="font-size: 16px; font-weight: 700; color: #b91c1c;">${poBreakdown.Rejected?.count || 0}</span>
+                                </div>
+                            </div>
+
+                            <!-- Recent PO Mini Table -->
+                            <div class="table-responsive" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden;">
+                                <table class="table" style="width: 100%; border-collapse: collapse; font-size: 12.5px;">
+                                    <thead>
+                                        <tr style="background: var(--surface, #f8fafc); border-bottom: 1px solid var(--border); text-align: left; color: var(--text-secondary); font-size: 11px; text-transform: uppercase;">
+                                            <th style="padding: 8px 12px;">PO ID</th>
+                                            <th style="padding: 8px 12px;">Supplier</th>
+                                            <th style="padding: 8px 12px; text-align: right;">Amount</th>
+                                            <th style="padding: 8px 12px; text-align: center;">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${recentOrders.length > 0 ? recentOrders.map(po => `
+                                            <tr style="border-bottom: 1px solid var(--border); cursor: pointer;" onclick="App.navigate('purchase-orders')">
+                                                <td style="padding: 8px 12px; font-family: monospace; font-weight: 600;">#${po.purchase_order_id}</td>
+                                                <td style="padding: 8px 12px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${Utils.escapeHtml(po.supplier_name)}</td>
+                                                <td style="padding: 8px 12px; text-align: right; font-weight: 600;">₹${Number(po.total_amount).toLocaleString('en-IN')}</td>
+                                                <td style="padding: 8px 12px; text-align: center;">
+                                                    <span style="display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10.5px; font-weight: 600; ${po.status === 'Accepted' || po.status === 'Delivered' ? 'background: #dcfce7; color: #15803d;' : po.status === 'Pending' ? 'background: #fef3c7; color: #b45309;' : 'background: #fee2e2; color: #b91c1c;'}">${po.status}</span>
+                                                </td>
+                                            </tr>
+                                        `).join('') : `<tr><td colspan="4" style="text-align: center; padding: 20px; color: var(--text-secondary);">No recent purchase orders.</td></tr>`}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- 2. Inventory Health & Throughput -->
+                        <div class="card" style="padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border); background: var(--card-bg, #ffffff);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <div>
+                                    <h4 style="margin: 0; font-size: 15px; font-weight: 700; color: var(--text-primary);"><i class='bx bx-layer' style="color: #8b5cf6;"></i> Inventory Health & Throughput</h4>
+                                    <span style="font-size: 12px; color: var(--text-secondary);">Catalog valuation & warehouse movements</span>
+                                </div>
+                                <button class="btn-link" onclick="App.navigate('inventory')" style="font-size: 12px; color: var(--primary); font-weight: 600; background: none; border: none; cursor: pointer;">View Inventory →</button>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 1.25rem;">
+                                <div style="background: var(--surface, #f8fafc); border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 11px; text-transform: uppercase; color: var(--text-secondary); font-weight: 600;">Stock Units on Hand</div>
+                                    <div style="font-size: 20px; font-weight: 800; color: var(--text-primary); margin-top: 4px;">${invHealth.total_units || 0}</div>
+                                    <div style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">across ${invHealth.total_products || 0} active products</div>
+                                </div>
+                                <div style="background: var(--surface, #f8fafc); border: 1px solid var(--border); border-radius: 8px; padding: 12px;">
+                                    <div style="font-size: 11px; text-transform: uppercase; color: var(--text-secondary); font-weight: 600;">Ledger Transactions</div>
+                                    <div style="font-size: 20px; font-weight: 800; color: var(--text-primary); margin-top: 4px;">${invHealth.total_transactions || 0}</div>
+                                    <div style="font-size: 11.5px; color: var(--text-secondary); margin-top: 2px;">historical movements</div>
+                                </div>
+                            </div>
+
+                            <!-- Movement Flow Breakdown -->
+                            <div style="border: 1px solid var(--border); border-radius: 8px; padding: 14px; background: var(--surface, #f8fafc);">
+                                <div style="font-size: 12px; font-weight: 700; color: var(--text-primary); margin-bottom: 10px;">Stock Movement Balance</div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                    <span style="font-size: 12px; color: var(--text-secondary);"><i class='bx bx-down-arrow-alt' style="color: #16a34a;"></i> Total Received (Stock-In)</span>
+                                    <strong style="color: #16a34a; font-size: 13px;">+${invHealth.received_units || 0} units</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                    <span style="font-size: 12px; color: var(--text-secondary);"><i class='bx bx-up-arrow-alt' style="color: #dc2626;"></i> Total Issued (Stock-Out)</span>
+                                    <strong style="color: #dc2626; font-size: 13px;">-${invHealth.issued_units || 0} units</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px dashed var(--border);">
+                                    <span style="font-size: 12px; font-weight: 600; color: var(--text-primary);">Stock Alert Status</span>
+                                    <span style="font-size: 12px; font-weight: 600; color: ${invHealth.low_stock_count > 0 ? '#ea580c' : '#16a34a'};">${invHealth.low_stock_count > 0 ? `${invHealth.low_stock_count} item(s) low` : 'All healthy'}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Row 3: Logistics, Users, & Infrastructure Telemetry -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+                        
+                        <!-- 1. Shipments & Logistics -->
+                        <div class="card" style="padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border); background: var(--card-bg, #ffffff);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <h4 style="margin: 0; font-size: 14.5px; font-weight: 700; color: var(--text-primary);"><i class='bx bx-car' style="color: #0284c7;"></i> Logistics & Shipments</h4>
+                                <button class="btn-link" onclick="App.navigate('shipments')" style="font-size: 12px; color: var(--primary); font-weight: 600; background: none; border: none; cursor: pointer;">Track →</button>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; margin-bottom: 12px;">
+                                <div style="padding: 10px 6px; border-radius: 8px; background: #e0f2fe; border: 1px solid #bae6fd;">
+                                    <div style="font-size: 18px; font-weight: 800; color: #0369a1;">${shipmentStats.ready_for_shipment || 0}</div>
+                                    <div style="font-size: 10.5px; color: #0369a1; font-weight: 600; margin-top: 2px;">Ready at Dock</div>
+                                </div>
+                                <div style="padding: 10px 6px; border-radius: 8px; background: #f3e8ff; border: 1px solid #e9d5ff;">
+                                    <div style="font-size: 18px; font-weight: 800; color: #7e22ce;">${shipmentStats.in_transit || 0}</div>
+                                    <div style="font-size: 10.5px; color: #7e22ce; font-weight: 600; margin-top: 2px;">In Transit</div>
+                                </div>
+                                <div style="padding: 10px 6px; border-radius: 8px; background: #dcfce7; border: 1px solid #bbf7d0;">
+                                    <div style="font-size: 18px; font-weight: 800; color: #15803d;">${shipmentStats.delivered || 0}</div>
+                                    <div style="font-size: 10.5px; color: #15803d; font-weight: 600; margin-top: 2px;">Delivered</div>
+                                </div>
+                            </div>
+                            <div style="font-size: 12px; color: var(--text-secondary); text-align: center;">
+                                Total tracked shipments: <strong>${shipmentStats.total_shipments || 0}</strong>
+                            </div>
+                        </div>
+
+                        <!-- 2. Organization Users -->
+                        <div class="card" style="padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border); background: var(--card-bg, #ffffff);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <h4 style="margin: 0; font-size: 14.5px; font-weight: 700; color: var(--text-primary);"><i class='bx bx-group' style="color: #7c3aed;"></i> Organization Roles</h4>
+                                <button class="btn-link" onclick="App.navigate('users')" style="font-size: 12px; color: var(--primary); font-weight: 600; background: none; border: none; cursor: pointer;">Manage Users →</button>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 8px;">
+                                <div style="display: flex; justify-content: space-between; font-size: 12.5px; padding-bottom: 6px; border-bottom: 1px solid var(--border);">
+                                    <span style="color: var(--text-secondary);"><i class='bx bx-shield-quarter'></i> Owners</span>
+                                    <strong>${usersByRole.Owner?.active || 0} active</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; font-size: 12.5px; padding-bottom: 6px; border-bottom: 1px solid var(--border);">
+                                    <span style="color: var(--text-secondary);"><i class='bx bx-briefcase'></i> Managers</span>
+                                    <strong>${usersByRole.Manager?.active || 0} active</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; font-size: 12.5px; padding-bottom: 6px; border-bottom: 1px solid var(--border);">
+                                    <span style="color: var(--text-secondary);"><i class='bx bx-user-pin'></i> Employees</span>
+                                    <strong>${usersByRole.Employee?.active || 0} active <span style="font-size: 11px; color: var(--text-secondary);">(${usersByRole.Employee?.total || 0} total)</span></strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; font-size: 12.5px;">
+                                    <span style="color: var(--text-secondary);"><i class='bx bx-buildings'></i> Suppliers</span>
+                                    <strong>${usersByRole.Supplier?.active || 0} active</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 3. Infrastructure & Backup Status -->
+                        <div class="card" style="padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border); background: var(--card-bg, #ffffff);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <h4 style="margin: 0; font-size: 14.5px; font-weight: 700; color: var(--text-primary);"><i class='bx bx-server' style="color: #10b981;"></i> System & Backups</h4>
+                                <button class="btn-link" onclick="App.navigate('backups')" style="font-size: 12px; color: var(--primary); font-weight: 600; background: none; border: none; cursor: pointer;">Manage Backups →</button>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 8px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; padding-bottom: 6px; border-bottom: 1px solid var(--border);">
+                                    <span style="color: var(--text-secondary);">Backend & DB</span>
+                                    <span class="badge" style="background: #dcfce7; color: #15803d; font-size: 11px; padding: 2px 7px; border-radius: 4px; font-weight: 600;"><i class='bx bx-check'></i> Online</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; padding-bottom: 6px; border-bottom: 1px solid var(--border);">
+                                    <span style="color: var(--text-secondary);">Latest Backup</span>
+                                    <strong style="font-size: 12px; font-family: monospace;">${latestBackup ? latestBackup.backup_name.slice(0, 18) + '...' : 'None'}</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; padding-bottom: 6px; border-bottom: 1px solid var(--border);">
+                                    <span style="color: var(--text-secondary);">Backup Date</span>
+                                    <span style="font-size: 12px; color: var(--text-secondary);">${latestBackup && latestBackup.backup_date ? new Date(latestBackup.backup_date).toLocaleDateString() : 'N/A'}</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
+                                    <span style="color: var(--text-secondary);">Backup Status</span>
+                                    <span class="badge" style="background: #dcfce7; color: #15803d; font-size: 11px; padding: 2px 7px; border-radius: 4px; font-weight: 600;">${latestBackup ? latestBackup.status : 'N/A'}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Row 4: Recent System Activity (Audit Logs) -->
+                    <div class="card" style="padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border); background: var(--card-bg, #ffffff); margin-bottom: 2rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+                            <div>
+                                <h3 style="font-size: 16px; font-weight: 700; margin: 0 0 4px 0; color: var(--text-primary);"><i class='bx bx-history' style="color: var(--primary);"></i> Recent System Activity</h3>
+                                <p style="font-size: 13px; color: var(--text-secondary); margin: 0;">Global security, user management, and catalog audit trail.</p>
+                            </div>
+                            <button class="btn btn-secondary" onclick="App.navigate('audit-logs')" style="display: inline-flex; align-items: center; gap: 4px; padding: 6px 14px; font-size: 12.5px; font-weight: 600; border-radius: 8px;">
+                                View All Audit Logs →
+                            </button>
+                        </div>
+                        <div class="table-responsive" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden;">
+                            <table style="width: 100%; text-align: left; border-collapse: collapse; font-size: 13px;">
+                                <thead>
+                                    <tr style="background: var(--surface, #f8fafc); border-bottom: 1px solid var(--border); color: var(--text-secondary); font-size: 11px; text-transform: uppercase;">
+                                        <th style="padding: 12px 16px;">User</th>
+                                        <th style="padding: 12px 16px;">Action</th>
+                                        <th style="padding: 12px 16px;">Details</th>
+                                        <th style="padding: 12px 16px;">Time</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${recentAudits.length > 0 ? recentAudits.map(a => `
+                                        <tr style="border-bottom: 1px solid var(--border);">
+                                            <td style="padding: 12px 16px; font-weight: 600;">
                                                 <div style="display: flex; align-items: center; gap: 8px;">
-                                                    <div style="width: 24px; height: 24px; border-radius: 50%; background: var(--bg); display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--text-secondary);"><i class='bx bx-user'></i></div>
+                                                    <div style="width: 26px; height: 26px; border-radius: 50%; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 13px;">
+                                                        <i class='bx bx-user'></i>
+                                                    </div>
                                                     ${Utils.escapeHtml(a.username)}
                                                 </div>
                                             </td>
-                                            <td style="padding: 16px; font-weight: 600;">${Utils.escapeHtml(a.action)}</td>
-                                            <td style="padding: 16px; color: var(--text-secondary); font-size: 13px;">${Utils.escapeHtml(a.details)}</td>
-                                            <td style="padding: 16px; color: var(--text-secondary); font-size: 13px;">${new Date(a.timestamp).toLocaleString()}</td>
+                                            <td style="padding: 12px 16px; font-weight: 600;">
+                                                <span class="badge" style="background: #f1f5f9; color: #475569; font-size: 11px; padding: 3px 8px; border-radius: 4px;">${Utils.escapeHtml(a.action)}</span>
+                                            </td>
+                                            <td style="padding: 12px 16px; color: var(--text-secondary); font-size: 12.5px;">${Utils.escapeHtml(a.details)}</td>
+                                            <td style="padding: 12px 16px; color: var(--text-secondary); font-size: 12px; white-space: nowrap;">${a.timestamp ? new Date(a.timestamp).toLocaleString() : 'N/A'}</td>
                                         </tr>
-                                    `).join('')
-                                    : '<tr><td colspan="4" style="padding: 24px; text-align: center; color: var(--text-secondary);">No recent audit logs.</td></tr>'
-                                }
-                            </tbody>
-                        </table>
+                                    `).join('') : `<tr><td colspan="4" style="padding: 24px; text-align: center; color: var(--text-secondary);">No recent audit logs recorded.</td></tr>`}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                    ${updateUsernameHtml}
+
+                    <!-- Row 5: Executive Administrative Profile Status -->
+                    <div class="card" style="padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border); background: var(--card-bg, #ffffff);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                            <div style="display: flex; align-items: center; gap: 14px;">
+                                <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(139, 92, 246, 0.12); color: #7c3aed; display: flex; align-items: center; justify-content: center; font-size: 24px;">
+                                    <i class='bx bx-crown'></i>
+                                </div>
+                                <div>
+                                    <h4 style="margin: 0 0 3px 0; font-size: 15px; font-weight: 700; color: var(--text-primary);">Owner Administration Profile</h4>
+                                    <div style="font-size: 12.5px; color: var(--text-secondary);">Logged in as <strong>${Utils.escapeHtml(user.username)}</strong> • Role: <strong>System Owner</strong> (Full Authority)</div>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn btn-secondary" onclick="App.navigate('system-status')" style="font-size: 12px; padding: 7px 14px; border-radius: 8px;">
+                                    <i class='bx bx-pulse'></i> System Health
+                                </button>
+                                <button class="btn btn-secondary" onclick="App.navigate('backups')" style="font-size: 12px; padding: 7px 14px; border-radius: 8px;">
+                                    <i class='bx bx-data'></i> Backup Vault
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 `;
-            } catch (err) {}
+            } catch (err) {
+                console.error("Failed to load Owner dashboard:", err);
+                statsContainer.innerHTML = `
+                    <div class="card" style="grid-column: 1 / -1; padding: 24px; color: var(--red); text-align: center; border: 1px solid var(--border); border-radius: 12px; background: var(--card-bg, #fff);">
+                        <i class='bx bx-error-circle' style="font-size: 28px; margin-bottom: 6px; display: block;"></i>
+                        <strong>Unable to load Owner Dashboard data.</strong>
+                        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">${Utils.escapeHtml(err.message || 'Server error')}</div>
+                    </div>
+                `;
+                contentContainer.innerHTML = `
+                    <div class="card" style="padding: 2.5rem; text-align: center; border: 1px solid var(--border); border-radius: 12px; background: var(--card-bg, #fff); margin-top: 1rem;">
+                        <i class='bx bx-refresh' style="font-size: 40px; color: var(--primary); margin-bottom: 1rem; display: block;"></i>
+                        <h4 style="margin-bottom: 0.5rem; color: var(--text);">Unable to load Owner Dashboard data</h4>
+                        <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 13.5px;">Please check your connection and click retry below.</p>
+                        <button class="btn btn-primary" onclick="App.pages['dashboard'].init()" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; font-size: 13px;">
+                            <i class='bx bx-refresh'></i> Retry
+                        </button>
+                    </div>
+                `;
+            }
         }
 
         // Attach event listener for change username (informational advisory; API managed by admin)

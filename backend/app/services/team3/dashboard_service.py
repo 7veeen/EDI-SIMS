@@ -660,7 +660,10 @@ def get_supplier_dashboard(user_id=None):
             "total_quotations": total_quotations,
             "active_pos": active_pos,
             "total_purchase_orders": total_purchase_orders,
+            "received_orders": total_purchase_orders,
+            "completed_orders": raw_ship_counts.get("Delivered", 0),
             "total_order_value": total_order_value,
+            "total_purchase_amount": total_order_value,
             "pending_deliveries": pending_deliveries,
             "shipment_stats": shipment_stats,
             "attention_items": attention_items,
@@ -986,32 +989,276 @@ def get_manager_dashboard():
 
 
 def get_owner_dashboard():
+    """
+    Get comprehensive executive-level dashboard metrics for the Owner role.
+    Organization-wide visibility across all workflows: Inventory, Procurement,
+    Quotations, Shipments, Users/Roles, System Health, and Audit activity.
+    Preserves all existing response keys: total_users, total_suppliers,
+    total_products, total_inventory_value, recent_audits.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
 
     try:
-        # Total users
-        cursor.execute('SELECT COUNT(*) FROM "Users"')
-        total_users = cursor.fetchone()[0]
-
-        # Total registered suppliers
-        cursor.execute('SELECT COUNT(*) FROM "Suppliers"')
-        total_suppliers = cursor.fetchone()[0]
-
-        # Total products in catalog
-        cursor.execute('SELECT COUNT(*) FROM "Products"')
-        total_products = cursor.fetchone()[0]
-
-        # Total inventory value: SUM(selling_price * quantity_available)
+        # 1. Users Breakdown (Total, Active, Inactive, and Grouped by Role)
         cursor.execute('''
-            SELECT COALESCE(SUM(p.selling_price * i.quantity_available), 0)
-            FROM "Products" p
-            JOIN "Inventory" i
-                ON p.product_id = i.product_id
+            SELECT r.role_name, u.status, COUNT(*)
+            FROM "Users" u
+            JOIN "Roles" r ON u.role_id = r.role_id
+            GROUP BY r.role_name, u.status
         ''')
-        total_inventory_value = float(cursor.fetchone()[0])
+        user_rows = cursor.fetchall()
+        total_users = 0
+        active_users_count = 0
+        inactive_users_count = 0
+        users_by_role = {}
+        for role_name, status, count in user_rows:
+            total_users += count
+            if status == "Active":
+                active_users_count += count
+            else:
+                inactive_users_count += count
+            if role_name not in users_by_role:
+                users_by_role[role_name] = {"total": 0, "active": 0, "inactive": 0}
+            users_by_role[role_name]["total"] += count
+            if status == "Active":
+                users_by_role[role_name]["active"] += count
+            else:
+                users_by_role[role_name]["inactive"] += count
 
-        # Recent system audit logs (last 5)
+        # 2. Total registered suppliers
+        cursor.execute('SELECT COUNT(*) FROM "Suppliers"')
+        total_suppliers = cursor.fetchone()[0] or 0
+
+        # 3. Product Catalog & Inventory Health
+        cursor.execute('''
+            SELECT 
+                COUNT(p.product_id) as total_products,
+                COALESCE(SUM(i.quantity_available), 0) as total_units,
+                COALESCE(SUM(p.selling_price * i.quantity_available), 0) as total_inventory_value,
+                COUNT(CASE WHEN i.quantity_available <= p.reorder_level THEN 1 END) as low_stock_count,
+                COUNT(CASE WHEN i.quantity_available = 0 THEN 1 END) as out_of_stock_count
+            FROM "Products" p
+            LEFT JOIN "Inventory" i ON p.product_id = i.product_id
+        ''')
+        inv_row = cursor.fetchone()
+        total_products = int(inv_row[0] or 0)
+        total_units = int(inv_row[1] or 0)
+        total_inventory_value = float(inv_row[2] or 0.0)
+        low_stock_count = int(inv_row[3] or 0)
+        out_of_stock_count = int(inv_row[4] or 0)
+
+        # 4. Stock Movement Throughput (Received vs Issued Volume)
+        cursor.execute('''
+            SELECT 
+                COALESCE(SUM(CASE WHEN transaction_type = 'STOCK_IN' THEN quantity ELSE 0 END), 0) as received_units,
+                COALESCE(SUM(CASE WHEN transaction_type = 'STOCK_OUT' THEN quantity ELSE 0 END), 0) as issued_units,
+                COUNT(*) as total_transactions
+            FROM "StockTransactions"
+        ''')
+        tx_row = cursor.fetchone()
+        received_units = int(tx_row[0] or 0)
+        issued_units = int(tx_row[1] or 0)
+        total_transactions = int(tx_row[2] or 0)
+
+        # 5. Purchase Orders & Financial Spend Overview
+        cursor.execute('''
+            SELECT status, COUNT(*), COALESCE(SUM(total_amount), 0)
+            FROM "PurchaseOrders"
+            GROUP BY status
+        ''')
+        po_rows = cursor.fetchall()
+        active_pos_count = 0
+        active_pos_value = 0.0
+        po_status_breakdown = {}
+        total_pos_count = 0
+        for status_val, count, val in po_rows:
+            total_pos_count += count
+            po_status_breakdown[status_val] = {
+                "count": count,
+                "value": float(val or 0.0)
+            }
+            if status_val in ('Pending', 'Accepted'):
+                active_pos_count += count
+                active_pos_value += float(val or 0.0)
+
+        # 6. Pending Quotations Overview
+        cursor.execute('''
+            SELECT COUNT(*) 
+            FROM "SupplierQuotations" 
+            WHERE status IN ('Submitted', 'Pending', 'Under Review')
+        ''')
+        pending_quotations_count = int(cursor.fetchone()[0] or 0)
+
+        # 7. Recent Purchase Orders (Latest 5)
+        cursor.execute('''
+            SELECT 
+                po.purchase_order_id, 
+                s.supplier_name, 
+                po.order_date, 
+                po.expected_delivery, 
+                po.total_amount, 
+                po.status 
+            FROM "PurchaseOrders" po 
+            LEFT JOIN "Suppliers" s ON po.supplier_id = s.supplier_id 
+            ORDER BY po.order_date DESC, po.purchase_order_id DESC 
+            LIMIT 5
+        ''')
+        recent_orders_rows = cursor.fetchall()
+        recent_orders = []
+        for r in recent_orders_rows:
+            recent_orders.append({
+                "purchase_order_id": r[0],
+                "supplier_name": r[1] or "Unknown Supplier",
+                "order_date": r[2].isoformat() if r[2] else None,
+                "expected_delivery": r[3].isoformat() if r[3] else None,
+                "total_amount": float(r[4] or 0.0),
+                "status": r[5]
+            })
+
+        # 8. Shipment & Logistics Statistics
+        cursor.execute('''
+            SELECT 
+                COUNT(CASE WHEN status = 'Ready for Shipment' THEN 1 END) as ready,
+                COUNT(CASE WHEN status IN ('Dispatched', 'In Transit') THEN 1 END) as in_transit,
+                COUNT(CASE WHEN status = 'Delivered' THEN 1 END) as delivered,
+                COUNT(*) as total
+            FROM "Shipments"
+        ''')
+        ship_row = cursor.fetchone()
+        shipment_stats = {
+            "ready_for_shipment": int(ship_row[0] or 0),
+            "in_transit": int(ship_row[1] or 0),
+            "delivered": int(ship_row[2] or 0),
+            "total_shipments": int(ship_row[3] or 0)
+        }
+
+        # 9. Latest Database Backup
+        cursor.execute('''
+            SELECT backup_id, backup_name, backup_type, backup_date, backup_size, status
+            FROM "BackupHistory"
+            ORDER BY backup_id DESC LIMIT 1
+        ''')
+        bk_row = cursor.fetchone()
+        latest_backup = None
+        if bk_row:
+            latest_backup = {
+                "backup_id": bk_row[0],
+                "backup_name": bk_row[1],
+                "backup_type": bk_row[2],
+                "backup_date": bk_row[3].isoformat() if bk_row[3] else None,
+                "backup_size": bk_row[4],
+                "status": bk_row[5]
+            }
+
+        # 10. System Health Summary
+        cursor.execute('''
+            SELECT status_id, module_name, status, progress, message, updated_at
+            FROM "SystemStatus"
+            ORDER BY status_id ASC LIMIT 1
+        ''')
+        sys_row = cursor.fetchone()
+        system_status = None
+        if sys_row:
+            system_status = {
+                "module_name": sys_row[1],
+                "status": sys_row[2],
+                "progress": sys_row[3],
+                "message": sys_row[4],
+                "updated_at": sys_row[5].isoformat() if sys_row[5] else None
+            }
+
+        # 11. Needs Your Attention Items (Real live pending decisions)
+        attention_items = []
+
+        # A. Pending Quotations Awaiting Approval
+        cursor.execute('''
+            SELECT 
+                sq.quotation_id, 
+                sq.quotation_number, 
+                s.supplier_name, 
+                p.product_name, 
+                sq.total_amount, 
+                sq.status, 
+                sq.quotation_date
+            FROM "SupplierQuotations" sq
+            LEFT JOIN "Suppliers" s ON sq.supplier_id = s.supplier_id
+            LEFT JOIN "Products" p ON sq.product_id = p.product_id
+            WHERE sq.status IN ('Submitted', 'Pending', 'Under Review')
+            ORDER BY sq.quotation_date DESC, sq.quotation_id DESC
+            LIMIT 4
+        ''')
+        for q_row in cursor.fetchall():
+            q_id = q_row[0]
+            q_num = q_row[1] or f"QTN-{q_id:04d}"
+            s_name = q_row[2] or "Supplier"
+            p_name = q_row[3] or "Product"
+            amt = float(q_row[4] or 0.0)
+            attention_items.append({
+                "type": "quotation",
+                "id": q_id,
+                "title": f"Quotation {q_num} ({s_name})",
+                "subtitle": f"{p_name} — Total: ₹{amt:,.2f}",
+                "status": q_row[5],
+                "badge": "Awaiting Approval",
+                "badge_color": "warning",
+                "action_label": "Review →",
+                "action_route": "quotations"
+            })
+
+        # B. Critical Low Stock Products
+        cursor.execute('''
+            SELECT p.product_id, p.product_name, p.sku, i.quantity_available, p.reorder_level
+            FROM "Products" p
+            JOIN "Inventory" i ON p.product_id = p.product_id
+            WHERE i.quantity_available <= p.reorder_level
+            ORDER BY i.quantity_available ASC
+            LIMIT 3
+        ''')
+        for p_row in cursor.fetchall():
+            prod_id = p_row[0]
+            prod_name = p_row[1]
+            sku = p_row[2]
+            qty = p_row[3]
+            reorder = p_row[4]
+            attention_items.append({
+                "type": "low_stock",
+                "id": prod_id,
+                "title": f"Low Stock: {prod_name}",
+                "subtitle": f"Available: {qty} units (Reorder point: {reorder}) • SKU: {sku}",
+                "status": "Low Stock",
+                "badge": "Action Required",
+                "badge_color": "danger",
+                "action_label": "Restock →",
+                "action_route": "inventory"
+            })
+
+        # C. Pending Purchase Orders Awaiting Response
+        cursor.execute('''
+            SELECT po.purchase_order_id, s.supplier_name, po.total_amount, po.status, po.order_date
+            FROM "PurchaseOrders" po
+            LEFT JOIN "Suppliers" s ON po.supplier_id = s.supplier_id
+            WHERE po.status = 'Pending'
+            ORDER BY po.order_date DESC, po.purchase_order_id DESC
+            LIMIT 3
+        ''')
+        for po_item in cursor.fetchall():
+            po_id = po_item[0]
+            s_name = po_item[1] or "Supplier"
+            po_amt = float(po_item[2] or 0.0)
+            attention_items.append({
+                "type": "purchase_order",
+                "id": po_id,
+                "title": f"Purchase Order #{po_id:04d} ({s_name})",
+                "subtitle": f"Value: ₹{po_amt:,.2f} — Waiting for supplier response",
+                "status": po_item[3],
+                "badge": "Pending Response",
+                "badge_color": "info",
+                "action_label": "View →",
+                "action_route": "purchase-orders"
+            })
+
+        # 12. Recent System Audit Logs (last 5, preserved)
         cursor.execute('''
             SELECT
                 al.log_id,
@@ -1062,11 +1309,39 @@ def get_owner_dashboard():
             })
 
         return {
+            # Backward-compatible keys
             "total_users": total_users,
             "total_suppliers": total_suppliers,
             "total_products": total_products,
             "total_inventory_value": total_inventory_value,
-            "recent_audits": recent_audits
+            "recent_audits": recent_audits,
+
+            # Extended executive metrics
+            "active_pos_count": active_pos_count,
+            "active_pos_value": active_pos_value,
+            "total_pos_count": total_pos_count,
+            "pending_quotations_count": pending_quotations_count,
+            "low_stock_count": low_stock_count,
+            "out_of_stock_count": out_of_stock_count,
+            "active_users_count": active_users_count,
+            "inactive_users_count": inactive_users_count,
+            "users_by_role": users_by_role,
+            "po_status_breakdown": po_status_breakdown,
+            "recent_orders": recent_orders,
+            "shipment_stats": shipment_stats,
+            "inventory_health": {
+                "total_products": total_products,
+                "total_units": total_units,
+                "total_inventory_value": total_inventory_value,
+                "low_stock_count": low_stock_count,
+                "out_of_stock_count": out_of_stock_count,
+                "received_units": received_units,
+                "issued_units": issued_units,
+                "total_transactions": total_transactions
+            },
+            "attention_items": attention_items,
+            "latest_backup": latest_backup,
+            "system_status": system_status
         }
 
     finally:
