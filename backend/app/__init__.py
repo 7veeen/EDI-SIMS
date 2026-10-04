@@ -83,6 +83,12 @@ def create_app():
     except (ImportError, AttributeError):
         pass
 
+    try:
+        from app.routes.team2.stock_requests import stock_requests_bp
+        app.register_blueprint(stock_requests_bp)
+    except (ImportError, AttributeError):
+        pass
+
     app.register_blueprint(reports_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(notifications_bp)

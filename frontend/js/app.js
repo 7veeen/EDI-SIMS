@@ -5,7 +5,7 @@ const App = {
     
     routes: [
         { path: 'dashboard', icon: 'bx-grid-alt', label: 'Dashboard', roles: ['Owner', 'Manager', 'Employee', 'Supplier'] },
-        { path: 'stock-requests', icon: 'bx-git-pull-request', label: 'Stock Requests', roles: ['Supplier'] },
+        { path: 'stock-requests', icon: 'bx-git-pull-request', label: 'Stock Requests', roles: ['Owner', 'Manager', 'Supplier'] },
         { path: 'quotations', icon: 'bx-file', label: 'Quotations', roles: ['Owner', 'Manager', 'Supplier'] },
         { path: 'users', icon: 'bx-group', label: 'User Management', roles: ['Owner', 'Manager'] },
         { path: 'products', icon: 'bx-package', label: 'Products', roles: ['Owner', 'Manager', 'Employee'] },

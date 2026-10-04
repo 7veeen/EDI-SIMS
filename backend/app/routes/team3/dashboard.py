@@ -29,7 +29,11 @@ def employee_dashboard():
 @dashboard_bp.route("/supplier", methods=["GET"])
 @role_required("Supplier")
 def supplier_dashboard():
-    dashboard_data = get_supplier_dashboard()
+    user_id = get_jwt_identity()
+    dashboard_data, error = get_supplier_dashboard(user_id)
+
+    if error:
+        return jsonify({"error": error}), 400
 
     return jsonify(dashboard_data), 200
 
