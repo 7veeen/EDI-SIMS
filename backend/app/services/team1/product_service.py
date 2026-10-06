@@ -3,7 +3,7 @@ from decimal import Decimal
 from app.extensions import get_db_connection
 
 
-def get_products(search=None, category_id=None, status=None):
+def get_products(search=None, category_id=None, status=None, page=None, page_size=None, sort_by=None, sort_order=None):
     conn = None
     cursor = None
 
@@ -11,7 +11,51 @@ def get_products(search=None, category_id=None, status=None):
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        query = '''
+        base_where = ' WHERE 1=1'
+        params = []
+
+        if search:
+            base_where += ' AND (p.product_name ILIKE %s OR p.sku ILIKE %s)'
+            params.extend([f"%{search}%", f"%{search}%"])
+
+        if category_id:
+            base_where += ' AND p.category_id = %s'
+            params.append(category_id)
+
+        if status:
+            base_where += ' AND p.status = %s'
+            params.append(status)
+
+        # Get total count
+        count_query = f'''
+            SELECT count(DISTINCT p.product_id)
+            FROM public."Products" p
+            JOIN public."Categories" c ON p.category_id = c.category_id
+            LEFT JOIN public."Inventory" i ON p.product_id = i.product_id
+            {base_where}
+        '''
+        cursor.execute(count_query, tuple(params))
+        total_count = cursor.fetchone()[0]
+
+        # Sorting whitelist
+        sort_map = {
+            "product_id": "p.product_id",
+            "product_name": "p.product_name",
+            "sku": "p.sku",
+            "category": "c.category_name",
+            "category_name": "c.category_name",
+            "price": "p.selling_price",
+            "selling_price": "p.selling_price",
+            "reorder_level": "p.reorder_level",
+            "status": "p.status",
+            "quantity": "COALESCE(i.quantity_available, 0)",
+            "quantity_available": "COALESCE(i.quantity_available, 0)"
+        }
+        order_col = sort_map.get((sort_by or "").lower(), "p.product_id")
+        order_dir = "DESC" if str(sort_order).upper() == "DESC" else "ASC"
+        order_clause = f" ORDER BY {order_col} {order_dir}"
+
+        query = f'''
             SELECT
                 p.product_id,
                 p.product_name,
@@ -26,25 +70,27 @@ def get_products(search=None, category_id=None, status=None):
             FROM public."Products" p
             JOIN public."Categories" c ON p.category_id = c.category_id
             LEFT JOIN public."Inventory" i ON p.product_id = i.product_id
-            WHERE 1=1
+            {base_where}
+            {order_clause}
         '''
-        params = []
 
-        if search:
-            query += ' AND (p.product_name ILIKE %s OR p.sku ILIKE %s)'
-            params.extend([f"%{search}%", f"%{search}%"])
+        query_params = list(params)
 
-        if category_id:
-            query += ' AND p.category_id = %s'
-            params.append(category_id)
+        if page is not None:
+            try:
+                page_num = max(1, int(page))
+            except (ValueError, TypeError):
+                page_num = 1
+            try:
+                limit_num = max(1, min(100, int(page_size or 10)))
+            except (ValueError, TypeError):
+                limit_num = 10
 
-        if status:
-            query += ' AND p.status = %s'
-            params.append(status)
+            offset_num = (page_num - 1) * limit_num
+            query += " LIMIT %s OFFSET %s"
+            query_params.extend([limit_num, offset_num])
 
-        query += ' ORDER BY p.product_id ASC'
-
-        cursor.execute(query, tuple(params))
+        cursor.execute(query, tuple(query_params))
         rows = cursor.fetchall()
 
         products = []
@@ -64,10 +110,10 @@ def get_products(search=None, category_id=None, status=None):
                 "inventory_id": r[9]
             })
 
-        return products, None
+        return products, total_count, None
 
     except Error as e:
-        return None, "Database error"
+        return None, 0, "Database error"
 
     finally:
         if cursor:
@@ -416,7 +462,7 @@ def delete_product(product_id):
         if row is None:
             return False, "Product not found", None
 
-        # Check if product is referenced in PO items, quotations, or stock transactions
+        # Check if product is referenced in PO items, quotations, stock transactions, or stock requests
         cursor.execute(
             'SELECT purchase_order_item_id FROM public."PurchaseOrderItems" WHERE product_id = %s LIMIT 1',
             (product_id,)
@@ -435,7 +481,13 @@ def delete_product(product_id):
         )
         has_transactions = cursor.fetchone() is not None
 
-        if has_po or has_quote or has_transactions:
+        cursor.execute(
+            'SELECT 1 FROM public."StockRequestItems" WHERE product_id = %s LIMIT 1',
+            (product_id,)
+        )
+        has_stock_requests = cursor.fetchone() is not None
+
+        if has_po or has_quote or has_transactions or has_stock_requests:
             # Cannot hard delete due to foreign key integrity constraints.
             # Soft-delete / deactivate product.
             cursor.execute(

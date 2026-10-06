@@ -22,13 +22,43 @@ categories_bp = Blueprint(
 @role_required("Owner", "Manager", "Employee", "Supplier")
 def get_category_list():
     search = request.args.get("search")
+    page = request.args.get("page")
+    page_size = request.args.get("page_size")
+    sort_by = request.args.get("sort_by")
+    sort_order = request.args.get("sort_order")
 
-    categories, error = get_categories(search=search)
+    categories, total, error = get_categories(
+        search=search,
+        page=page,
+        page_size=page_size,
+        sort_by=sort_by,
+        sort_order=sort_order
+    )
 
     if error:
         return jsonify({"error": error}), 500
 
-    return jsonify({"categories": categories}), 200
+    response_data = {
+        "categories": categories,
+        "total": total
+    }
+
+    if page is not None:
+        try:
+            p_num = max(1, int(page))
+        except (ValueError, TypeError):
+            p_num = 1
+        try:
+            ps_num = max(1, min(100, int(page_size or 10)))
+        except (ValueError, TypeError):
+            ps_num = 10
+
+        total_pages = (total + ps_num - 1) // ps_num if total > 0 else 1
+        response_data["page"] = p_num
+        response_data["page_size"] = ps_num
+        response_data["total_pages"] = total_pages
+
+    return jsonify(response_data), 200
 
 
 # View One Category

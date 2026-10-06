@@ -73,34 +73,59 @@ def create_new_user():
 def get_users_list():
     role_name = request.args.get("role")
     search = request.args.get("search")
+    page = request.args.get("page")
+    page_size = request.args.get("page_size")
+    sort_by = request.args.get("sort_by")
+    sort_order = request.args.get("sort_order")
 
     claims = get_jwt()
     creator_role = claims.get("role")
 
-    if role_name:
-        allowed_roles = {
-            "Owner": ["Owner", "Manager", "Employee", "Supplier"],
-            "Manager": ["Employee", "Supplier"]
-        }
+    if creator_role == "Manager" and role_name in ["Owner", "Manager"]:
+        return jsonify({
+            "error": "You do not have permission to view users with this role"
+        }), 403
 
-        if role_name not in allowed_roles[creator_role]:
-            return jsonify({
-                "error": "You do not have permission to view users with this role"
-            }), 403
-
-    users, error = get_users(
+    users, total, error = get_users(
+        creator_role=creator_role,
         role_name=role_name,
-        search=search
+        search=search,
+        page=page,
+        page_size=page_size,
+        sort_by=sort_by,
+        sort_order=sort_order
     )
 
     if error:
+        if error == "You do not have permission to view users with this role":
+            return jsonify({
+                "error": error
+            }), 403
         return jsonify({
             "error": error
         }), 500
 
-    return jsonify({
-        "users": users
-    }), 200
+    response_data = {
+        "users": users,
+        "total": total
+    }
+
+    if page is not None:
+        try:
+            p_num = max(1, int(page))
+        except (ValueError, TypeError):
+            p_num = 1
+        try:
+            ps_num = max(1, min(100, int(page_size or 10)))
+        except (ValueError, TypeError):
+            ps_num = 10
+
+        total_pages = (total + ps_num - 1) // ps_num if total > 0 else 1
+        response_data["page"] = p_num
+        response_data["page_size"] = ps_num
+        response_data["total_pages"] = total_pages
+
+    return jsonify(response_data), 200
 
 @users_bp.route("/<int:user_id>", methods=["GET"])
 @role_required("Owner", "Manager")

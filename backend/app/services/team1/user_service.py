@@ -106,13 +106,61 @@ def create_user(username, email, password, role_name, creator_role):
         if conn:
             conn.close()
 
-def get_users(role_name=None, search=None):
+def get_users(creator_role=None, role_name=None, search=None, page=None, page_size=None, sort_by=None, sort_order=None):
     conn = None
     cursor = None
 
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
+
+        conditions = []
+        parameters = []
+
+        # Role scoping based on creator_role
+        if creator_role == "Manager":
+            if role_name:
+                if role_name not in ["Employee", "Supplier"]:
+                    return None, 0, "You do not have permission to view users with this role"
+                conditions.append("r.role_name = %s")
+                parameters.append(role_name)
+            else:
+                conditions.append("r.role_name IN ('Employee', 'Supplier')")
+        else:
+            if role_name:
+                conditions.append("r.role_name = %s")
+                parameters.append(role_name)
+
+        if search:
+            conditions.append("(u.username ILIKE %s OR u.email ILIKE %s)")
+            parameters.extend([f"%{search}%", f"%{search}%"])
+
+        where_clause = ""
+        if conditions:
+            where_clause = " WHERE " + " AND ".join(conditions)
+
+        # Get total count
+        count_query = '''
+            SELECT count(*)
+            FROM public."Users" u
+            JOIN public."Roles" r
+                ON u.role_id = r.role_id
+        ''' + where_clause
+
+        cursor.execute(count_query, tuple(parameters))
+        total_count = cursor.fetchone()[0]
+
+        # Sorting whitelist
+        sort_map = {
+            "user_id": "u.user_id",
+            "username": "u.username",
+            "email": "u.email",
+            "role": "r.role_name",
+            "status": "u.status"
+        }
+        order_col = sort_map.get((sort_by or "").lower(), "u.user_id")
+        order_dir = "DESC" if str(sort_order).upper() == "DESC" else "ASC"
+        order_clause = f" ORDER BY {order_col} {order_dir}"
 
         query = '''
             SELECT
@@ -124,25 +172,25 @@ def get_users(role_name=None, search=None):
             FROM public."Users" u
             JOIN public."Roles" r
                 ON u.role_id = r.role_id
-        '''
+        ''' + where_clause + order_clause
 
-        conditions = []
-        parameters = []
+        query_params = list(parameters)
 
-        if role_name:
-            conditions.append("r.role_name = %s")
-            parameters.append(role_name)
+        if page is not None:
+            try:
+                page_num = max(1, int(page))
+            except (ValueError, TypeError):
+                page_num = 1
+            try:
+                limit_num = max(1, min(100, int(page_size or 10)))
+            except (ValueError, TypeError):
+                limit_num = 10
 
-        if search:
-            conditions.append("u.username ILIKE %s")
-            parameters.append(f"%{search}%")
+            offset_num = (page_num - 1) * limit_num
+            query += " LIMIT %s OFFSET %s"
+            query_params.extend([limit_num, offset_num])
 
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
-
-        query += " ORDER BY u.user_id"
-
-        cursor.execute(query, tuple(parameters))
+        cursor.execute(query, tuple(query_params))
 
         rows = cursor.fetchall()
 
@@ -157,10 +205,10 @@ def get_users(role_name=None, search=None):
                 "status": row[4]
             })
 
-        return users, None
+        return users, total_count, None
 
     except Error:
-        return None, "Database error"
+        return None, 0, "Database error"
 
     finally:
         if cursor:

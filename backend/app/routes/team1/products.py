@@ -23,6 +23,10 @@ def list_products():
     search = request.args.get("search")
     category_id = request.args.get("category_id")
     status = request.args.get("status")
+    page = request.args.get("page")
+    page_size = request.args.get("page_size")
+    sort_by = request.args.get("sort_by")
+    sort_order = request.args.get("sort_order")
 
     if category_id:
         try:
@@ -30,12 +34,40 @@ def list_products():
         except ValueError:
             return jsonify({"error": "category_id must be an integer"}), 400
 
-    products, error = get_products(search=search, category_id=category_id, status=status)
+    products, total, error = get_products(
+        search=search,
+        category_id=category_id,
+        status=status,
+        page=page,
+        page_size=page_size,
+        sort_by=sort_by,
+        sort_order=sort_order
+    )
 
     if error:
         return jsonify({"error": error}), 500
 
-    return jsonify({"products": products}), 200
+    response_data = {
+        "products": products,
+        "total": total
+    }
+
+    if page is not None:
+        try:
+            p_num = max(1, int(page))
+        except (ValueError, TypeError):
+            p_num = 1
+        try:
+            ps_num = max(1, min(100, int(page_size or 10)))
+        except (ValueError, TypeError):
+            ps_num = 10
+
+        total_pages = (total + ps_num - 1) // ps_num if total > 0 else 1
+        response_data["page"] = p_num
+        response_data["page_size"] = ps_num
+        response_data["total_pages"] = total_pages
+
+    return jsonify(response_data), 200
 
 
 # View Single Product

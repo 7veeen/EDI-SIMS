@@ -57,7 +57,7 @@ def create_category(category_name, description):
             conn.close()
 
 
-def get_categories(search=None):
+def get_categories(search=None, page=None, page_size=None, sort_by=None, sort_order=None):
     conn = None
     cursor = None
 
@@ -65,27 +65,54 @@ def get_categories(search=None):
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        query = '''
+        where_clause = ""
+        parameters = []
+
+        if search:
+            where_clause = " WHERE category_name ILIKE %s"
+            parameters.append(f"%{search}%")
+
+        count_query = 'SELECT count(*) FROM public."Categories"' + where_clause
+        cursor.execute(count_query, tuple(parameters))
+        total_count = cursor.fetchone()[0]
+
+        # Sorting whitelist
+        sort_map = {
+            "category_id": "category_id",
+            "category_name": "category_name",
+            "description": "description"
+        }
+        order_col = sort_map.get((sort_by or "").lower(), "category_id")
+        order_dir = "DESC" if str(sort_order).upper() == "DESC" else "ASC"
+        order_clause = f" ORDER BY {order_col} {order_dir}"
+
+        query = f'''
             SELECT
                 category_id,
                 category_name,
                 description
             FROM public."Categories"
+            {where_clause}
+            {order_clause}
         '''
 
-        parameters = []
+        query_params = list(parameters)
 
-        if search:
-            query += '''
-                WHERE category_name ILIKE %s
-            '''
-            parameters.append(f"%{search}%")
+        if page is not None:
+            try:
+                page_num = max(1, int(page))
+            except (ValueError, TypeError):
+                page_num = 1
+            try:
+                limit_num = max(1, min(100, int(page_size or 10)))
+            except (ValueError, TypeError):
+                limit_num = 10
 
-        query += '''
-            ORDER BY category_id
-        '''
+            offset_num = (page_num - 1) * limit_num
+            query += " LIMIT %s OFFSET %s"
+            query_params.extend([limit_num, offset_num])
 
-        cursor.execute(query, tuple(parameters))
+        cursor.execute(query, tuple(query_params))
 
         rows = cursor.fetchall()
 
@@ -98,10 +125,10 @@ def get_categories(search=None):
                 "description": row[2]
             })
 
-        return categories, None
+        return categories, total_count, None
 
     except Error:
-        return None, "Database error"
+        return None, 0, "Database error"
 
     finally:
         if cursor:
