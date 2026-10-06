@@ -5,7 +5,9 @@ from app.services.team1.user_service import (
     create_user,
     get_users,
     get_user_by_id,
-    update_user_status
+    update_user_status,
+    update_user,
+    count_active_owners
 )
 from app.middleware.team1_auth import role_required
 
@@ -154,6 +156,55 @@ def get_user(user_id):
         "user": user
     }), 200
 
+@users_bp.route("/<int:user_id>", methods=["PUT"])
+@role_required("Owner", "Manager")
+def edit_user(user_id):
+    data = request.get_json()
+
+    if not data:
+        return jsonify({
+            "error": "Request body is required"
+        }), 400
+
+    if "password" in data or "password_hash" in data:
+        return jsonify({
+            "error": "Password cannot be updated through this endpoint"
+        }), 400
+
+    username = data.get("username")
+    email = data.get("email")
+    role_name = data.get("role")
+
+    if username is None and email is None and role_name is None:
+        return jsonify({
+            "error": "At least one editable field (username, email, role) must be provided"
+        }), 400
+
+    claims = get_jwt()
+    actor_role = claims.get("role")
+    actor_id = int(claims.get("sub"))
+    ip_address = request.remote_addr
+
+    updated_user, error, status_code = update_user(
+        target_user_id=user_id,
+        actor_id=actor_id,
+        actor_role=actor_role,
+        username=username,
+        email=email,
+        role_name=role_name,
+        ip_address=ip_address
+    )
+
+    if error:
+        return jsonify({
+            "error": error
+        }), status_code
+
+    return jsonify({
+        "message": "User updated successfully",
+        "user": updated_user
+    }), 200
+
 @users_bp.route("/<int:user_id>/status", methods=["PUT"])
 @role_required("Owner", "Manager")
 def change_user_status(user_id):
@@ -173,7 +224,7 @@ def change_user_status(user_id):
 
     claims = get_jwt()
     creator_role = claims.get("role")
-    current_user_id = int(get_jwt()["sub"])
+    current_user_id = int(claims.get("sub"))
 
     if current_user_id == user_id:
         return jsonify({
@@ -200,7 +251,24 @@ def change_user_status(user_id):
             "error": "You do not have permission to change this user's status"
         }), 403
 
-    updated_user, error = update_user_status(user_id, status)
+    # Final active Owner protection
+    if status == "Inactive" and target_user["role"] == "Owner":
+        active_owners_count, err = count_active_owners(exclude_user_id=user_id)
+        if err:
+            return jsonify({
+                "error": err
+            }), 500
+        if active_owners_count == 0:
+            return jsonify({
+                "error": "Cannot deactivate the last active Owner account."
+            }), 403
+
+    updated_user, error = update_user_status(
+        user_id=user_id,
+        status=status,
+        actor_id=current_user_id,
+        ip_address=request.remote_addr
+    )
 
     if error:
         return jsonify({
@@ -210,4 +278,4 @@ def change_user_status(user_id):
     return jsonify({
         "message": "User status updated successfully",
         "user": updated_user
-    }), 200
+    }), 200

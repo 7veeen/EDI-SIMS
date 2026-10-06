@@ -148,6 +148,14 @@ App.pages['users'] = {
                 const targetUserId = parseInt(u.user_id);
                 const isSelf = targetUserId === currentUserId;
 
+                // Edit permission:
+                let canEdit = false;
+                if (isOwner) {
+                    canEdit = true;
+                } else if (isManager) {
+                    canEdit = !isSelf && (u.role === 'Employee' || u.role === 'Supplier');
+                }
+
                 // Status toggle permissions
                 let canToggle = false;
                 if (isOwner) {
@@ -174,15 +182,22 @@ App.pages['users'] = {
                         </td>
                         <td style="text-align: right;">
                             <div class="table-actions" style="justify-content: flex-end;">
+                                ${canEdit ? `
+                                    <button class="btn-icon" 
+                                        onclick="App.pages['users'].showEditModal(${u.user_id})" 
+                                        title="Edit User">
+                                        <i class='bx bx-edit-alt'></i>
+                                    </button>
+                                ` : ''}
                                 ${canToggle ? `
                                     <button class="btn-icon ${u.status === 'Active' ? 'text-danger' : 'text-success'}" 
-                                        onclick="App.pages['users'].toggleStatus(${u.user_id}, '${u.status}', '${Utils.escapeHtml(u.username)}')" 
+                                        onclick="App.pages['users'].toggleStatus(${u.user_id}, '${u.status}', '${Utils.escapeHtml(u.username)}', '${u.role}')" 
                                         title="${u.status === 'Active' ? 'Deactivate User' : 'Activate User'}">
                                         <i class='bx ${u.status === 'Active' ? 'bx-block' : 'bx-check-circle'}'></i>
                                     </button>
-                                ` : `
+                                ` : (isSelf ? `
                                     <span class="protected-badge"><i class='bx bx-lock-alt'></i> Protected</span>
-                                `}
+                                ` : '')}
                             </div>
                         </td>
                     </tr>
@@ -245,7 +260,7 @@ App.pages['users'] = {
         this.loadUsers();
     },
 
-    async toggleStatus(id, currentStatus, username) {
+    async toggleStatus(id, currentStatus, username, role) {
         const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
         const actionWord = newStatus === 'Inactive' ? 'deactivate' : 'activate';
         const confirmMsg = `Are you sure you want to ${actionWord} user "${username || id}"?`;
@@ -258,6 +273,118 @@ App.pages['users'] = {
             this.loadUsers();
         } catch (error) {
             Utils.showToast(error.message || "Failed to update user status", "error");
+        }
+    },
+
+    async showEditModal(id) {
+        try {
+            const data = await Api.get(`/users/${id}`);
+            const user = data.user;
+            if (!user) {
+                Utils.showToast("User not found", "error");
+                return;
+            }
+
+            const currentUser = Auth.getUser() || {};
+            const currentUserId = parseInt(currentUser.id || 0);
+            const isSelf = parseInt(user.user_id) === currentUserId;
+            const isOwner = currentUser.role === 'Owner';
+            const isManager = currentUser.role === 'Manager';
+
+            let roleInputHtml = '';
+            if (isSelf) {
+                roleInputHtml = `
+                    <input type="text" id="eu_role" class="input" value="${user.role}" disabled style="width: 100%; padding: 10px 15px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-hover); color: var(--text-secondary); cursor: not-allowed;">
+                    <span style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Your role cannot be modified.</span>
+                `;
+            } else if (isOwner) {
+                roleInputHtml = `
+                    <select id="eu_role" class="input" required style="width: 100%; padding: 10px 15px; border-radius: 8px; border: 1px solid var(--border); background: var(--white);">
+                        <option value="Owner" ${user.role === 'Owner' ? 'selected' : ''}>Owner</option>
+                        <option value="Manager" ${user.role === 'Manager' ? 'selected' : ''}>Manager</option>
+                        <option value="Employee" ${user.role === 'Employee' ? 'selected' : ''}>Employee</option>
+                        <option value="Supplier" ${user.role === 'Supplier' ? 'selected' : ''}>Supplier</option>
+                    </select>
+                `;
+            } else if (isManager) {
+                roleInputHtml = `
+                    <select id="eu_role" class="input" required style="width: 100%; padding: 10px 15px; border-radius: 8px; border: 1px solid var(--border); background: var(--white);">
+                        <option value="Employee" ${user.role === 'Employee' ? 'selected' : ''}>Employee</option>
+                        <option value="Supplier" ${user.role === 'Supplier' ? 'selected' : ''}>Supplier</option>
+                    </select>
+                `;
+            }
+
+            Modal.create({
+                id: 'editUserModal',
+                title: `Edit User: ${Utils.escapeHtml(user.username)}`,
+                content: `
+                    <form id="edit-user-form" style="display: flex; flex-direction: column; gap: 1.25rem;">
+                        <div class="form-group" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            <label style="font-size: 13px; font-weight: 600; color: var(--text-secondary);">Username</label>
+                            <input type="text" id="eu_username" class="input" value="${Utils.escapeHtml(user.username)}" required style="width: 100%; padding: 10px 15px; border-radius: 8px; border: 1px solid var(--border);">
+                        </div>
+                        <div class="form-group" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            <label style="font-size: 13px; font-weight: 600; color: var(--text-secondary);">Email Address</label>
+                            <input type="email" id="eu_email" class="input" value="${Utils.escapeHtml(user.email)}" required style="width: 100%; padding: 10px 15px; border-radius: 8px; border: 1px solid var(--border);">
+                        </div>
+                        <div class="form-group" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            <label style="font-size: 13px; font-weight: 600; color: var(--text-secondary);">Role</label>
+                            ${roleInputHtml}
+                        </div>
+                        <div id="eu_error" class="error-text hidden" style="color: var(--red); font-size: 13px; text-align: center;"></div>
+                        <div class="modal-footer" style="padding-top: 1.5rem; margin-top: 0.5rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 1rem;">
+                            <button type="button" class="btn cancel-btn" style="background: white; border: 1px solid var(--border); padding: 10px 20px;">Cancel</button>
+                            <button type="submit" class="btn primary" style="padding: 10px 20px;">Save Changes</button>
+                        </div>
+                    </form>
+                `,
+                onOpen: (modalEl, close) => {
+                    modalEl.querySelector('.cancel-btn').addEventListener('click', close);
+                    const form = modalEl.querySelector('#edit-user-form');
+                    form.addEventListener('submit', async (e) => {
+                        e.preventDefault();
+
+                        const newUsername = modalEl.querySelector('#eu_username').value.trim();
+                        const newEmail = modalEl.querySelector('#eu_email').value.trim();
+                        const roleEl = modalEl.querySelector('#eu_role');
+                        const newRole = isSelf ? user.role : (roleEl ? roleEl.value : user.role);
+
+                        if (!isSelf && newRole !== user.role) {
+                            const confirmRole = confirm(`You are changing this user's role from ${user.role} to ${newRole}. Continue?`);
+                            if (!confirmRole) return;
+                        }
+
+                        const payload = {
+                            username: newUsername,
+                            email: newEmail
+                        };
+                        if (!isSelf && newRole) {
+                            payload.role = newRole;
+                        }
+
+                        const errEl = modalEl.querySelector('#eu_error');
+                        const btn = form.querySelector('button[type="submit"]');
+
+                        try {
+                            btn.disabled = true;
+                            btn.innerHTML = 'Saving...';
+
+                            await Api.put(`/users/${id}`, payload);
+                            Utils.showToast("User updated successfully", "success");
+                            this.loadUsers();
+                            close();
+                        } catch (err) {
+                            errEl.textContent = err.message || "Failed to update user";
+                            errEl.classList.remove('hidden');
+                            btn.disabled = false;
+                            btn.innerHTML = 'Save Changes';
+                        }
+                    });
+                }
+            });
+        } catch (err) {
+            Utils.showToast(err.message || "Failed to load user details", "error");
         }
     },
 
