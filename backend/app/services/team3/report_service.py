@@ -210,6 +210,30 @@ def generate_inventory_report_record(report_name, report_type, generated_by):
         conn.close()
 
 
+DANGEROUS_FORMULA_PREFIXES = ('=', '+', '-', '@')
+
+
+def sanitize_csv_cell(value):
+    """
+    Sanitizes untrusted text values to prevent CSV / Formula Injection (CWE-1236).
+    If a text value (after stripping any leading whitespace or control characters such as
+    spaces, tabs, carriage returns, newlines) begins with '=', '+', '-', or '@',
+    it is prepended with a single quote (') so spreadsheet applications (Excel, Calc, Sheets)
+    treat it as literal text rather than executing it as an expression or macro.
+    """
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        return value
+    if not value:
+        return value
+
+    stripped = value.lstrip(' \t\r\n\v\f')
+    if stripped and stripped.startswith(DANGEROUS_FORMULA_PREFIXES):
+        return f"'{value}"
+    return value
+
+
 def generate_inventory_csv_export(report_type="Inventory"):
     """
     Generates a live inventory report formatted as RFC 4180 compliant CSV with UTF-8 BOM encoding.
@@ -249,15 +273,15 @@ def generate_inventory_csv_export(report_type="Inventory"):
 
         writer.writerow([
             item["product_id"],
-            item["product_name"],
-            item["sku"],
-            item["category_name"],
+            sanitize_csv_cell(item["product_name"]),
+            sanitize_csv_cell(item["sku"]),
+            sanitize_csv_cell(item["category_name"]),
             item["quantity_available"],
             item["reorder_level"],
             f"{item['unit_price']:.2f}",
             f"{item['inventory_value']:.2f}",
             item["stock_status"],
-            item["status"],
+            sanitize_csv_cell(item["status"]),
             last_updated_str
         ])
 

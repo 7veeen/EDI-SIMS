@@ -73,5 +73,27 @@ const Api = {
 
     async delete(endpoint) {
         return this.request(endpoint, { method: 'DELETE' });
+    },
+
+    // Notification helpers (Step 7A)
+    async getNotifications(params = '') {
+        const query = params ? `?${params}` : '';
+        return this.get(`/notifications/${query}`);
+    },
+
+    async getNotification(id) {
+        return this.get(`/notifications/${id}`);
+    },
+
+    async getUnreadNotificationCount() {
+        return this.get('/notifications/unread-count');
+    },
+
+    async markNotificationRead(id) {
+        return this.patch(`/notifications/${id}/read`);
+    },
+
+    async markAllNotificationsRead() {
+        return this.patch('/notifications/read-all');
     }
 };

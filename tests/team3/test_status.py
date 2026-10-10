@@ -219,8 +219,11 @@ class Team3SystemStatusAndHealthTestCase(unittest.TestCase):
         self.assertEqual(resp_restored.status_code, 200)
 
     def test_10_existing_reports_status_endpoint_compatibility(self):
-        """Test existing GET /api/reports/status remains functional with original payload"""
-        resp = self.client.get("/api/reports/status")
+        """Test existing GET /api/reports/status remains functional with original payload for authorized role"""
+        resp = self.client.get(
+            "/api/reports/status",
+            headers={"Authorization": f"Bearer {self.owner_token}"}
+        )
         self.assertEqual(resp.status_code, 200)
         data = resp.get_json()
         self.assertEqual(data.get("status"), "READY")

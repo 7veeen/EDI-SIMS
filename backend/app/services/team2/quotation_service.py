@@ -599,6 +599,31 @@ def create_quotation(data, user_id, role, username):
 
         conn.commit()
 
+        # Trigger Event C: New Quotation Submitted
+        if initial_status == "Submitted" and po_id:
+            try:
+                from app.services.team3.notification_service import (
+                    create_notification,
+                    get_po_creator_user_id,
+                    get_active_managers_and_owners
+                )
+                recipients = set(get_active_managers_and_owners())
+                po_creator = get_po_creator_user_id(po_id)
+                if po_creator:
+                    recipients.add(po_creator)
+                for r_uid in recipients:
+                    create_notification(
+                        user_id=r_uid,
+                        title="New Quotation Submitted",
+                        message=f"A new quotation has been submitted for Purchase Order #{po_id}.",
+                        notification_type="Quotation Submitted",
+                        priority="High",
+                        reference_type="PurchaseOrder",
+                        reference_id=po_id
+                    )
+            except Exception as notif_err:
+                print(f"[NOTIFICATION WARNING] Failed to notify quotation submission: {notif_err}", flush=True)
+
         result = {
             "quotation_number": quotation_num,
             "purchase_order_id": po_id,
@@ -795,6 +820,32 @@ def submit_quotation(quotation_id, user_id, role, username):
             ))
 
         conn.commit()
+
+        # Trigger Event C: New Quotation Submitted
+        if po_id:
+            try:
+                from app.services.team3.notification_service import (
+                    create_notification,
+                    get_po_creator_user_id,
+                    get_active_managers_and_owners
+                )
+                recipients = set(get_active_managers_and_owners())
+                po_creator = get_po_creator_user_id(po_id)
+                if po_creator:
+                    recipients.add(po_creator)
+                for r_uid in recipients:
+                    create_notification(
+                        user_id=r_uid,
+                        title="New Quotation Submitted",
+                        message=f"A new quotation has been submitted for Purchase Order #{po_id}.",
+                        notification_type="Quotation Submitted",
+                        priority="High",
+                        reference_type="PurchaseOrder",
+                        reference_id=po_id
+                    )
+            except Exception as notif_err:
+                print(f"[NOTIFICATION WARNING] Failed to notify quotation submission: {notif_err}", flush=True)
+
         return {"quotation_id": quotation_id, "status": "Submitted", "quotation_number": q_num}, None
 
     except Exception as e:
@@ -883,9 +934,19 @@ def approve_quotation(quotation_id, user_id, role, username):
             WHERE quotation_id = %s
         """, (int(user_id), quotation_id))
 
-        # 2. Reject competing quotations for the same PO and product
+        # 2. Find and reject competing quotations for the same PO and product
         competing_count = 0
+        competing_suppliers = []
         if po_id:
+            cursor.execute("""
+                SELECT DISTINCT supplier_id FROM "SupplierQuotations"
+                WHERE purchase_order_id = %s 
+                  AND product_id = %s 
+                  AND quotation_id != %s 
+                  AND status IN ('Submitted', 'Pending', 'Under Review')
+            """, (po_id, product_id, quotation_id))
+            competing_suppliers = [r[0] for r in cursor.fetchall()]
+
             cursor.execute("""
                 UPDATE "SupplierQuotations"
                 SET status = 'Rejected',
@@ -922,6 +983,40 @@ def approve_quotation(quotation_id, user_id, role, username):
             ))
 
         conn.commit()
+
+        # Trigger Event D: Quotation Approved -> notify approved supplier
+        try:
+            from app.services.team3.notification_service import (
+                create_notification,
+                get_supplier_user_id
+            )
+            sup_user_id = get_supplier_user_id(supplier_id)
+            if sup_user_id:
+                create_notification(
+                    user_id=sup_user_id,
+                    title="Quotation Approved",
+                    message=f"Your quotation for Purchase Order #{po_id} has been approved." if po_id else "Your quotation has been approved.",
+                    notification_type="Quotation Approved",
+                    priority="High",
+                    reference_type="PurchaseOrder",
+                    reference_id=po_id
+                )
+            # Trigger Event E: Notify competing suppliers of rejection
+            for comp_sup_id in competing_suppliers:
+                c_user_id = get_supplier_user_id(comp_sup_id)
+                if c_user_id and c_user_id != sup_user_id:
+                    create_notification(
+                        user_id=c_user_id,
+                        title="Quotation Rejected",
+                        message=f"Your quotation for Purchase Order #{po_id} has been rejected." if po_id else "Your quotation has been rejected.",
+                        notification_type="Quotation Rejected",
+                        priority="High",
+                        reference_type="PurchaseOrder",
+                        reference_id=po_id
+                    )
+        except Exception as notif_err:
+            print(f"[NOTIFICATION WARNING] Failed to send quotation approval/rejection notifications: {notif_err}", flush=True)
+
         return {
             "quotation_id": quotation_id,
             "quotation_number": q_num,
@@ -1016,6 +1111,28 @@ def reject_quotation(quotation_id, rejection_reason, user_id, role, username):
             ))
 
         conn.commit()
+
+        # Trigger Event E: Quotation Rejected -> notify supplier
+        try:
+            from app.services.team3.notification_service import (
+                create_notification,
+                get_supplier_user_id
+            )
+            sup_user_id = get_supplier_user_id(supplier_id)
+            if sup_user_id:
+                msg = f"Your quotation for Purchase Order #{po_id} has been rejected. Reason: {reason}" if reason else f"Your quotation for Purchase Order #{po_id} has been rejected."
+                create_notification(
+                    user_id=sup_user_id,
+                    title="Quotation Rejected",
+                    message=msg,
+                    notification_type="Quotation Rejected",
+                    priority="High",
+                    reference_type="PurchaseOrder",
+                    reference_id=po_id
+                )
+        except Exception as notif_err:
+            print(f"[NOTIFICATION WARNING] Failed to notify quotation rejection: {notif_err}", flush=True)
+
         return {"quotation_id": quotation_id, "status": "Rejected", "rejection_reason": reason}, None
 
     except Exception as e:

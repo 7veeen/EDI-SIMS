@@ -608,6 +608,22 @@ def assign_employee(shipment_id, employee_id, user_id=None, role=None, username=
 
         conn.commit()
 
+        # Trigger Event A: Notify assigned employee (only if real change)
+        if current_assigned_id != employee_id:
+            try:
+                from app.services.team3.notification_service import create_notification
+                create_notification(
+                    user_id=employee_id,
+                    title="Shipment Assigned",
+                    message=f"You have been assigned shipment #{shipment_id} for receiving.",
+                    notification_type="Shipment Assignment",
+                    priority="High",
+                    reference_type="Shipment",
+                    reference_id=shipment_id
+                )
+            except Exception as notif_err:
+                print(f"[NOTIFICATION WARNING] Failed to notify assigned employee: {notif_err}", flush=True)
+
         return {
             "shipment_id": shipment_id,
             "shipment_number": shipment_num,
@@ -1038,7 +1054,7 @@ def update_shipment_status(shipment_id, new_status, location=None, notes=None, u
 
         cursor.execute("""
             SELECT shp.shipment_id, shp.purchase_order_id, shp.supplier_id, shp.status, shp.shipment_number, 
-                   shp.shipped_at, shp.delivered_at, s.supplier_name
+                   shp.shipped_at, shp.delivered_at, s.supplier_name, shp.assigned_employee_id
             FROM "Shipments" shp
             JOIN "Suppliers" s ON shp.supplier_id = s.supplier_id
             WHERE shp.shipment_id = %s
@@ -1056,6 +1072,7 @@ def update_shipment_status(shipment_id, new_status, location=None, notes=None, u
         existing_shipped_at = row[5]
         existing_delivered_at = row[6]
         supplier_name = row[7]
+        assigned_employee_id = row[8]
 
         # Supplier isolation check
         if role == 'Supplier':
@@ -1145,6 +1162,39 @@ def update_shipment_status(shipment_id, new_status, location=None, notes=None, u
         ))
 
         conn.commit()
+
+        # Trigger Event B: Shipment Delivered
+        if new_status == "Delivered" and current_status != "Delivered":
+            try:
+                from app.services.team3.notification_service import (
+                    create_notification,
+                    get_active_managers_and_owners
+                )
+                # 1. Notify Assigned Employee if assigned
+                if assigned_employee_id:
+                    create_notification(
+                        user_id=assigned_employee_id,
+                        title="Shipment Delivered",
+                        message=f"Shipment #{shipment_id} has been delivered and is ready for receiving.",
+                        notification_type="Shipment Delivered",
+                        priority="High",
+                        reference_type="Shipment",
+                        reference_id=shipment_id
+                    )
+                # 2. Notify active Managers and Owners
+                mo_ids = get_active_managers_and_owners()
+                for mo_id in mo_ids:
+                    create_notification(
+                        user_id=mo_id,
+                        title="Shipment Delivered",
+                        message=f"Shipment #{shipment_id} has been delivered.",
+                        notification_type="Shipment Delivered",
+                        priority="High",
+                        reference_type="Shipment",
+                        reference_id=shipment_id
+                    )
+            except Exception as notif_err:
+                print(f"[NOTIFICATION WARNING] Failed to send shipment delivered notifications: {notif_err}", flush=True)
 
         return {
             "shipment_id": shipment_id,

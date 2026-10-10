@@ -437,7 +437,7 @@ def respond_to_stock_request(stock_request_id, user_id, role, data):
 
     try:
         cursor.execute("""
-            SELECT stock_request_id, request_number, supplier_id, status
+            SELECT stock_request_id, request_number, supplier_id, status, requested_by
             FROM "StockRequests"
             WHERE stock_request_id = %s
             FOR UPDATE
@@ -449,6 +449,7 @@ def respond_to_stock_request(stock_request_id, user_id, role, data):
 
         current_status = sr[3]
         req_supplier_id = sr[2]
+        req_by_user_id = sr[4]
 
         if current_status in ("Completed", "Cancelled"):
             return None, f"Cannot respond to a stock request that is {current_status}."
@@ -532,6 +533,21 @@ def respond_to_stock_request(stock_request_id, user_id, role, data):
         upd = cursor.fetchone()
 
         conn.commit()
+
+        try:
+            from app.services.team3.notification_service import create_notification
+            if req_by_user_id:
+                create_notification(
+                    user_id=req_by_user_id,
+                    title="Stock Request Updated",
+                    message=f"Supplier responded to stock request {upd[0]} with status '{upd[1]}'.",
+                    notification_type="Stock Request",
+                    priority="Normal",
+                    reference_type="StockRequest",
+                    reference_id=stock_request_id
+                )
+        except Exception as notif_err:
+            print(f"[NOTIFICATION WARNING] Failed to notify stock request response: {notif_err}", flush=True)
 
         return {
             "message": f"Stock request {upd[0]} updated to '{upd[1]}'.",

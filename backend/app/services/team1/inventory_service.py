@@ -254,6 +254,27 @@ def adjust_inventory(inventory_id, new_quantity, user_id=None, notes=None):
 
         conn.commit()
 
+        # Trigger Event I: Low Stock Alert if reduced to or below reorder level
+        if delta < 0 and new_quantity <= reorder_level:
+            try:
+                from app.services.team3.notification_service import (
+                    create_notification,
+                    get_active_managers_and_owners
+                )
+                mgr_owner_ids = get_active_managers_and_owners()
+                for mo_id in mgr_owner_ids:
+                    create_notification(
+                        user_id=mo_id,
+                        title="Low Stock Alert",
+                        message=f"Product {product_name} is low in stock. Current quantity: {new_quantity}.",
+                        notification_type="Low Stock",
+                        priority="High",
+                        reference_type="Product",
+                        reference_id=product_id
+                    )
+            except Exception as notif_err:
+                print(f"[NOTIFICATION WARNING] Failed to send low stock notification in adjust_inventory: {notif_err}", flush=True)
+
         stock_status = "Out of Stock" if new_quantity <= 0 else ("Low Stock" if new_quantity <= reorder_level else "In Stock")
 
         result = {
@@ -543,6 +564,33 @@ def stock_in(shipment_id, product_id, quantity, notes=None, user_id=None, role=N
 
         conn.commit()
 
+        # Trigger Event J: Stock-In Completed -> notify relevant Managers/Owners (excluding the actor)
+        try:
+            from app.services.team3.notification_service import (
+                create_notification,
+                get_active_managers_and_owners,
+                get_po_creator_user_id
+            )
+            actor_uid = int(user_id) if user_id else None
+            recipients = set(get_active_managers_and_owners(exclude_user_id=actor_uid))
+            if po_id:
+                po_creator = get_po_creator_user_id(po_id)
+                if po_creator and po_creator != actor_uid:
+                    recipients.add(po_creator)
+
+            for r_uid in recipients:
+                create_notification(
+                    user_id=r_uid,
+                    title="Stock Received",
+                    message=f"Stock-In completed for shipment #{shipment_id}.",
+                    notification_type="Stock-In",
+                    priority="Normal",
+                    reference_type="Shipment",
+                    reference_id=shipment_id
+                )
+        except Exception as notif_err:
+            print(f"[NOTIFICATION WARNING] Failed to send stock-in notification: {notif_err}", flush=True)
+
         stock_status = "Out of Stock" if new_qty <= 0 else ("Low Stock" if new_qty <= reorder_level else "In Stock")
 
         return {
@@ -700,26 +748,28 @@ def stock_out(product_id, quantity, reason=None, notes=None, user_id=None, role=
         tx_id = tx_row[0]
         tx_date = tx_row[1]
 
-        # 5. Low-stock notification trigger if applicable
+        conn.commit()
+
+        # Trigger Event I: Low Stock Alert -> notify active Managers and Owners
         if new_stock <= reorder_level:
             try:
-                alert_title = f"Low Stock Alert: {prod_name}"
-                alert_msg = f"Product '{prod_name}' (SKU: {prod_sku}) is currently at {new_stock} units, which is at or below the reorder level of {reorder_level}."
-                cursor.execute("""
-                    INSERT INTO "Notifications" (
-                        user_id,
-                        title,
-                        message,
-                        notification_type,
-                        is_read,
-                        created_at
+                from app.services.team3.notification_service import (
+                    create_notification,
+                    get_active_managers_and_owners
+                )
+                mgr_owner_ids = get_active_managers_and_owners()
+                for mo_id in mgr_owner_ids:
+                    create_notification(
+                        user_id=mo_id,
+                        title="Low Stock Alert",
+                        message=f"Product {prod_name} is low in stock. Current quantity: {new_stock}.",
+                        notification_type="Low Stock",
+                        priority="High",
+                        reference_type="Product",
+                        reference_id=product_id
                     )
-                    VALUES (%s, %s, %s, 'Warning', false, NOW())
-                """, (int(user_id) if user_id else None, alert_title, alert_msg))
-            except Exception:
-                pass  # Notifications table is optional, never fail stock transaction
-
-        conn.commit()
+            except Exception as notif_err:
+                print(f"[NOTIFICATION WARNING] Failed to send low stock notification in stock_out: {notif_err}", flush=True)
 
         stock_status = "Out of Stock" if new_stock <= 0 else ("Low Stock" if new_stock <= reorder_level else "In Stock")
 

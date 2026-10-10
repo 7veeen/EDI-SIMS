@@ -246,7 +246,8 @@ App.pages['shipments'] = {
             const remQty = s.total_remaining_quantity !== undefined ? s.total_remaining_quantity : Math.max(0, expQty - recQty);
             const recStatus = s.receiving_status || 'Pending Receipt';
 
-            const isAssignedToCurrentUser = isEmployee && (s.assigned_employee_id === user.user_id);
+            const currentUserId = user ? parseInt(user.id || user.user_id || 0) : 0;
+            const isAssignedToCurrentUser = isEmployee && parseInt(s.assigned_employee_id) === currentUserId;
             const canStockIn = isDelivered && remQty > 0 && (isManagerOrOwner || isAssignedToCurrentUser);
 
             let receivingBadge = '';
@@ -754,8 +755,9 @@ App.pages['shipments'] = {
 
             const statusBadge = this.getStatusBadge(s.status);
             const user = Auth.getUser();
+            const currentUserId = user ? parseInt(user.id || user.user_id || 0) : 0;
             const isManagerOrOwner = user && (user.role === 'Owner' || user.role === 'Manager');
-            const isAssignedEmployee = user && user.role === 'Employee' && (s.assigned_employee_id === user.user_id);
+            const isAssignedEmployee = user && user.role === 'Employee' && parseInt(s.assigned_employee_id) === currentUserId;
             const isDelivered = s.status && s.status.toLowerCase() === 'delivered';
             const remQty = s.total_remaining_quantity !== undefined ? s.total_remaining_quantity : 0;
             const canStockIn = isDelivered && remQty > 0 && (isManagerOrOwner || isAssignedEmployee);

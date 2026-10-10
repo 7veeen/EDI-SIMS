@@ -582,7 +582,7 @@ def respond_to_purchase_order(purchase_order_id, response_data, user_id=None, ro
 
         # Fetch PO to verify existence and ownership
         cursor.execute("""
-            SELECT po.purchase_order_id, po.supplier_id, po.status, po.supplier_response, s.supplier_name
+            SELECT po.purchase_order_id, po.supplier_id, po.status, po.supplier_response, s.supplier_name, po.ordered_by
             FROM "PurchaseOrders" po
             JOIN "Suppliers" s ON po.supplier_id = s.supplier_id
             WHERE po.purchase_order_id = %s
@@ -597,6 +597,7 @@ def respond_to_purchase_order(purchase_order_id, response_data, user_id=None, ro
         current_status = po_row[2]
         current_response = po_row[3]
         supplier_name = po_row[4]
+        ordered_by_user_id = po_row[5]
 
         # Supplier isolation check
         if role == 'Supplier':
@@ -654,6 +655,45 @@ def respond_to_purchase_order(purchase_order_id, response_data, user_id=None, ro
         ))
 
         conn.commit()
+
+        # Trigger Event F & G: Supplier Response Notifications
+        try:
+            from app.services.team3.notification_service import (
+                create_notification,
+                get_active_managers_and_owners
+            )
+            recipients = set()
+            if ordered_by_user_id:
+                recipients.add(int(ordered_by_user_id))
+            # Also ensure active managers/owners are reached if creator not set
+            if not recipients:
+                recipients.update(get_active_managers_and_owners())
+
+            if action == 'Accepted':
+                for r_uid in recipients:
+                    create_notification(
+                        user_id=r_uid,
+                        title="Purchase Order Accepted",
+                        message=f"Purchase Order #{po_id} has been accepted by the supplier.",
+                        notification_type="PO Accepted",
+                        priority="High",
+                        reference_type="PurchaseOrder",
+                        reference_id=po_id
+                    )
+            elif action == 'Rejected':
+                rej_msg = f"Purchase Order #{po_id} has been rejected by the supplier." + (f" Reason: {rejection_reason}" if rejection_reason else "")
+                for r_uid in recipients:
+                    create_notification(
+                        user_id=r_uid,
+                        title="Purchase Order Rejected",
+                        message=rej_msg,
+                        notification_type="PO Rejected",
+                        priority="High",
+                        reference_type="PurchaseOrder",
+                        reference_id=po_id
+                    )
+        except Exception as notif_err:
+            print(f"[NOTIFICATION WARNING] Failed to send PO response notification: {notif_err}", flush=True)
 
         result = {
             "purchase_order_id": updated_row[0],

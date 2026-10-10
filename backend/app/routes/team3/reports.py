@@ -1,4 +1,5 @@
 from flask import Blueprint, jsonify, request, Response
+from flask_jwt_extended import get_jwt_identity
 
 from app.middleware.team1_auth import role_required
 from app.services.team3.report_service import (
@@ -12,6 +13,8 @@ reports_bp = Blueprint("reports", __name__, url_prefix="/api/reports")
 
 
 @reports_bp.route("/", methods=["GET"])
+@reports_bp.route("", methods=["GET"])
+@role_required("Owner", "Manager")
 def get_reports():
     reports, error, status_code = get_reports_metadata()
     if error:
@@ -21,6 +24,7 @@ def get_reports():
 
 
 @reports_bp.route("/status", methods=["GET"])
+@role_required("Owner", "Manager")
 def get_inventory_status():
     status_info, error, status_code = check_inventory_status()
     if error:
@@ -30,22 +34,28 @@ def get_inventory_status():
 
 
 @reports_bp.route("/generate", methods=["POST"])
+@role_required("Owner", "Manager")
 def generate_report():
+    user_id = get_jwt_identity()
+    try:
+        user_id = int(user_id)
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid user identity"}), 401
+
     data = request.get_json(silent=True) or {}
 
     report_name = data.get("report_name")
     report_type = data.get("report_type")
-    generated_by = data.get("generated_by")
 
-    if not report_name or not report_type or not generated_by:
+    if not report_name or not report_type:
         return jsonify({
-            "error": "report_name, report_type and generated_by are required"
+            "error": "report_name and report_type are required"
         }), 400
 
     result, error, status_code = generate_inventory_report_record(
         report_name=report_name,
         report_type=report_type,
-        generated_by=generated_by
+        generated_by=user_id
     )
     if error:
         return jsonify(error), status_code

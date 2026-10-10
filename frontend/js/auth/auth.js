@@ -28,9 +28,11 @@ const Auth = {
                 localStorage.setItem('sims_access_token', data.access_token);
                 
                 const userData = data.user || {};
+                const resolvedId = userData.user_id || userData.id || data.user_id || data.id;
                 
                 localStorage.setItem('sims_user', JSON.stringify({
-                    id: userData.user_id || userData.id || data.user_id || data.id,
+                    id: resolvedId,
+                    user_id: resolvedId,
                     username: userData.username || data.username || username,
                     role: userData.role || userData.role_name || data.role || data.role_name
                 }));
