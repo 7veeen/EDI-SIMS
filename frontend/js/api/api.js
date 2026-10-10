@@ -95,5 +95,22 @@ const Api = {
 
     async markAllNotificationsRead() {
         return this.patch('/notifications/read-all');
+    },
+
+    // Reports helpers (Phase 2)
+    async getReports() {
+        return this.get('/reports/');
+    },
+
+    async getReport(id) {
+        return this.get(`/reports/${id}`);
+    },
+
+    async getReportStatus() {
+        return this.get('/reports/status');
+    },
+
+    async generateReport(data) {
+        return this.post('/reports/generate', data);
     }
 };
