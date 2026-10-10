@@ -10,6 +10,8 @@ from app.services.team3.report_service import (
     generate_report_record,
     generate_inventory_report_record,
     generate_inventory_csv_export,
+    serialize_snapshot_to_csv,
+    generate_snapshot_pdf,
     SUPPORTED_REPORT_TYPES
 )
 
@@ -52,6 +54,9 @@ def generate_report():
     report_type = data.get("report_type")
     start_date = data.get("start_date")
     end_date = data.get("end_date")
+    user_id_filter = data.get("user_id")
+    action_filter = data.get("action")
+    entity_type_filter = data.get("entity_type") or data.get("table_name")
 
     if not report_name or not report_type:
         return jsonify({
@@ -90,7 +95,10 @@ def generate_report():
         report_type=report_type,
         generated_by=user_id,
         start_date=start_date,
-        end_date=end_date
+        end_date=end_date,
+        user_id_filter=user_id_filter,
+        action_filter=action_filter,
+        entity_type_filter=entity_type_filter
     )
     if error:
         return jsonify(error), status_code
@@ -140,4 +148,73 @@ def get_report_detail(report_id):
         return jsonify(error), status_code
 
     return jsonify(report), 200
+
+
+@reports_bp.route("/<report_id>/export/csv", methods=["GET"])
+@role_required("Owner", "Manager")
+def export_snapshot_csv(report_id):
+    try:
+        report_id_int = int(report_id)
+        if report_id_int <= 0:
+            return jsonify({"error": "Invalid report ID"}), 400
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid report ID"}), 400
+
+    report, error, status_code = get_report_by_id(report_id_int)
+    if error:
+        return jsonify(error), status_code
+
+    result, error, status_code = serialize_snapshot_to_csv(report)
+    if error:
+        return jsonify(error), status_code
+
+    csv_bytes, filename = result
+    response = Response(
+        csv_bytes,
+        mimetype="text/csv",
+        headers={
+            "Content-Type": "text/csv; charset=utf-8",
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Access-Control-Expose-Headers": "Content-Disposition",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        }
+    )
+    return response, 200
+
+
+@reports_bp.route("/<report_id>/export/pdf", methods=["GET"])
+@role_required("Owner", "Manager")
+def export_snapshot_pdf(report_id):
+    try:
+        report_id_int = int(report_id)
+        if report_id_int <= 0:
+            return jsonify({"error": "Invalid report ID"}), 400
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid report ID"}), 400
+
+    report, error, status_code = get_report_by_id(report_id_int)
+    if error:
+        return jsonify(error), status_code
+
+    result, error, status_code = generate_snapshot_pdf(report)
+    if error:
+        return jsonify(error), status_code
+
+    pdf_bytes, filename = result
+    response = Response(
+        pdf_bytes,
+        mimetype="application/pdf",
+        headers={
+            "Content-Type": "application/pdf",
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Access-Control-Expose-Headers": "Content-Disposition",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        }
+    )
+    return response, 200
+
 

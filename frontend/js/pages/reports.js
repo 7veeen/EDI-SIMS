@@ -586,6 +586,8 @@ App.pages['reports'] = {
                 typeBadgeStyle = 'background: rgba(217, 119, 6, 0.1); color: #d97706; font-weight: 600; padding: 2px 8px; border-radius: 4px;';
             } else if (r.report_type === 'Supplier Performance') {
                 typeBadgeStyle = 'background: rgba(14, 165, 233, 0.1); color: #0284c7; font-weight: 600; padding: 2px 8px; border-radius: 4px;';
+            } else if (r.report_type === 'Audit Trail') {
+                typeBadgeStyle = 'background: rgba(71, 85, 105, 0.1); color: #334155; font-weight: 600; padding: 2px 8px; border-radius: 4px;';
             }
 
             return `
@@ -680,6 +682,7 @@ App.pages['reports'] = {
                             <option value="Purchase Orders">Purchase Orders</option>
                             <option value="Quotations">Quotations</option>
                             <option value="Supplier Performance">Supplier Performance</option>
+                            <option value="Audit Trail">Audit Trail</option>
                         </select>
                         <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
                             Select the module data to capture for this historical point-in-time snapshot.
@@ -729,6 +732,8 @@ App.pages['reports'] = {
                             nameInput.value = `Quotations Snapshot - ${todayStr}`;
                         } else if (selType === 'Supplier Performance') {
                             nameInput.value = `Supplier Performance Snapshot - ${todayStr}`;
+                        } else if (selType === 'Audit Trail') {
+                            nameInput.value = `Audit Trail Snapshot - ${todayStr}`;
                         }
                     }
                 });
@@ -865,7 +870,8 @@ App.pages['reports'] = {
                 </div>
             `,
             footer: `
-                <div style="display: flex; justify-content: flex-end; width: 100%;">
+                <div id="modal-report-footer-actions" style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 0.5rem;">
+                    <div id="modal-export-buttons-group" style="display: flex; gap: 0.5rem; flex-wrap: wrap;"></div>
                     <button type="button" class="btn btn-outline" id="modal-close-report-btn">Close</button>
                 </div>
             `,
@@ -883,6 +889,28 @@ App.pages['reports'] = {
                         : await Api.get(`/reports/${reportId}`);
                     const container = modalEl.querySelector('#report-modal-content-area');
                     if (!container) return;
+
+                    const exportGroup = modalEl.querySelector('#modal-export-buttons-group');
+                    if (exportGroup) {
+                        if (data.has_snapshot && data.snapshot) {
+                            exportGroup.innerHTML = `
+                                <button type="button" class="btn btn-secondary" id="modal-export-csv-btn" title="Download historical snapshot as CSV">
+                                    <i class='bx bx-download'></i> Export Snapshot CSV
+                                </button>
+                                <button type="button" class="btn btn-secondary" id="modal-export-pdf-btn" title="Download historical snapshot as PDF">
+                                    <i class='bx bxs-file-pdf' style="color: #dc2626;"></i> Export PDF
+                                </button>
+                            `;
+                            modalEl.querySelector('#modal-export-csv-btn')?.addEventListener('click', () => {
+                                this.exportSnapshotCsv(reportId, data.report_name);
+                            });
+                            modalEl.querySelector('#modal-export-pdf-btn')?.addEventListener('click', () => {
+                                this.exportSnapshotPdf(reportId, data.report_name);
+                            });
+                        } else {
+                            exportGroup.innerHTML = '';
+                        }
+                    }
 
                     let html = `
                         <div style="background: var(--surface); padding: 1.25rem; border-radius: 8px; margin-bottom: 1.5rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; border: 1px solid var(--border);">
@@ -1344,6 +1372,76 @@ App.pages['reports'] = {
                                     <div>&bull; <strong>On-Time Delivery Rate:</strong> Deliveries on or before expected delivery date &divide; Measurable Deliveries (with recorded planned dates). Deliveries lacking planned dates are marked <em>Unscheduled</em> to prevent bias.</div>
                                 </div>
                             `;
+                        } else if (repType === 'Audit Trail') {
+                            const totalEvents = items.length;
+                            const uniqueActors = new Set(items.map(ev => ev.user_id).filter(Boolean)).size;
+                            const entityTypes = new Set(items.map(ev => ev.table_name).filter(Boolean)).size;
+
+                            html += `
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; margin-bottom: 1.25rem;">
+                                    <div class="glass-panel" style="padding: 0.75rem 1rem; border-radius: 6px; text-align: center;">
+                                        <div style="font-size: 0.75rem; color: var(--gray);">Total Events</div>
+                                        <div style="font-size: 1.3rem; font-weight: 700; color: var(--text);">${totalEvents}</div>
+                                    </div>
+                                    <div class="glass-panel" style="padding: 0.75rem 1rem; border-radius: 6px; text-align: center;">
+                                        <div style="font-size: 0.75rem; color: var(--gray);">Active Actors</div>
+                                        <div style="font-size: 1.3rem; font-weight: 700; color: #2563eb;">${uniqueActors}</div>
+                                    </div>
+                                    <div class="glass-panel" style="padding: 0.75rem 1rem; border-radius: 6px; text-align: center;">
+                                        <div style="font-size: 0.75rem; color: var(--gray);">Entity Tables</div>
+                                        <div style="font-size: 1.3rem; font-weight: 700; color: #7c3aed;">${entityTypes}</div>
+                                    </div>
+                                    <div class="glass-panel" style="padding: 0.75rem 1rem; border-radius: 6px; text-align: center;">
+                                        <div style="font-size: 0.75rem; color: var(--gray);">Logged Outcome</div>
+                                        <div style="font-size: 1.3rem; font-weight: 700; color: #059669;">Verified Success</div>
+                                    </div>
+                                </div>
+
+                                <div class="table-container" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px;">
+                                    <table style="width: 100%; font-size: 0.85rem;">
+                                        <thead>
+                                            <tr style="position: sticky; top: 0; background: var(--surface); z-index: 1;">
+                                                <th style="width: 60px;">Event ID</th>
+                                                <th>Timestamp</th>
+                                                <th>Actor</th>
+                                                <th>Action</th>
+                                                <th>Entity</th>
+                                                <th>Record ID</th>
+                                                <th>Description</th>
+                                                <th>Outcome</th>
+                                                <th>IP Address</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${items.map(ev => {
+                                                let actColor = '#2563eb';
+                                                const a = (ev.action || '').toUpperCase();
+                                                if (a === 'DELETE') actColor = '#dc2626';
+                                                else if (a === 'UPDATE') actColor = '#d97706';
+                                                else if (a === 'INSERT' || a === 'CREATE') actColor = '#059669';
+
+                                                return `
+                                                    <tr>
+                                                        <td><strong>#${ev.log_id || 'N/A'}</strong></td>
+                                                        <td>${Utils.escapeHtml(ev.action_time ? Utils.formatDate(ev.action_time) : 'N/A')}</td>
+                                                        <td><strong>${Utils.escapeHtml(ev.actor_username || ('User #' + (ev.user_id || 'N/A')))}</strong></td>
+                                                        <td>
+                                                            <span class="badge" style="background: rgba(0,0,0,0.06); color: ${actColor}; font-weight: 600; padding: 2px 6px; border-radius: 4px;">
+                                                                ${Utils.escapeHtml(ev.action || 'UNKNOWN')}
+                                                            </span>
+                                                        </td>
+                                                        <td><code>${Utils.escapeHtml(ev.table_name || 'General')}</code></td>
+                                                        <td>${ev.record_id ? '#' + ev.record_id : '<span style="color:var(--gray)">N/A</span>'}</td>
+                                                        <td>${Utils.escapeHtml(ev.description || '-')}</td>
+                                                        <td><span class="status-badge status-active" style="font-size: 0.65rem; padding: 1px 5px;">${Utils.escapeHtml(ev.outcome || 'Success')}</span></td>
+                                                        <td style="font-family: monospace; font-size: 0.75rem; color: var(--gray);">${Utils.escapeHtml(ev.ip_address || 'N/A')}</td>
+                                                    </tr>
+                                                `;
+                                            }).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            `;
                         }
                     }
 
@@ -1362,5 +1460,135 @@ App.pages['reports'] = {
                 }
             }
         });
+    },
+
+    async exportSnapshotCsv(reportId, reportName) {
+        const btn = document.getElementById('modal-export-csv-btn');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = `<i class='bx bx-loader-alt bx-spin'></i> Exporting...`;
+        }
+
+        try {
+            const token = localStorage.getItem('sims_token') || localStorage.getItem('sims_access_token');
+            const headers = {};
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            const response = await fetch(`${API_BASE_URL}/reports/${reportId}/export/csv`, {
+                headers
+            });
+
+            if (response.status === 401) {
+                Auth.logout();
+                Utils.showToast("Session expired. Please login again.", "error");
+                return;
+            }
+
+            if (response.status === 403) {
+                Utils.showToast("Access denied: You do not have permission to export this report.", "error");
+                return;
+            }
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.message || errData.error || `Export failed with status ${response.status}`);
+            }
+
+            const blob = await response.blob();
+            let filename = `report_${reportId}_snapshot.csv`;
+            const disposition = response.headers.get('Content-Disposition');
+            if (disposition && disposition.includes('filename=')) {
+                const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                if (match && match[1]) {
+                    filename = match[1].replace(/['"]/g, '').trim();
+                }
+            }
+
+            const blobUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = blobUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(blobUrl);
+            a.remove();
+
+            Utils.showToast("Historical snapshot CSV downloaded successfully.", "success");
+        } catch (error) {
+            Utils.showToast(error.message || "Failed to export historical snapshot CSV", "error");
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = `<i class='bx bx-download'></i> Export Snapshot CSV`;
+            }
+        }
+    },
+
+    async exportSnapshotPdf(reportId, reportName) {
+        const btn = document.getElementById('modal-export-pdf-btn');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = `<i class='bx bx-loader-alt bx-spin'></i> Generating PDF...`;
+        }
+
+        try {
+            const token = localStorage.getItem('sims_token') || localStorage.getItem('sims_access_token');
+            const headers = {};
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            const response = await fetch(`${API_BASE_URL}/reports/${reportId}/export/pdf`, {
+                headers
+            });
+
+            if (response.status === 401) {
+                Auth.logout();
+                Utils.showToast("Session expired. Please login again.", "error");
+                return;
+            }
+
+            if (response.status === 403) {
+                Utils.showToast("Access denied: You do not have permission to export this report.", "error");
+                return;
+            }
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.message || errData.error || `PDF generation failed with status ${response.status}`);
+            }
+
+            const blob = await response.blob();
+            let filename = `report_${reportId}_snapshot.pdf`;
+            const disposition = response.headers.get('Content-Disposition');
+            if (disposition && disposition.includes('filename=')) {
+                const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                if (match && match[1]) {
+                    filename = match[1].replace(/['"]/g, '').trim();
+                }
+            }
+
+            const blobUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = blobUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(blobUrl);
+            a.remove();
+
+            Utils.showToast("Historical snapshot PDF downloaded successfully.", "success");
+        } catch (error) {
+            Utils.showToast(error.message || "Failed to export historical snapshot PDF", "error");
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = `<i class='bx bxs-file-pdf' style="color: #dc2626;"></i> Export PDF`;
+            }
+        }
     }
 };

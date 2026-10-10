@@ -751,7 +751,7 @@ class Team3ReportsAndExportTestCase(unittest.TestCase):
 
     def test_18_phase4_unsupported_report_type_rejection(self):
         """Unsupported report types return HTTP 400 Bad Request"""
-        invalid_types = ["Shipments", "Audit Trail", "RandomType", ""]
+        invalid_types = ["Shipments", "Analytics", "RandomType", ""]
         for bad_type in invalid_types:
             with self.subTest(report_type=bad_type):
                 resp = self.client.post(
@@ -959,7 +959,7 @@ class Team3ReportsAndExportTestCase(unittest.TestCase):
         resp_bad_type = self.client.post(
             "/api/reports/generate",
             headers={"Authorization": f"Bearer {self.owner_token}"},
-            json={"report_name": "Audit Test", "report_type": "Audit Trail"}
+            json={"report_name": "Unsupported Type Test", "report_type": "UnsupportedType"}
         )
         self.assertEqual(resp_bad_type.status_code, 400)
         self.assertIn("Invalid report type", resp_bad_type.get_json().get("error", ""))
@@ -1088,6 +1088,374 @@ class Team3ReportsAndExportTestCase(unittest.TestCase):
                     self.assertEqual(resp.status_code, 500)
                     self.assertEqual(resp.get_json().get("error"), "Failed to create report record")
                     mock_conn.rollback.assert_called_once()
+
+    def test_28_phase6_audit_trail_report_generation_and_retrieval(self):
+        """Phase 6: Owner and Manager can generate and retrieve Audit Trail report snapshot"""
+        for role, token, user_id in [("Owner", self.owner_token, self.owner_user_id), ("Manager", self.manager_token, self.manager_user_id)]:
+            with self.subTest(role=role):
+                payload = {
+                    "report_name": f"{role} Audit Trail Snapshot",
+                    "report_type": "Audit Trail"
+                }
+                resp_gen = self.client.post(
+                    "/api/reports/generate",
+                    headers={"Authorization": f"Bearer {token}"},
+                    json=payload
+                )
+                self.assertEqual(resp_gen.status_code, 201)
+                data = resp_gen.get_json()
+                self.assertIn("report", data)
+                self.assertIn("data", data)
+                report_id = data["report"]["report_id"]
+                self.assertEqual(data["report"]["report_type"], "Audit Trail")
+                self.assertEqual(data["report"]["generated_by"], user_id)
+                self.assertTrue(data["report"]["has_snapshot"])
+                self.assertIsInstance(data["data"], list)
+
+                # Retrieve via detail endpoint
+                resp_get = self.client.get(
+                    f"/api/reports/{report_id}",
+                    headers={"Authorization": f"Bearer {token}"}
+                )
+                self.assertEqual(resp_get.status_code, 200)
+                detail = resp_get.get_json()
+                self.assertEqual(detail["report_id"], report_id)
+                self.assertEqual(detail["report_type"], "Audit Trail")
+                self.assertTrue(detail["has_snapshot"])
+                self.assertIsInstance(detail["snapshot"], list)
+
+                # Validate schema if audit logs exist
+                if len(detail["snapshot"]) > 0:
+                    first_ev = detail["snapshot"][0]
+                    self.assertIn("log_id", first_ev)
+                    self.assertIn("action_time", first_ev)
+                    self.assertIn("user_id", first_ev)
+                    self.assertIn("actor_username", first_ev)
+                    self.assertIn("action", first_ev)
+                    self.assertIn("table_name", first_ev)
+                    self.assertIn("description", first_ev)
+                    self.assertIn("outcome", first_ev)
+                    self.assertIn("ip_address", first_ev)
+
+                    # Ensure no sensitive credentials/tokens leaked
+                    for k, v in first_ev.items():
+                        self.assertNotIn("password", str(k).lower())
+                        self.assertNotIn("token", str(k).lower())
+                        self.assertNotIn("secret", str(k).lower())
+
+    def test_29_phase6_audit_trail_filters_and_validation(self):
+        """Phase 6: Audit Trail query input validation and optional filtering"""
+        # Invalid start_date returns 400
+        resp_bad_start = self.client.post(
+            "/api/reports/generate",
+            headers={"Authorization": f"Bearer {self.owner_token}"},
+            json={"report_name": "Bad Date", "report_type": "Audit Trail", "start_date": "invalid-date"}
+        )
+        self.assertEqual(resp_bad_start.status_code, 400)
+        self.assertIn("Invalid start_date format", resp_bad_start.get_json().get("error", ""))
+
+        # Invalid end_date returns 400
+        resp_bad_end = self.client.post(
+            "/api/reports/generate",
+            headers={"Authorization": f"Bearer {self.owner_token}"},
+            json={"report_name": "Bad Date", "report_type": "Audit Trail", "end_date": "not-valid"}
+        )
+        self.assertEqual(resp_bad_end.status_code, 400)
+        self.assertIn("Invalid end_date format", resp_bad_end.get_json().get("error", ""))
+
+        # Start date after end date returns 400
+        resp_rev = self.client.post(
+            "/api/reports/generate",
+            headers={"Authorization": f"Bearer {self.owner_token}"},
+            json={"report_name": "Reversed", "report_type": "Audit Trail", "start_date": "2026-12-31", "end_date": "2026-01-01"}
+        )
+        self.assertEqual(resp_rev.status_code, 400)
+        self.assertIn("Start date cannot be after end date", resp_rev.get_json().get("error", ""))
+
+        # Valid date filtering works
+        resp_valid = self.client.post(
+            "/api/reports/generate",
+            headers={"Authorization": f"Bearer {self.owner_token}"},
+            json={
+                "report_name": "Filtered Audit Trail",
+                "report_type": "Audit Trail",
+                "start_date": "2020-01-01",
+                "end_date": "2030-12-31"
+            }
+        )
+        self.assertEqual(resp_valid.status_code, 201)
+
+    def test_30_phase6_audit_trail_rbac_and_spoof_prevention(self):
+        """Phase 6: Audit Trail RBAC rejection for Employee/Supplier and spoof prevention"""
+        # Anonymous rejected with 401
+        resp_anon = self.client.post(
+            "/api/reports/generate",
+            json={"report_name": "Anon Audit", "report_type": "Audit Trail"}
+        )
+        self.assertEqual(resp_anon.status_code, 401)
+
+        # Employee rejected with 403
+        resp_emp = self.client.post(
+            "/api/reports/generate",
+            headers={"Authorization": f"Bearer {self.employee_token}"},
+            json={"report_name": "Emp Audit", "report_type": "Audit Trail"}
+        )
+        self.assertEqual(resp_emp.status_code, 403)
+
+        # Supplier rejected with 403
+        resp_sup = self.client.post(
+            "/api/reports/generate",
+            headers={"Authorization": f"Bearer {self.supplier_token}"},
+            json={"report_name": "Sup Audit", "report_type": "Audit Trail"}
+        )
+        self.assertEqual(resp_sup.status_code, 403)
+
+        # Spoofed identity strictly ignored
+        resp_spoof = self.client.post(
+            "/api/reports/generate",
+            headers={"Authorization": f"Bearer {self.owner_token}"},
+            json={
+                "report_name": "Spoofed Audit",
+                "report_type": "Audit Trail",
+                "generated_by": 999999
+            }
+        )
+        self.assertEqual(resp_spoof.status_code, 201)
+        self.assertEqual(resp_spoof.get_json()["report"]["generated_by"], self.owner_user_id)
+
+    def test_31_phase6_audit_trail_historical_immutability_and_rollback(self):
+        """Phase 6: Historical detail retrieval does not query live audit table and handles rollback"""
+        # Create audit trail report
+        resp_gen = self.client.post(
+            "/api/reports/generate",
+            headers={"Authorization": f"Bearer {self.owner_token}"},
+            json={"report_name": "Immutability Audit Test", "report_type": "Audit Trail"}
+        )
+        self.assertEqual(resp_gen.status_code, 201)
+        rep_id = resp_gen.get_json()["report"]["report_id"]
+
+        with patch("app.services.team3.report_service.fetch_audit_trail_report_data") as mock_fetch:
+            resp_detail = self.client.get(
+                f"/api/reports/{rep_id}",
+                headers={"Authorization": f"Bearer {self.owner_token}"}
+            )
+            self.assertEqual(resp_detail.status_code, 200)
+            mock_fetch.assert_not_called()
+
+        # Test persistence failure rollback
+        with patch("app.services.team3.report_service.fetch_audit_trail_report_data", return_value=([], None, 200)):
+            with patch("app.services.team3.report_service.get_db_connection") as mock_db:
+                mock_conn = mock_db.return_value
+                mock_cursor = mock_conn.cursor.return_value
+                mock_cursor.execute.side_effect = Exception("Simulated DB Write Error")
+
+                resp_fail = self.client.post(
+                    "/api/reports/generate",
+                    headers={"Authorization": f"Bearer {self.owner_token}"},
+                    json={"report_name": "Rollback Test", "report_type": "Audit Trail"}
+                )
+                self.assertEqual(resp_fail.status_code, 500)
+                mock_conn.rollback.assert_called_once()
+
+    def test_32_phase6_historical_snapshot_csv_export_all_types(self):
+        """Phase 6: GET /api/reports/<report_id>/export/csv exports valid CSV for all 6 report types"""
+        report_types = [
+            "Inventory",
+            "Stock Transactions",
+            "Purchase Orders",
+            "Quotations",
+            "Supplier Performance",
+            "Audit Trail"
+        ]
+        for rep_type in report_types:
+            with self.subTest(report_type=rep_type):
+                # Generate a report for this type
+                resp_gen = self.client.post(
+                    "/api/reports/generate",
+                    headers={"Authorization": f"Bearer {self.owner_token}"},
+                    json={"report_name": f"CSV Export Test {rep_type}", "report_type": rep_type}
+                )
+                self.assertEqual(resp_gen.status_code, 201)
+                rep_id = resp_gen.get_json()["report"]["report_id"]
+
+                # Export CSV
+                resp_csv = self.client.get(
+                    f"/api/reports/{rep_id}/export/csv",
+                    headers={"Authorization": f"Bearer {self.owner_token}"}
+                )
+                self.assertEqual(resp_csv.status_code, 200)
+                self.assertIn("text/csv", resp_csv.content_type)
+                disp = resp_csv.headers.get("Content-Disposition", "")
+                self.assertIn(f"id{rep_id}.csv", disp)
+
+                raw_bytes = resp_csv.data
+                self.assertTrue(raw_bytes.startswith(b'\xef\xbb\xbf'), "CSV must start with UTF-8 BOM")
+
+                # Parse CSV
+                csv_text = raw_bytes.decode('utf-8-sig')
+                reader = csv.reader(io.StringIO(csv_text))
+                rows = list(reader)
+                self.assertGreaterEqual(len(rows), 1, "Must contain at least header row")
+                header = rows[0]
+                self.assertEqual(header[0], "Report ID")
+                self.assertEqual(header[1], "Report Name")
+
+    def test_33_phase6_historical_snapshot_csv_formula_injection_and_legacy_handling(self):
+        """Phase 6: Historical CSV sanitizes formula injection and handles legacy/unauthorized requests"""
+        # 1. Formula injection test with mock report
+        mock_rep = {
+            "report_id": 9991,
+            "report_name": "=cmd|' /C calc'!A0",
+            "report_type": "Inventory",
+            "has_snapshot": True,
+            "snapshot": [{
+                "product_id": 1,
+                "product_name": "+SUM(A1:B1)",
+                "sku": "-Discount SKU",
+                "category_name": "@Special",
+                "quantity_available": 10,
+                "reorder_level": 5,
+                "unit_price": 20.0,
+                "inventory_value": 200.0,
+                "stock_status": "NORMAL",
+                "status": "   =2+2"
+            }]
+        }
+        with patch("app.routes.team3.reports.get_report_by_id", return_value=(mock_rep, None, 200)):
+            resp = self.client.get(
+                "/api/reports/9991/export/csv",
+                headers={"Authorization": f"Bearer {self.owner_token}"}
+            )
+            self.assertEqual(resp.status_code, 200)
+            csv_str = resp.data.decode('utf-8-sig')
+            reader = csv.reader(io.StringIO(csv_str))
+            rows = list(reader)
+            self.assertEqual(len(rows), 2)
+            data_row = rows[1]
+            self.assertTrue(data_row[1].startswith("'="))
+            self.assertTrue(data_row[3].startswith("'+"))
+            self.assertTrue(data_row[4].startswith("'-"))
+            self.assertTrue(data_row[5].startswith("'@"))
+
+        # 2. Legacy report without snapshot returns 404
+        mock_legacy = {
+            "report_id": 46,
+            "report_name": "Legacy Pre-Phase 2 Report",
+            "report_type": "Inventory",
+            "has_snapshot": False,
+            "snapshot": None
+        }
+        with patch("app.routes.team3.reports.get_report_by_id", return_value=(mock_legacy, None, 200)):
+            resp_leg = self.client.get(
+                "/api/reports/46/export/csv",
+                headers={"Authorization": f"Bearer {self.owner_token}"}
+            )
+            self.assertEqual(resp_leg.status_code, 404)
+            self.assertIn("Historical snapshot unavailable", resp_leg.get_json().get("error", ""))
+
+        # 3. Invalid report ID returns 400
+        resp_invalid_id = self.client.get(
+            "/api/reports/not-an-id/export/csv",
+            headers={"Authorization": f"Bearer {self.owner_token}"}
+        )
+        self.assertEqual(resp_invalid_id.status_code, 400)
+
+        # 4. Anonymous returns 401
+        resp_anon = self.client.get("/api/reports/1/export/csv")
+        self.assertEqual(resp_anon.status_code, 401)
+
+        # 5. Employee returns 403
+        resp_emp = self.client.get(
+            "/api/reports/1/export/csv",
+            headers={"Authorization": f"Bearer {self.employee_token}"}
+        )
+        self.assertEqual(resp_emp.status_code, 403)
+
+    def test_34_phase6_historical_snapshot_pdf_export_all_types(self):
+        """Phase 6: GET /api/reports/<report_id>/export/pdf generates valid readable PDFs for all 6 types"""
+        import pypdf
+        report_types = [
+            "Inventory",
+            "Stock Transactions",
+            "Purchase Orders",
+            "Quotations",
+            "Supplier Performance",
+            "Audit Trail"
+        ]
+        for rep_type in report_types:
+            with self.subTest(report_type=rep_type):
+                resp_gen = self.client.post(
+                    "/api/reports/generate",
+                    headers={"Authorization": f"Bearer {self.owner_token}"},
+                    json={"report_name": f"PDF Export Test {rep_type}", "report_type": rep_type}
+                )
+                self.assertEqual(resp_gen.status_code, 201)
+                rep_id = resp_gen.get_json()["report"]["report_id"]
+
+                resp_pdf = self.client.get(
+                    f"/api/reports/{rep_id}/export/pdf",
+                    headers={"Authorization": f"Bearer {self.owner_token}"}
+                )
+                self.assertEqual(resp_pdf.status_code, 200)
+                self.assertEqual(resp_pdf.content_type, "application/pdf")
+                disp = resp_pdf.headers.get("Content-Disposition", "")
+                self.assertIn(f"id{rep_id}.pdf", disp)
+
+                raw_pdf = resp_pdf.data
+                self.assertTrue(raw_pdf.startswith(b'%PDF'), "PDF file must have %PDF magic header")
+
+                pdf_reader = pypdf.PdfReader(io.BytesIO(raw_pdf))
+                self.assertGreaterEqual(len(pdf_reader.pages), 1)
+                full_text = "".join(page.extract_text() for page in pdf_reader.pages)
+                self.assertIn("SIMS", full_text)
+                self.assertIn(str(rep_id), full_text)
+                self.assertIn("Page 1 of", full_text)
+
+    def test_35_phase6_pdf_export_rbac_and_immutability(self):
+        """Phase 6: PDF export RBAC restrictions and does not query live business tables"""
+        # Anonymous rejected with 401
+        resp_anon = self.client.get("/api/reports/1/export/pdf")
+        self.assertEqual(resp_anon.status_code, 401)
+
+        # Employee rejected with 403
+        resp_emp = self.client.get(
+            "/api/reports/1/export/pdf",
+            headers={"Authorization": f"Bearer {self.employee_token}"}
+        )
+        self.assertEqual(resp_emp.status_code, 403)
+
+        # Legacy report without snapshot returns 404
+        mock_legacy = {
+            "report_id": 46,
+            "report_name": "Legacy Pre-Phase 2 Report",
+            "report_type": "Inventory",
+            "has_snapshot": False,
+            "snapshot": None
+        }
+        with patch("app.routes.team3.reports.get_report_by_id", return_value=(mock_legacy, None, 200)):
+            resp_leg = self.client.get(
+                "/api/reports/46/export/pdf",
+                headers={"Authorization": f"Bearer {self.owner_token}"}
+            )
+            self.assertEqual(resp_leg.status_code, 404)
+            self.assertIn("Historical snapshot unavailable", resp_leg.get_json().get("error", ""))
+
+        # Verify live business tables are not queried during PDF export
+        resp_gen = self.client.post(
+            "/api/reports/generate",
+            headers={"Authorization": f"Bearer {self.owner_token}"},
+            json={"report_name": "Live Query Immutability PDF Test", "report_type": "Audit Trail"}
+        )
+        self.assertEqual(resp_gen.status_code, 201)
+        rep_id = resp_gen.get_json()["report"]["report_id"]
+
+        with patch("app.services.team3.report_service.fetch_audit_trail_report_data") as mock_fetch:
+            resp_pdf = self.client.get(
+                f"/api/reports/{rep_id}/export/pdf",
+                headers={"Authorization": f"Bearer {self.owner_token}"}
+            )
+            self.assertEqual(resp_pdf.status_code, 200)
+            mock_fetch.assert_not_called()
 
 
 if __name__ == "__main__":
