@@ -1,0 +1,274 @@
+/* ==============================
+   MODAL BACKGROUND
+   ============================== */
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+
+    width: 100%;
+    height: 100%;
+
+    background: rgba(0, 0, 0, 0.45);
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    padding: 20px;
+
+    z-index: 1000;
+}
+
+
+/* ==============================
+   MODAL CONTENT
+   ============================== */
+
+.modal-content {
+    width: 100%;
+    max-width: 550px;
+
+    background: #ffffff;
+
+    border-radius: 10px;
+
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+
+    overflow: hidden;
+}
+
+
+/* ==============================
+   MODAL HEADER
+   ============================== */
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    padding: 20px 24px;
+
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-header h2 {
+    font-size: 20px;
+    color: #111827;
+}
+
+
+/* ==============================
+   CLOSE BUTTON
+   ============================== */
+
+.close-modal {
+    background: transparent;
+
+    font-size: 25px;
+
+    color: #6b7280;
+
+    padding: 2px 8px;
+
+    border-radius: 5px;
+}
+
+.close-modal:hover {
+    background: #f3f4f6;
+    color: #111827;
+}
+
+
+/* ==============================
+   MODAL BODY
+   ============================== */
+
+.modal-body {
+    padding: 24px;
+}
+
+.modal-body>p {
+    margin-bottom: 15px;
+    color: #4b5563;
+}
+
+
+/* ==============================
+   BACKUP DETAILS
+   ============================== */
+
+.backup-details {
+    background: #f9fafb;
+
+    padding: 15px;
+
+    border-radius: 7px;
+
+    margin-bottom: 18px;
+}
+
+.backup-details p {
+    margin-bottom: 7px;
+}
+
+.backup-details p:last-child {
+    margin-bottom: 0;
+}
+
+
+/* ==============================
+   RESTORE WARNING
+   ============================== */
+
+.restore-warning {
+    background: #fef3c7;
+
+    color: #92400e;
+
+    padding: 12px 15px;
+
+    border-radius: 6px;
+
+    font-size: 13px;
+
+    margin-bottom: 18px;
+}
+
+
+/* ==============================
+   DELETE WARNING
+   ============================== */
+
+.delete-warning {
+    background: #fee2e2;
+
+    color: #991b1b;
+
+    padding: 12px 15px;
+
+    border-radius: 6px;
+
+    font-size: 13px;
+
+    margin-top: 15px;
+}
+
+
+/* ==============================
+   RESTORE RESULT
+   ============================== */
+
+#restore-result {
+    margin-top: 15px;
+}
+
+.restore-success {
+    background: #dcfce7;
+
+    color: #166534;
+
+    padding: 12px;
+
+    border-radius: 6px;
+
+    font-size: 13px;
+}
+
+.restore-error {
+    background: #fee2e2;
+
+    color: #991b1b;
+
+    padding: 12px;
+
+    border-radius: 6px;
+
+    font-size: 13px;
+}
+
+
+/* ==============================
+   MODAL FOOTER
+   ============================== */
+
+.modal-footer {
+    display: flex;
+
+    justify-content: flex-end;
+
+    gap: 10px;
+
+    padding: 18px 24px;
+
+    border-top: 1px solid #e5e7eb;
+
+    background: #fafafa;
+}
+
+
+/* ==============================
+   MODAL BUTTONS
+   ============================== */
+
+.modal-footer button {
+    padding: 9px 16px;
+
+    border-radius: 6px;
+
+    font-size: 13px;
+
+    font-weight: 600;
+}
+
+
+/* Dry Run */
+
+#dry-run-btn {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+#dry-run-btn:hover {
+    background: #e5e7eb;
+}
+
+
+/* Actual Restore */
+
+#actual-restore-btn {
+    background: #d97706;
+    color: #ffffff;
+}
+
+#actual-restore-btn:hover:not(:disabled) {
+    background: #b45309;
+}
+
+
+/* Delete */
+
+#confirm-delete-btn {
+    background: #dc2626;
+    color: #ffffff;
+}
+
+#confirm-delete-btn:hover {
+    background: #b91c1c;
+}
+
+
+/* Cancel */
+
+.cancel-btn {
+    background: #ffffff;
+    color: #374151;
+
+    border: 1px solid #d1d5db !important;
+}
+
+.cancel-btn:hover {
+    background: #f3f4f6;
+}

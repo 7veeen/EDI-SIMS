@@ -1,0 +1,174 @@
+/* ==============================
+   TABLE CONTAINER
+   ============================== */
+
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+}
+
+
+/* ==============================
+   BACKUP TABLE
+   ============================== */
+
+#backup-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 900px;
+}
+
+
+/* ==============================
+   TABLE HEADER
+   ============================== */
+
+#backup-table thead {
+    background: #f9fafb;
+}
+
+#backup-table th {
+    padding: 14px 12px;
+    text-align: left;
+
+    font-size: 13px;
+    font-weight: 600;
+
+    color: #4b5563;
+
+    border-bottom: 1px solid #e5e7eb;
+}
+
+
+/* ==============================
+   TABLE BODY
+   ============================== */
+
+#backup-table td {
+    padding: 14px 12px;
+
+    font-size: 14px;
+    color: #374151;
+
+    border-bottom: 1px solid #f0f0f0;
+}
+
+#backup-table tbody tr:hover {
+    background: #f9fafb;
+}
+
+
+/* ==============================
+   BACKUP NAME
+   ============================== */
+
+.backup-name {
+    font-weight: 600;
+    color: #111827;
+}
+
+
+/* ==============================
+   STATUS
+   ============================== */
+
+.status {
+    display: inline-block;
+
+    padding: 5px 9px;
+
+    border-radius: 20px;
+
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.status-success {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.status-failed {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+
+/* ==============================
+   ACTION BUTTONS
+   ============================== */
+
+.action-buttons {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.action-btn {
+    padding: 6px 10px;
+
+    border-radius: 5px;
+
+    font-size: 12px;
+    font-weight: 600;
+}
+
+
+/* View */
+
+.view-btn {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.view-btn:hover {
+    background: #e5e7eb;
+}
+
+
+/* Download */
+
+.download-btn {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.download-btn:hover {
+    background: #bfdbfe;
+}
+
+
+/* Restore */
+
+.restore-btn {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.restore-btn:hover {
+    background: #fde68a;
+}
+
+
+/* Delete */
+
+.delete-btn {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.delete-btn:hover {
+    background: #fecaca;
+}
+
+
+/* ==============================
+   EMPTY TABLE
+   ============================== */
+
+.empty-row {
+    text-align: center;
+    padding: 30px !important;
+
+    color: #6b7280 !important;
+}
