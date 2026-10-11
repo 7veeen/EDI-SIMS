@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
+from flask_jwt_extended import get_jwt_identity, get_jwt
 from app.middleware.team1_auth import role_required
 from app.services.team2.stock_request_service import (
     get_stock_requests,
@@ -12,7 +12,8 @@ stock_requests_bp = Blueprint("stock_requests", __name__, url_prefix="/api/stock
 
 
 @stock_requests_bp.route("/", methods=["GET"])
-@jwt_required()
+@stock_requests_bp.route("", methods=["GET"])
+@role_required("Owner", "Manager", "Supplier")
 def list_stock_requests():
     """List stock requests with strict role-based access and supplier isolation."""
     user_id = get_jwt_identity()
@@ -41,7 +42,7 @@ def list_stock_requests():
 
 
 @stock_requests_bp.route("/<int:stock_request_id>", methods=["GET"])
-@jwt_required()
+@role_required("Owner", "Manager", "Supplier")
 def get_single_stock_request(stock_request_id):
     """Get single stock request details with supplier isolation."""
     user_id = get_jwt_identity()
@@ -65,6 +66,7 @@ def get_single_stock_request(stock_request_id):
 
 
 @stock_requests_bp.route("/", methods=["POST"])
+@stock_requests_bp.route("", methods=["POST"])
 @role_required("Owner", "Manager")
 def create_new_stock_request():
     """Create a new stock request. Restricted to Owner and Manager."""

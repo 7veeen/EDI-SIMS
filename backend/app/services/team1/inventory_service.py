@@ -846,13 +846,49 @@ def stock_out(product_id, quantity, reason=None, notes=None, user_id=None, role=
             conn.close()
 
 
-def get_stock_transactions(product_id=None, transaction_type=None, date_from=None, date_to=None, user_id_filter=None, shipment_id_filter=None, role=None):
+def get_stock_transactions(product_id=None, transaction_type=None, date_from=None, date_to=None, user_id_filter=None, shipment_id_filter=None, role=None, auth_user_id=None):
     """
     Retrieve stock movement transaction history with flexible filters.
     Available to Owner, Manager, Employee. Suppliers are forbidden.
+    Enforces role-based data isolation:
+      - Supplier: Access denied.
+      - Employee: Automatically restricted to authenticated employee's records (st.user_id = auth_user_id).
+                  If client passes a user_id filter that doesn't match auth_user_id, access is denied (403).
+      - Owner / Manager: Can view all records or filter by any user_id.
     """
     if role == 'Supplier':
         return None, "Access denied. Suppliers cannot view transaction history."
+
+    if role not in ('Owner', 'Manager', 'Employee'):
+        return None, "Access denied. You do not have permission to view transaction history."
+
+    # Validate and enforce Employee scoping
+    scoped_user_id = None
+    if role == 'Employee':
+        if auth_user_id is None:
+            return None, "Access denied. User identity is required for Employee queries."
+        try:
+            emp_uid = int(auth_user_id)
+        except (ValueError, TypeError):
+            return None, "Access denied. Invalid user identity."
+
+        if user_id_filter is not None and str(user_id_filter).strip() != "":
+            try:
+                requested_uid = int(user_id_filter)
+            except (ValueError, TypeError):
+                return None, "Invalid user_id parameter"
+
+            if requested_uid != emp_uid:
+                return None, "Access denied. Employees can only view their own transaction records."
+
+        scoped_user_id = emp_uid
+    else:
+        # For Owner and Manager, respect user_id_filter if provided
+        if user_id_filter is not None and str(user_id_filter).strip() != "":
+            try:
+                scoped_user_id = int(user_id_filter)
+            except (ValueError, TypeError):
+                scoped_user_id = None
 
     conn = None
     cursor = None
@@ -885,6 +921,10 @@ def get_stock_transactions(product_id=None, transaction_type=None, date_from=Non
         """
         params = []
 
+        if scoped_user_id is not None:
+            query += " AND st.user_id = %s"
+            params.append(scoped_user_id)
+
         if product_id:
             try:
                 query += " AND st.product_id = %s"
@@ -895,13 +935,6 @@ def get_stock_transactions(product_id=None, transaction_type=None, date_from=Non
         if transaction_type and transaction_type.strip():
             query += " AND st.transaction_type = %s"
             params.append(transaction_type.strip().upper())
-
-        if user_id_filter:
-            try:
-                query += " AND st.user_id = %s"
-                params.append(int(user_id_filter))
-            except (ValueError, TypeError):
-                pass
 
         if shipment_id_filter:
             try:
@@ -954,12 +987,19 @@ def get_stock_transactions(product_id=None, transaction_type=None, date_from=Non
             conn.close()
 
 
-def get_stock_transaction_by_id(transaction_id, role=None):
+def get_stock_transaction_by_id(transaction_id, role=None, auth_user_id=None):
     """
     Get a single stock transaction record by ID.
+    Enforces role-based data isolation:
+      - Supplier: Access denied.
+      - Employee: Can only view transactions logged by themselves (st.user_id == auth_user_id).
+      - Owner / Manager: Can view any transaction.
     """
     if role == 'Supplier':
         return None, "Access denied. Suppliers cannot view transaction history."
+
+    if role not in ('Owner', 'Manager', 'Employee'):
+        return None, "Access denied. You do not have permission to view transaction history."
 
     try:
         transaction_id = int(transaction_id)
@@ -1001,6 +1041,19 @@ def get_stock_transaction_by_id(transaction_id, role=None):
         if not r:
             return None, "Transaction not found"
 
+        # Employee data isolation check
+        if role == 'Employee':
+            if auth_user_id is None:
+                return None, "Access denied. User identity is required."
+            try:
+                emp_uid = int(auth_user_id)
+            except (ValueError, TypeError):
+                return None, "Access denied. Invalid user identity."
+
+            tx_user_id = r[4]
+            if tx_user_id != emp_uid:
+                return None, "Access denied. You do not have permission to view this transaction."
+
         tx_d = r[12]
         tx = {
             "transaction_id": r[0],
@@ -1028,4 +1081,5 @@ def get_stock_transaction_by_id(transaction_id, role=None):
             cursor.close()
         if conn:
             conn.close()
+
 

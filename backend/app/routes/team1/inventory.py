@@ -218,6 +218,7 @@ def perform_stock_out():
 def list_stock_transactions():
     claims = get_jwt()
     user_role = claims.get("role")
+    auth_user_id = get_jwt_identity()
 
     product_id = request.args.get("product_id")
     tx_type = request.args.get("transaction_type") or request.args.get("type")
@@ -233,7 +234,8 @@ def list_stock_transactions():
         date_to=date_to,
         user_id_filter=user_id_filter,
         shipment_id_filter=shipment_id_filter,
-        role=user_role
+        role=user_role,
+        auth_user_id=auth_user_id
     )
 
     if error:
@@ -253,8 +255,13 @@ def list_stock_transactions():
 def view_stock_transaction(transaction_id):
     claims = get_jwt()
     user_role = claims.get("role")
+    auth_user_id = get_jwt_identity()
 
-    tx, error = get_stock_transaction_by_id(transaction_id, role=user_role)
+    tx, error = get_stock_transaction_by_id(
+        transaction_id,
+        role=user_role,
+        auth_user_id=auth_user_id
+    )
 
     if error:
         if "Access denied" in error:
@@ -264,4 +271,5 @@ def view_stock_transaction(transaction_id):
         return jsonify({"error": error}), 500
 
     return jsonify({"transaction": tx}), 200
+
 
