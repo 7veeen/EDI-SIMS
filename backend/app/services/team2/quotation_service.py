@@ -597,6 +597,20 @@ def create_quotation(data, user_id, role, username):
                 username or supplier_name
             ))
 
+        # Audit Log: QUOTATION_CREATED on SupplierQuotations
+        try:
+            from app.services.team3.audit_service import log_audit_event
+            primary_qid = created_quotations[0]["quotation_id"] if created_quotations else None
+            log_audit_event(
+                action='QUOTATION_CREATED',
+                table_name='SupplierQuotations',
+                record_id=primary_qid,
+                user_id=int(user_id) if user_id else None,
+                cursor=cursor
+            )
+        except Exception as audit_err:
+            print(f"[AUDIT WARNING] Failed to record quotation creation audit log: {audit_err}", flush=True)
+
         conn.commit()
 
         # Trigger Event C: New Quotation Submitted
@@ -819,6 +833,19 @@ def submit_quotation(quotation_id, user_id, role, username):
                 username or s_name
             ))
 
+        # Audit Log: QUOTATION_SUBMITTED on SupplierQuotations
+        try:
+            from app.services.team3.audit_service import log_audit_event
+            log_audit_event(
+                action='QUOTATION_SUBMITTED',
+                table_name='SupplierQuotations',
+                record_id=quotation_id,
+                user_id=int(user_id) if user_id else None,
+                cursor=cursor
+            )
+        except Exception as audit_err:
+            print(f"[AUDIT WARNING] Failed to record quotation submission audit log: {audit_err}", flush=True)
+
         conn.commit()
 
         # Trigger Event C: New Quotation Submitted
@@ -982,6 +1009,19 @@ def approve_quotation(quotation_id, user_id, role, username):
                 username
             ))
 
+        # Audit Log: QUOTATION_APPROVED on SupplierQuotations
+        try:
+            from app.services.team3.audit_service import log_audit_event
+            log_audit_event(
+                action='QUOTATION_APPROVED',
+                table_name='SupplierQuotations',
+                record_id=quotation_id,
+                user_id=int(user_id) if user_id else None,
+                cursor=cursor
+            )
+        except Exception as audit_err:
+            print(f"[AUDIT WARNING] Failed to record quotation approval audit log: {audit_err}", flush=True)
+
         conn.commit()
 
         # Trigger Event D: Quotation Approved -> notify approved supplier
@@ -1109,6 +1149,19 @@ def reject_quotation(quotation_id, rejection_reason, user_id, role, username):
                 f"Quotation {q_num} rejected: {reason}",
                 username
             ))
+
+        # Audit Log: QUOTATION_REJECTED on SupplierQuotations
+        try:
+            from app.services.team3.audit_service import log_audit_event
+            log_audit_event(
+                action='QUOTATION_REJECTED',
+                table_name='SupplierQuotations',
+                record_id=quotation_id,
+                user_id=int(user_id) if user_id else None,
+                cursor=cursor
+            )
+        except Exception as audit_err:
+            print(f"[AUDIT WARNING] Failed to record quotation rejection audit log: {audit_err}", flush=True)
 
         conn.commit()
 

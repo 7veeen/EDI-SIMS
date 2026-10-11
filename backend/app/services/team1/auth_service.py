@@ -55,6 +55,19 @@ def login_user(username, password):
                 "role": role_name
             }
         )
+        # Audit Log: LOGIN on Users
+        try:
+            from app.services.team3.audit_service import log_audit_event
+            log_audit_event(
+                action='LOGIN',
+                table_name='Users',
+                record_id=user_id,
+                user_id=user_id,
+                cursor=cursor
+            )
+            conn.commit()
+        except Exception as audit_err:
+            print(f"[AUDIT WARNING] Failed to record login audit log: {audit_err}", flush=True)
 
         return {
             "access_token": access_token,
@@ -121,6 +134,19 @@ def change_password(user_id, current_password, new_password):
             ''',
             (new_password_hash, user_id)
         )
+
+        # Audit Log: PASSWORD_CHANGED on Users
+        try:
+            from app.services.team3.audit_service import log_audit_event
+            log_audit_event(
+                action='PASSWORD_CHANGED',
+                table_name='Users',
+                record_id=user_id,
+                user_id=int(user_id),
+                cursor=cursor
+            )
+        except Exception as audit_err:
+            print(f"[AUDIT WARNING] Failed to record password change audit log: {audit_err}", flush=True)
 
         conn.commit()
 

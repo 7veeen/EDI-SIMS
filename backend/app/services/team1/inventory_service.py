@@ -252,6 +252,19 @@ def adjust_inventory(inventory_id, new_quantity, user_id=None, notes=None):
             if tx_row:
                 transaction_id = tx_row[0]
 
+        # Audit Log: INVENTORY_ADJUSTED on Inventory
+        try:
+            from app.services.team3.audit_service import log_audit_event
+            log_audit_event(
+                action='INVENTORY_ADJUSTED',
+                table_name='Inventory',
+                record_id=inventory_id,
+                user_id=int(user_id) if user_id else None,
+                cursor=cursor
+            )
+        except Exception as audit_err:
+            print(f"[AUDIT WARNING] Failed to record inventory adjustment audit log: {audit_err}", flush=True)
+
         conn.commit()
 
         # Trigger Event I: Low Stock Alert if reduced to or below reorder level
@@ -562,6 +575,19 @@ def stock_in(shipment_id, product_id, quantity, notes=None, user_id=None, role=N
             username or role or "Employee"
         ))
 
+        # Audit Log: STOCK_IN on StockTransactions
+        try:
+            from app.services.team3.audit_service import log_audit_event
+            log_audit_event(
+                action='STOCK_IN',
+                table_name='StockTransactions',
+                record_id=tx_id,
+                user_id=int(user_id) if user_id else None,
+                cursor=cursor
+            )
+        except Exception as audit_err:
+            print(f"[AUDIT WARNING] Failed to record stock_in audit log: {audit_err}", flush=True)
+
         conn.commit()
 
         # Trigger Event J: Stock-In Completed -> notify relevant Managers/Owners (excluding the actor)
@@ -747,6 +773,19 @@ def stock_out(product_id, quantity, reason=None, notes=None, user_id=None, role=
         tx_row = cursor.fetchone()
         tx_id = tx_row[0]
         tx_date = tx_row[1]
+
+        # Audit Log: STOCK_OUT on StockTransactions
+        try:
+            from app.services.team3.audit_service import log_audit_event
+            log_audit_event(
+                action='STOCK_OUT',
+                table_name='StockTransactions',
+                record_id=tx_id,
+                user_id=int(user_id) if user_id else None,
+                cursor=cursor
+            )
+        except Exception as audit_err:
+            print(f"[AUDIT WARNING] Failed to record stock_out audit log: {audit_err}", flush=True)
 
         conn.commit()
 

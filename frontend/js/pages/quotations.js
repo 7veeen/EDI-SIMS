@@ -81,7 +81,7 @@ App.pages['quotations'] = {
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <span style="font-size: 13px; font-weight: 500; color: var(--text-secondary);">Total Value</span>
                         <div style="width: 36px; height: 36px; border-radius: 8px; background: rgba(99, 102, 241, 0.1); color: #4f46e5; display: flex; align-items: center; justify-content: center; font-size: 18px;">
-                            <i class='bx bx-dollar-circle'></i>
+                            <i class='bx bx-rupee'></i>
                         </div>
                     </div>
                     <div style="margin-top: 10px;">

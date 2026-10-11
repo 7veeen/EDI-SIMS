@@ -74,7 +74,7 @@ App.pages['purchase-orders'] = {
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <span style="font-size: 13px; font-weight: 500; color: var(--text-secondary);">Total Value</span>
                         <div style="width: 36px; height: 36px; border-radius: 8px; background: rgba(139, 92, 246, 0.1); color: #7c3aed; display: flex; align-items: center; justify-content: center; font-size: 18px;">
-                            <i class='bx bx-dollar'></i>
+                            <i class='bx bx-rupee'></i>
                         </div>
                     </div>
                     <div style="margin-top: 10px;">

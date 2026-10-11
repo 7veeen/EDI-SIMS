@@ -35,6 +35,15 @@ const Utils = {
         });
     },
 
+    formatCurrency(amount, includeSymbol = true) {
+        const num = Number(amount) || 0;
+        const formatted = num.toLocaleString('en-IN', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+        return includeSymbol ? `₹${formatted}` : formatted;
+    },
+
     escapeHtml(unsafe) {
         if (!unsafe) return '';
         return unsafe

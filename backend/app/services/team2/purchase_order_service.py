@@ -515,6 +515,19 @@ def create_purchase_order(data, ordered_by_user_id, username):
             username or 'Manager'
         ))
 
+        # Audit Log: PO_CREATED on PurchaseOrders
+        try:
+            from app.services.team3.audit_service import log_audit_event
+            log_audit_event(
+                action='PO_CREATED',
+                table_name='PurchaseOrders',
+                record_id=new_po_id,
+                user_id=int(ordered_by_user_id),
+                cursor=cursor
+            )
+        except Exception as audit_err:
+            print(f"[AUDIT WARNING] Failed to record PO created audit log: {audit_err}", flush=True)
+
         # Atomic commit
         conn.commit()
 
@@ -653,6 +666,20 @@ def respond_to_purchase_order(purchase_order_id, response_data, user_id=None, ro
             notes_text,
             actor_name
         ))
+
+        # Audit Log: PO_ACCEPTED / PO_REJECTED on PurchaseOrders
+        try:
+            from app.services.team3.audit_service import log_audit_event
+            audit_action = 'PO_ACCEPTED' if action == 'Accepted' else 'PO_REJECTED'
+            log_audit_event(
+                action=audit_action,
+                table_name='PurchaseOrders',
+                record_id=po_id,
+                user_id=int(user_id) if user_id else None,
+                cursor=cursor
+            )
+        except Exception as audit_err:
+            print(f"[AUDIT WARNING] Failed to record PO response audit log: {audit_err}", flush=True)
 
         conn.commit()
 

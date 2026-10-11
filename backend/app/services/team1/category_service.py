@@ -35,6 +35,18 @@ def create_category(category_name, description):
 
         row = cursor.fetchone()
 
+        # Audit Log: CREATE_CATEGORY on Categories
+        try:
+            from app.services.team3.audit_service import log_audit_event
+            log_audit_event(
+                action='CREATE_CATEGORY',
+                table_name='Categories',
+                record_id=row[0],
+                cursor=cursor
+            )
+        except Exception as audit_err:
+            print(f"[AUDIT WARNING] Failed to record category creation audit log: {audit_err}", flush=True)
+
         conn.commit()
 
         return {
@@ -220,6 +232,18 @@ def update_category(category_id, category_name, description):
         if row is None:
             return None, "Category not found"
 
+        # Audit Log: UPDATE_CATEGORY on Categories
+        try:
+            from app.services.team3.audit_service import log_audit_event
+            log_audit_event(
+                action='UPDATE_CATEGORY',
+                table_name='Categories',
+                record_id=row[0],
+                cursor=cursor
+            )
+        except Exception as audit_err:
+            print(f"[AUDIT WARNING] Failed to record category update audit log: {audit_err}", flush=True)
+
         conn.commit()
 
         return {
@@ -282,6 +306,18 @@ def delete_category(category_id):
             ''',
             (category_id,)
         )
+
+        # Audit Log: DELETE_CATEGORY on Categories
+        try:
+            from app.services.team3.audit_service import log_audit_event
+            log_audit_event(
+                action='DELETE_CATEGORY',
+                table_name='Categories',
+                record_id=category_id,
+                cursor=cursor
+            )
+        except Exception as audit_err:
+            print(f"[AUDIT WARNING] Failed to record category delete audit log: {audit_err}", flush=True)
 
         conn.commit()
 

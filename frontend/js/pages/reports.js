@@ -975,7 +975,7 @@ App.pages['reports'] = {
                                     </div>
                                     <div class="glass-panel" style="padding: 0.75rem 1rem; border-radius: 6px; text-align: center;">
                                         <div style="font-size: 0.75rem; color: var(--gray);">Total Inventory Value</div>
-                                        <div style="font-size: 1.3rem; font-weight: 700; color: #059669;">$${totalVal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                                        <div style="font-size: 1.3rem; font-weight: 700; color: #059669;">${Utils.formatCurrency(totalVal)}</div>
                                     </div>
                                     <div class="glass-panel" style="padding: 0.75rem 1rem; border-radius: 6px; text-align: center;">
                                         <div style="font-size: 0.75rem; color: var(--gray);">Low Stock Alerts</div>
@@ -1007,8 +1007,8 @@ App.pages['reports'] = {
                                                         <td>${Utils.escapeHtml(it.category_name || 'Uncategorized')}</td>
                                                         <td style="text-align: right; font-weight: 600;">${Number(it.quantity_available || 0).toLocaleString()}</td>
                                                         <td style="text-align: right; color: var(--gray);">${Number(it.reorder_level || 0).toLocaleString()}</td>
-                                                        <td style="text-align: right;">$${Number(it.unit_price || 0).toFixed(2)}</td>
-                                                        <td style="text-align: right; font-weight: 600;">$${Number(it.inventory_value || 0).toFixed(2)}</td>
+                                                        <td style="text-align: right;">${Utils.formatCurrency(it.unit_price)}</td>
+                                                        <td style="text-align: right; font-weight: 600;">${Utils.formatCurrency(it.inventory_value)}</td>
                                                         <td>
                                                             <span class="status-badge ${isLow ? 'status-inactive' : 'status-active'}" style="font-size: 0.7rem; padding: 2px 6px;">
                                                                 ${isLow ? 'LOW STOCK' : 'IN STOCK'}
@@ -1114,7 +1114,7 @@ App.pages['reports'] = {
                                     </div>
                                     <div class="glass-panel" style="padding: 0.75rem 1rem; border-radius: 6px; text-align: center;">
                                         <div style="font-size: 0.75rem; color: var(--gray);">Total PO Value</div>
-                                        <div style="font-size: 1.3rem; font-weight: 700; color: #059669;">$${totalVal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                                        <div style="font-size: 1.3rem; font-weight: 700; color: #059669;">${Utils.formatCurrency(totalVal)}</div>
                                     </div>
                                     <div class="glass-panel" style="padding: 0.75rem 1rem; border-radius: 6px; text-align: center;">
                                         <div style="font-size: 0.75rem; color: var(--gray);">Accepted / Completed</div>
@@ -1166,7 +1166,7 @@ App.pages['reports'] = {
                                                             ${itemSummary ? `<div style="font-size: 0.7rem; color: var(--text-secondary); max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${itemSummary}">${itemSummary}</div>` : ''}
                                                         </td>
                                                         <td style="text-align: right; font-weight: 600; color: #059669;">
-                                                            $${Number(po.total_amount || 0).toFixed(2)}
+                                                            ${Utils.formatCurrency(po.total_amount)}
                                                         </td>
                                                         <td>${Utils.escapeHtml(po.ordered_by_username || ('User #' + po.ordered_by))}</td>
                                                     </tr>
@@ -1191,7 +1191,7 @@ App.pages['reports'] = {
                                     </div>
                                     <div class="glass-panel" style="padding: 0.75rem 1rem; border-radius: 6px; text-align: center;">
                                         <div style="font-size: 0.75rem; color: var(--gray);">Total Quoted Value</div>
-                                        <div style="font-size: 1.3rem; font-weight: 700; color: #059669;">$${totalVal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                                        <div style="font-size: 1.3rem; font-weight: 700; color: #059669;">${Utils.formatCurrency(totalVal)}</div>
                                     </div>
                                     <div class="glass-panel" style="padding: 0.75rem 1rem; border-radius: 6px; text-align: center;">
                                         <div style="font-size: 0.75rem; color: var(--gray);">Approved / Accepted</div>
@@ -1228,7 +1228,7 @@ App.pages['reports'] = {
                                                 if (['Rejected', 'Expired'].includes(q.status)) statusClass = 'status-inactive';
 
                                                 const qItems = Array.isArray(q.items) ? q.items : [];
-                                                const itemSummary = qItems.map(qi => `${qi.quoted_quantity || 0}x ${Utils.escapeHtml(qi.product_name || '')} @ $${Number(qi.unit_price || 0).toFixed(2)}`).join(', ');
+                                                const itemSummary = qItems.map(qi => `${qi.quoted_quantity || 0}x ${Utils.escapeHtml(qi.product_name || '')} @ ${Utils.formatCurrency(qi.unit_price)}`).join(', ');
 
                                                 return `
                                                     <tr>
@@ -1252,7 +1252,7 @@ App.pages['reports'] = {
                                                             ${itemSummary ? `<div style="font-size: 0.7rem; color: var(--text-secondary); max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${itemSummary}">${itemSummary}</div>` : ''}
                                                         </td>
                                                         <td style="text-align: right; font-weight: 600; color: #059669;">
-                                                            $${Number(q.total_amount || 0).toFixed(2)}
+                                                            ${Utils.formatCurrency(q.total_amount)}
                                                         </td>
                                                         <td style="font-size: 0.8rem;">
                                                             ${q.approved_by_username ? `<div><i class='bx bx-check-circle' style='color:#059669;'></i> ${Utils.escapeHtml(q.approved_by_username)}</div>` : ''}
@@ -1280,7 +1280,7 @@ App.pages['reports'] = {
                                     </div>
                                     <div class="glass-panel" style="padding: 0.75rem 1rem; border-radius: 6px; text-align: center;">
                                         <div style="font-size: 0.75rem; color: var(--gray);">Aggregate PO Value</div>
-                                        <div style="font-size: 1.3rem; font-weight: 700; color: #059669;">$${totalPOVal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                                        <div style="font-size: 1.3rem; font-weight: 700; color: #059669;">${Utils.formatCurrency(totalPOVal)}</div>
                                     </div>
                                     <div class="glass-panel" style="padding: 0.75rem 1rem; border-radius: 6px; text-align: center;">
                                         <div style="font-size: 0.75rem; color: var(--gray);">Total Purchase Orders</div>
@@ -1337,7 +1337,7 @@ App.pages['reports'] = {
                                                         </td>
                                                         <td style="text-align: right;">
                                                             <strong>${s.total_purchase_orders || 0} POs</strong>
-                                                            <div style="font-size: 0.75rem; color: #059669; font-weight: 600;">$${Number(s.total_order_value || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                                                            <div style="font-size: 0.75rem; color: #059669; font-weight: 600;">${Utils.formatCurrency(s.total_order_value)}</div>
                                                         </td>
                                                         <td style="text-align: right;">
                                                             <strong style="color: ${s.po_acceptance_rate >= 70 ? '#059669' : '#d97706'};">${poAccStr}</strong>
@@ -1345,7 +1345,7 @@ App.pages['reports'] = {
                                                         </td>
                                                         <td style="text-align: right;">
                                                             <strong>${s.total_quotations || 0} quotes</strong>
-                                                            <div style="font-size: 0.75rem; color: #0284c7; font-weight: 600;">$${Number(s.total_quoted_value || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                                                            <div style="font-size: 0.75rem; color: #0284c7; font-weight: 600;">${Utils.formatCurrency(s.total_quoted_value)}</div>
                                                         </td>
                                                         <td style="text-align: right;">
                                                             <div>Resp: <strong>${qRespStr}</strong></div>

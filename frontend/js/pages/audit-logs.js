@@ -15,7 +15,7 @@ App.pages['audit-logs'] = {
                         <tr>
                             <th>ID</th>
                             <th>Time</th>
-                            <th>User ID</th>
+                            <th>User</th>
                             <th>Action</th>
                             <th>Table</th>
                             <th>Record ID</th>
@@ -41,20 +41,24 @@ App.pages['audit-logs'] = {
                 return;
             }
 
-            tbody.innerHTML = data.map(l => `
+            tbody.innerHTML = data.map(l => {
+                const userDisplay = l.username || (l.user_id != null ? `User #${l.user_id}` : 'System');
+                const recordIdDisplay = (l.record_id !== null && l.record_id !== undefined && l.record_id !== '') ? String(l.record_id) : '-';
+                return `
                 <tr>
-                    <td>#${l.log_id}</td>
+                    <td>#${Utils.escapeHtml(String(l.log_id || ''))}</td>
                     <td>${Utils.formatDate(l.action_time)}</td>
-                    <td>User #${l.user_id}</td>
-                    <td><span class="badge" style="position: relative; top:0; background: #e0e0e0; color: #333;">${l.action}</span></td>
-                    <td>${l.table_name}</td>
-                    <td>${l.record_id || '-'}</td>
-                    <td>${l.ip_address || '-'}</td>
+                    <td>${Utils.escapeHtml(userDisplay)}</td>
+                    <td><span class="badge" style="position: relative; top:0; background: #e0e0e0; color: #333;">${Utils.escapeHtml(l.action || '-')}</span></td>
+                    <td>${Utils.escapeHtml(l.table_name || '-')}</td>
+                    <td>${Utils.escapeHtml(recordIdDisplay)}</td>
+                    <td>${Utils.escapeHtml(l.ip_address || '-')}</td>
                 </tr>
-            `).join('');
+            `;
+            }).join('');
             
         } catch (error) {
-            tbody.innerHTML = `<tr><td colspan="7" class="text-danger" style="text-align: center;">Failed to load audit logs: ${error.message}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7" class="text-danger" style="text-align: center;">Failed to load audit logs: ${Utils.escapeHtml(error.message || 'Unknown error')}</td></tr>`;
         }
     }
 };

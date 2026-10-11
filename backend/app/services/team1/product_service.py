@@ -269,6 +269,18 @@ def create_product(product_name, sku, category_id, selling_price, reorder_level=
         inv_row = cursor.fetchone()
         new_inventory_id = inv_row[0]
 
+        # Audit Log: CREATE_PRODUCT on Products
+        try:
+            from app.services.team3.audit_service import log_audit_event
+            log_audit_event(
+                action='CREATE_PRODUCT',
+                table_name='Products',
+                record_id=new_product_id,
+                cursor=cursor
+            )
+        except Exception as audit_err:
+            print(f"[AUDIT WARNING] Failed to record product creation audit log: {audit_err}", flush=True)
+
         conn.commit()
 
         # Fetch Category Name
@@ -400,6 +412,19 @@ def update_product(product_id, product_name=None, sku=None, category_id=None, se
             (new_name, new_sku, new_cat_id, new_price, new_reorder, new_status, product_id)
         )
         row = cursor.fetchone()
+
+        # Audit Log: UPDATE_PRODUCT on Products
+        try:
+            from app.services.team3.audit_service import log_audit_event
+            log_audit_event(
+                action='UPDATE_PRODUCT',
+                table_name='Products',
+                record_id=product_id,
+                cursor=cursor
+            )
+        except Exception as audit_err:
+            print(f"[AUDIT WARNING] Failed to record product update audit log: {audit_err}", flush=True)
+
         conn.commit()
 
         # Get Category name and current inventory quantity
@@ -494,6 +519,19 @@ def delete_product(product_id):
                 'UPDATE public."Products" SET status = %s WHERE product_id = %s',
                 ('Inactive', product_id)
             )
+
+            # Audit Log: DEACTIVATE_PRODUCT on Products
+            try:
+                from app.services.team3.audit_service import log_audit_event
+                log_audit_event(
+                    action='DEACTIVATE_PRODUCT',
+                    table_name='Products',
+                    record_id=product_id,
+                    cursor=cursor
+                )
+            except Exception as audit_err:
+                print(f"[AUDIT WARNING] Failed to record product deactivation audit log: {audit_err}", flush=True)
+
             conn.commit()
             return True, None, "deactivated"
 
@@ -506,6 +544,19 @@ def delete_product(product_id):
             'DELETE FROM public."Products" WHERE product_id = %s',
             (product_id,)
         )
+
+        # Audit Log: DELETE_PRODUCT on Products
+        try:
+            from app.services.team3.audit_service import log_audit_event
+            log_audit_event(
+                action='DELETE_PRODUCT',
+                table_name='Products',
+                record_id=product_id,
+                cursor=cursor
+            )
+        except Exception as audit_err:
+            print(f"[AUDIT WARNING] Failed to record product delete audit log: {audit_err}", flush=True)
+
         conn.commit()
 
         return True, None, "deleted"

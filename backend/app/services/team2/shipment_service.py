@@ -606,6 +606,19 @@ def assign_employee(shipment_id, employee_id, user_id=None, role=None, username=
             username or role or "Manager"
         ))
 
+        # Audit Log: EMPLOYEE_ASSIGNED on Shipments
+        try:
+            from app.services.team3.audit_service import log_audit_event
+            log_audit_event(
+                action='EMPLOYEE_ASSIGNED',
+                table_name='Shipments',
+                record_id=shipment_id,
+                user_id=int(user_id) if user_id else None,
+                cursor=cursor
+            )
+        except Exception as audit_err:
+            print(f"[AUDIT WARNING] Failed to record employee assignment audit log: {audit_err}", flush=True)
+
         conn.commit()
 
         # Trigger Event A: Notify assigned employee (only if real change)
@@ -864,6 +877,19 @@ def create_shipment(data, user_id, role, username):
             f"Shipment {shipment_number} created with carrier {carrier} (Tracking: {tracking_number})",
             username or supplier_name
         ))
+
+        # Audit Log: SHIPMENT_CREATED on Shipments
+        try:
+            from app.services.team3.audit_service import log_audit_event
+            log_audit_event(
+                action='SHIPMENT_CREATED',
+                table_name='Shipments',
+                record_id=new_shipment_id,
+                user_id=int(user_id) if user_id else None,
+                cursor=cursor
+            )
+        except Exception as audit_err:
+            print(f"[AUDIT WARNING] Failed to record shipment creation audit log: {audit_err}", flush=True)
 
         conn.commit()
 
@@ -1160,6 +1186,19 @@ def update_shipment_status(shipment_id, new_status, location=None, notes=None, u
             status_notes,
             username or supplier_name or role
         ))
+
+        # Audit Log: SHIPMENT_STATUS_CHANGED on Shipments
+        try:
+            from app.services.team3.audit_service import log_audit_event
+            log_audit_event(
+                action='SHIPMENT_STATUS_CHANGED',
+                table_name='Shipments',
+                record_id=shipment_id,
+                user_id=int(user_id) if user_id else None,
+                cursor=cursor
+            )
+        except Exception as audit_err:
+            print(f"[AUDIT WARNING] Failed to record shipment status change audit log: {audit_err}", flush=True)
 
         conn.commit()
 

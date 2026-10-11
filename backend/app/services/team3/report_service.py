@@ -1,6 +1,7 @@
 import csv
 import io
 import json
+import os
 import re
 import xml.sax.saxutils
 from datetime import datetime
@@ -13,8 +14,34 @@ from reportlab.platypus import (
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.pdfgen import canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
 from app.extensions import get_db_connection
+
+# Configure TrueType font for clean Unicode Indian Rupee symbol (₹ / U+20B9) support
+PDF_FONT_REGULAR = "Helvetica"
+PDF_FONT_BOLD = "Helvetica-Bold"
+PDF_CURRENCY_SYMBOL = "INR "
+
+try:
+    _candidates = [
+        ("C:/Windows/Fonts/arial.ttf", "C:/Windows/Fonts/arialbd.ttf"),
+        ("C:/WINNT/Fonts/arial.ttf", "C:/WINNT/Fonts/arialbd.ttf"),
+        ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+        ("/usr/share/fonts/TTF/DejaVuSans.ttf", "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf"),
+    ]
+    for _reg_path, _bold_path in _candidates:
+        if os.path.exists(_reg_path) and os.path.exists(_bold_path):
+            if "SimsFont" not in pdfmetrics.getRegisteredFontNames():
+                pdfmetrics.registerFont(TTFont("SimsFont", _reg_path))
+                pdfmetrics.registerFont(TTFont("SimsFont-Bold", _bold_path))
+            PDF_FONT_REGULAR = "SimsFont"
+            PDF_FONT_BOLD = "SimsFont-Bold"
+            PDF_CURRENCY_SYMBOL = "\u20b9"
+            break
+except Exception:
+    pass
 
 
 class NumberedCanvas(canvas.Canvas):
@@ -36,7 +63,7 @@ class NumberedCanvas(canvas.Canvas):
 
     def draw_page_number(self, page_count):
         self.saveState()
-        self.setFont("Helvetica", 8)
+        self.setFont(PDF_FONT_REGULAR, 8)
         self.setFillColor(colors.HexColor("#64748b"))
         self.setStrokeColor(colors.HexColor("#cbd5e1"))
         self.setLineWidth(0.5)
@@ -1349,9 +1376,9 @@ def serialize_snapshot_to_csv(report):
             "Report ID", "Report Name", "Supplier ID", "Supplier Name",
             "Contact Person", "Email", "Phone", "Status",
             "Total POs", "Accepted POs", "Rejected POs", "Delivered POs",
-            "Total PO Value ($)", "PO Acceptance Rate (%)",
+            "Total PO Value (INR)", "PO Acceptance Rate (%)",
             "Total Quotations", "Responded Quotations", "Approved Quotations",
-            "Total Quoted Value ($)", "Quotation Response Rate (%)",
+            "Total Quoted Value (INR)", "Quotation Response Rate (%)",
             "Quotation Approval Rate (%)", "Total Shipments", "Delivered Shipments",
             "Measurable Deliveries", "On-Time Deliveries", "Late Deliveries",
             "On-Time Delivery Rate (%)", "Avg Delivery Delay (Days)"
@@ -1463,7 +1490,7 @@ def generate_snapshot_pdf(report):
     title_style = ParagraphStyle(
         'DocTitle',
         parent=styles['Normal'],
-        fontName='Helvetica-Bold',
+        fontName=PDF_FONT_BOLD,
         fontSize=15,
         leading=18,
         textColor=colors.HexColor('#0f172a')
@@ -1471,7 +1498,7 @@ def generate_snapshot_pdf(report):
     badge_style = ParagraphStyle(
         'TypeBadge',
         parent=styles['Normal'],
-        fontName='Helvetica-Bold',
+        fontName=PDF_FONT_BOLD,
         fontSize=9.5,
         leading=12,
         textColor=colors.HexColor('#2563eb')
@@ -1479,7 +1506,7 @@ def generate_snapshot_pdf(report):
     meta_lbl_style = ParagraphStyle(
         'MetaLabel',
         parent=styles['Normal'],
-        fontName='Helvetica-Bold',
+        fontName=PDF_FONT_BOLD,
         fontSize=7.5,
         leading=10,
         textColor=colors.HexColor('#64748b')
@@ -1487,7 +1514,7 @@ def generate_snapshot_pdf(report):
     meta_val_style = ParagraphStyle(
         'MetaVal',
         parent=styles['Normal'],
-        fontName='Helvetica',
+        fontName=PDF_FONT_REGULAR,
         fontSize=8,
         leading=11,
         textColor=colors.HexColor('#0f172a')
@@ -1495,7 +1522,7 @@ def generate_snapshot_pdf(report):
     kpi_val_style = ParagraphStyle(
         'KPIVal',
         parent=styles['Normal'],
-        fontName='Helvetica-Bold',
+        fontName=PDF_FONT_BOLD,
         fontSize=13,
         leading=16,
         alignment=1,
@@ -1504,7 +1531,7 @@ def generate_snapshot_pdf(report):
     kpi_lbl_style = ParagraphStyle(
         'KPILbl',
         parent=styles['Normal'],
-        fontName='Helvetica',
+        fontName=PDF_FONT_REGULAR,
         fontSize=7,
         leading=9.5,
         alignment=1,
@@ -1513,7 +1540,7 @@ def generate_snapshot_pdf(report):
     th_style = ParagraphStyle(
         'TableHeader',
         parent=styles['Normal'],
-        fontName='Helvetica-Bold',
+        fontName=PDF_FONT_BOLD,
         fontSize=7.5,
         leading=9.5,
         textColor=colors.white
@@ -1531,7 +1558,7 @@ def generate_snapshot_pdf(report):
     td_style = ParagraphStyle(
         'TableData',
         parent=styles['Normal'],
-        fontName='Helvetica',
+        fontName=PDF_FONT_REGULAR,
         fontSize=7,
         leading=9,
         textColor=colors.HexColor('#1e293b')
@@ -1612,7 +1639,7 @@ def generate_snapshot_pdf(report):
         kpi_data = [
             [Paragraph(f"{len(items)}", kpi_val_style),
              Paragraph(f"{tot_qty:,}", kpi_val_style),
-             Paragraph(f"${tot_val:,.2f}", kpi_val_style),
+             Paragraph(f"{PDF_CURRENCY_SYMBOL}{tot_val:,.2f}", kpi_val_style),
              Paragraph(f"{low_stock}", kpi_val_style)],
             [Paragraph("Total Products", kpi_lbl_style),
              Paragraph("Available Units", kpi_lbl_style),
@@ -1651,8 +1678,8 @@ def generate_snapshot_pdf(report):
                 Paragraph(_safe_escape(it.get("category_name")), td_style),
                 Paragraph(f"{it.get('quantity_available', 0)}", td_r_style),
                 Paragraph(f"{it.get('reorder_level', 0)}", td_r_style),
-                Paragraph(f"${float(it.get('unit_price', 0)):.2f}", td_r_style),
-                Paragraph(f"${float(it.get('inventory_value', 0)):.2f}", td_r_style),
+                Paragraph(f"{PDF_CURRENCY_SYMBOL}{float(it.get('unit_price', 0)):.2f}", td_r_style),
+                Paragraph(f"{PDF_CURRENCY_SYMBOL}{float(it.get('inventory_value', 0)):.2f}", td_r_style),
                 Paragraph(_safe_escape(it.get("stock_status")), td_c_style),
                 Paragraph(_safe_escape(it.get("status")), td_c_style)
             ])
@@ -1724,7 +1751,7 @@ def generate_snapshot_pdf(report):
 
         kpi_data = [
             [Paragraph(f"{len(items)}", kpi_val_style),
-             Paragraph(f"${tot_val:,.2f}", kpi_val_style),
+             Paragraph(f"{PDF_CURRENCY_SYMBOL}{tot_val:,.2f}", kpi_val_style),
              Paragraph(f"{tot_lines}", kpi_val_style),
              Paragraph(f"{app_pos}", kpi_val_style)],
             [Paragraph("Total Purchase Orders", kpi_lbl_style),
@@ -1764,7 +1791,7 @@ def generate_snapshot_pdf(report):
                     Paragraph(_safe_escape(po.get("supplier_name")), td_style),
                     Paragraph(_safe_escape(po.get("order_date")), td_style),
                     Paragraph(_safe_escape(po.get("status")), td_c_style),
-                    Paragraph(f"${float(po.get('total_amount', 0)):.2f}", td_r_style),
+                    Paragraph(f"{PDF_CURRENCY_SYMBOL}{float(po.get('total_amount', 0)):.2f}", td_r_style),
                     Paragraph("(No item details)", td_style),
                     Paragraph("-", td_style),
                     Paragraph("-", td_r_style),
@@ -1778,12 +1805,12 @@ def generate_snapshot_pdf(report):
                         Paragraph(_safe_escape(po.get("supplier_name")) if idx == 0 else "", td_style),
                         Paragraph(_safe_escape(po.get("order_date")) if idx == 0 else "", td_style),
                         Paragraph(_safe_escape(po.get("status")) if idx == 0 else "", td_c_style),
-                        Paragraph(f"${float(po.get('total_amount', 0)):.2f}" if idx == 0 else "", td_r_style),
+                        Paragraph(f"{PDF_CURRENCY_SYMBOL}{float(po.get('total_amount', 0)):.2f}" if idx == 0 else "", td_r_style),
                         Paragraph(_safe_escape(it.get("product_name")), td_style),
                         Paragraph(_safe_escape(it.get("sku")), td_style),
                         Paragraph(f"{it.get('quantity', 0)}", td_r_style),
-                        Paragraph(f"${float(it.get('unit_price', 0)):.2f}", td_r_style),
-                        Paragraph(f"${float(it.get('total_price', 0)):.2f}", td_r_style)
+                        Paragraph(f"{PDF_CURRENCY_SYMBOL}{float(it.get('unit_price', 0)):.2f}", td_r_style),
+                        Paragraph(f"{PDF_CURRENCY_SYMBOL}{float(it.get('total_price', 0)):.2f}", td_r_style)
                     ])
 
     elif report_type == "Quotations":
@@ -1793,7 +1820,7 @@ def generate_snapshot_pdf(report):
 
         kpi_data = [
             [Paragraph(f"{len(items)}", kpi_val_style),
-             Paragraph(f"${tot_val:,.2f}", kpi_val_style),
+             Paragraph(f"{PDF_CURRENCY_SYMBOL}{tot_val:,.2f}", kpi_val_style),
              Paragraph(f"{tot_lines}", kpi_val_style),
              Paragraph(f"{app_q}", kpi_val_style)],
             [Paragraph("Total Quotations", kpi_lbl_style),
@@ -1833,7 +1860,7 @@ def generate_snapshot_pdf(report):
                     Paragraph(_safe_escape(q.get("supplier_name")), td_style),
                     Paragraph(_safe_escape(q.get("quotation_date")), td_style),
                     Paragraph(_safe_escape(q.get("status")), td_c_style),
-                    Paragraph(f"${float(q.get('total_amount', 0)):.2f}", td_r_style),
+                    Paragraph(f"{PDF_CURRENCY_SYMBOL}{float(q.get('total_amount', 0)):.2f}", td_r_style),
                     Paragraph("(No items)", td_style),
                     Paragraph("-", td_style),
                     Paragraph("-", td_r_style),
@@ -1847,12 +1874,12 @@ def generate_snapshot_pdf(report):
                         Paragraph(_safe_escape(q.get("supplier_name")) if idx == 0 else "", td_style),
                         Paragraph(_safe_escape(q.get("quotation_date")) if idx == 0 else "", td_style),
                         Paragraph(_safe_escape(q.get("status")) if idx == 0 else "", td_c_style),
-                        Paragraph(f"${float(q.get('total_amount', 0)):.2f}" if idx == 0 else "", td_r_style),
+                        Paragraph(f"{PDF_CURRENCY_SYMBOL}{float(q.get('total_amount', 0)):.2f}" if idx == 0 else "", td_r_style),
                         Paragraph(_safe_escape(it.get("product_name")), td_style),
                         Paragraph(_safe_escape(it.get("sku")), td_style),
                         Paragraph(f"{it.get('quantity', 0)}", td_r_style),
-                        Paragraph(f"${float(it.get('quoted_price', 0)):.2f}", td_r_style),
-                        Paragraph(f"${float(it.get('subtotal', 0)):.2f}", td_r_style)
+                        Paragraph(f"{PDF_CURRENCY_SYMBOL}{float(it.get('quoted_price', 0)):.2f}", td_r_style),
+                        Paragraph(f"{PDF_CURRENCY_SYMBOL}{float(it.get('subtotal', 0)):.2f}", td_r_style)
                     ])
 
     elif report_type == "Supplier Performance":
@@ -1864,7 +1891,7 @@ def generate_snapshot_pdf(report):
         kpi_data = [
             [Paragraph(f"{tot_sup}", kpi_val_style),
              Paragraph(f"{tot_pos}", kpi_val_style),
-             Paragraph(f"${tot_val:,.2f}", kpi_val_style),
+             Paragraph(f"{PDF_CURRENCY_SYMBOL}{tot_val:,.2f}", kpi_val_style),
              Paragraph(f"{avg_acc:.1f}%", kpi_val_style)],
             [Paragraph("Suppliers Evaluated", kpi_lbl_style),
              Paragraph("Total Orders Placed", kpi_lbl_style),
@@ -1904,10 +1931,10 @@ def generate_snapshot_pdf(report):
                 Paragraph(_safe_escape(s.get("supplier_name")), td_style),
                 Paragraph(_safe_escape(s.get("status") or "Active"), td_c_style),
                 Paragraph(po_str, td_style),
-                Paragraph(f"${float(s.get('total_order_value', 0)):.2f}", td_r_style),
+                Paragraph(f"{PDF_CURRENCY_SYMBOL}{float(s.get('total_order_value', 0)):.2f}", td_r_style),
                 Paragraph(f"{float(s.get('po_acceptance_rate', 0)):.1f}%", td_c_style),
                 Paragraph(q_str, td_style),
-                Paragraph(f"${float(s.get('total_quoted_value', 0)):.2f}", td_r_style),
+                Paragraph(f"{PDF_CURRENCY_SYMBOL}{float(s.get('total_quoted_value', 0)):.2f}", td_r_style),
                 Paragraph(f"{float(s.get('quotation_approval_rate', 0)):.1f}%", td_c_style),
                 Paragraph(sh_str, td_style),
                 Paragraph(f"{float(s.get('on_time_delivery_rate', 0)):.1f}%", td_c_style)

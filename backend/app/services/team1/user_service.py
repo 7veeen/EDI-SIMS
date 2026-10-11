@@ -86,6 +86,19 @@ def create_user(username, email, password, role_name, creator_role):
 
         new_user = cursor.fetchone()
 
+        # Audit log for user creation
+        try:
+            from app.services.team3.audit_service import log_audit_event
+            action = "CREATE_EMPLOYEE" if role_name in ("Employee", "Supplier") else "CREATE_USER"
+            log_audit_event(
+                action=action,
+                table_name="Users",
+                record_id=new_user[0],
+                cursor=cursor
+            )
+        except Exception as audit_err:
+            print(f"[AUDIT WARNING] Failed to record user creation audit log: {audit_err}", flush=True)
+
         conn.commit()
 
         return {
@@ -271,15 +284,17 @@ def get_user_by_id(user_id):
 
 def log_user_audit(cursor, actor_id, action, target_user_id, ip_address=None):
     try:
-        cursor.execute(
-            '''
-            INSERT INTO public."AuditLogs" (user_id, action, table_name, record_id, ip_address)
-            VALUES (%s, %s, 'Users', %s, %s)
-            ''',
-            (actor_id, action, target_user_id, ip_address or '127.0.0.1')
+        from app.services.team3.audit_service import log_audit_event
+        log_audit_event(
+            action=action,
+            table_name='Users',
+            record_id=target_user_id,
+            user_id=actor_id,
+            cursor=cursor,
+            ip_address=ip_address
         )
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[AUDIT WARNING] log_user_audit failed: {e}", flush=True)
 
 
 def count_active_owners(exclude_user_id=None):

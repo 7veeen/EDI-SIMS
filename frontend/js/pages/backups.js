@@ -51,24 +51,28 @@ App.pages['backups'] = {
                 return;
             }
 
-            tbody.innerHTML = data.map(b => `
+            tbody.innerHTML = data.map(b => {
+                const creatorDisplay = b.creator_username || (b.created_by != null ? `User #${b.created_by}` : 'System');
+                const statusClass = b.status === 'Success' ? 'status-active' : 'status-inactive';
+                return `
                 <tr>
-                    <td>#${b.backup_id}</td>
-                    <td><strong>${Utils.escapeHtml(b.backup_name)}</strong></td>
-                    <td><span class="badge" style="position: relative; top:0; background: #e0e0e0; color: #333;">${b.backup_type}</span></td>
-                    <td>${b.backup_size}</td>
+                    <td>#${Utils.escapeHtml(String(b.backup_id || ''))}</td>
+                    <td><strong>${Utils.escapeHtml(b.backup_name || '')}</strong></td>
+                    <td><span class="badge" style="position: relative; top:0; background: #e0e0e0; color: #333;">${Utils.escapeHtml(b.backup_type || 'Full')}</span></td>
+                    <td>${Utils.escapeHtml(b.backup_size || '-')}</td>
                     <td>${Utils.formatDate(b.backup_date)}</td>
                     <td>
-                        <span class="status-badge ${b.status === 'Success' ? 'status-active' : 'status-inactive'}">
-                            ${b.status}
+                        <span class="status-badge ${statusClass}">
+                            ${Utils.escapeHtml(b.status || 'Unknown')}
                         </span>
                     </td>
-                    <td>User #${b.created_by}</td>
+                    <td>${Utils.escapeHtml(creatorDisplay)}</td>
                 </tr>
-            `).join('');
+            `;
+            }).join('');
             
         } catch (error) {
-            tbody.innerHTML = `<tr><td colspan="7" class="text-danger" style="text-align: center;">Failed to load backups: ${error.message}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7" class="text-danger" style="text-align: center;">Failed to load backups: ${Utils.escapeHtml(error.message || 'Unknown error')}</td></tr>`;
         }
     },
 

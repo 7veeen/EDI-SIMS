@@ -59,7 +59,7 @@ def get_detailed_health():
         ''')
         rows = cursor.fetchall()
         for row in rows:
-            updated_str = row[4].isoformat() if hasattr(row[4], "isoformat") else str(row[4])
+            updated_str = row[4].isoformat() if hasattr(row[4], "isoformat") and row[4] else (str(row[4]) if row[4] else None)
             modules.append({
                 "name": row[0],
                 "status": row[1],

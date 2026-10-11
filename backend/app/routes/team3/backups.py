@@ -37,15 +37,17 @@ def get_backups():
     try:
         cursor.execute('''
             SELECT
-                backup_id,
-                backup_name,
-                backup_type,
-                backup_date,
-                backup_size,
-                created_by,
-                status
-            FROM "BackupHistory"
-            ORDER BY backup_id DESC
+                bh.backup_id,
+                bh.backup_name,
+                bh.backup_type,
+                bh.backup_date,
+                bh.backup_size,
+                bh.created_by,
+                bh.status,
+                COALESCE(u.username, CONCAT('User #', bh.created_by::text)) AS creator_username
+            FROM "BackupHistory" bh
+            LEFT JOIN "Users" u ON bh.created_by = u.user_id
+            ORDER BY bh.backup_id DESC
         ''')
 
         rows = cursor.fetchall()
@@ -60,7 +62,8 @@ def get_backups():
                 "backup_date": row[3],
                 "backup_size": row[4],
                 "created_by": row[5],
-                "status": row[6]
+                "status": row[6],
+                "creator_username": row[7]
             })
 
         return jsonify(backups), 200
