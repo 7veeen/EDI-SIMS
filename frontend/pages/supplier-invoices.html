@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIMS - Supplier Invoices &amp; Payments</title>
+    <link rel="stylesheet" href="../index.css?v=7">
+    <link rel="stylesheet" href="../css/supplier-invoices.css?v=1">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+</head>
+<body class="standalone-invoice-page">
+    <div class="page-payments-root" style="max-width: 1300px; margin: 30px auto; padding: 0 20px;">
+        <!-- Header -->
+        <div class="page-header">
+            <div>
+                <span class="eyebrow">ACCOUNTS PAYABLE &amp; PROCUREMENT</span>
+                <h1>Supplier Invoices &amp; Payments 💳</h1>
+                <p>Submit invoices for verified deliveries, track management approvals, and review disbursement vouchers.</p>
+            </div>
+            <div class="header-actions">
+                <a href="../index.html#payments" class="btn primary">
+                    <i class='bx bx-arrow-back'></i> Open in SIMS Portal
+                </a>
+            </div>
+        </div>
+
+        <!-- Metric Stat Cards -->
+        <div class="fin-stats-grid">
+            <div class="fin-stat-card">
+                <div class="fin-stat-header">
+                    <span class="fin-stat-title">Total Invoiced</span>
+                    <div class="fin-stat-icon primary"><i class='bx bx-receipt'></i></div>
+                </div>
+                <div>
+                    <div class="fin-stat-value">₹0.00</div>
+                    <span class="fin-stat-desc">Cumulative non-rejected invoices</span>
+                </div>
+            </div>
+
+            <div class="fin-stat-card">
+                <div class="fin-stat-header">
+                    <span class="fin-stat-title">Pending Approval</span>
+                    <div class="fin-stat-icon warning"><i class='bx bx-time-five'></i></div>
+                </div>
+                <div>
+                    <div class="fin-stat-value" style="color: #d97706;">0</div>
+                    <span class="fin-stat-desc">Submitted, awaiting review</span>
+                </div>
+            </div>
+
+            <div class="fin-stat-card">
+                <div class="fin-stat-header">
+                    <span class="fin-stat-title">Total Disbursed</span>
+                    <div class="fin-stat-icon success"><i class='bx bx-check-double'></i></div>
+                </div>
+                <div>
+                    <div class="fin-stat-value" style="color: #059669;">₹0.00</div>
+                    <span class="fin-stat-desc">Verified payments to date</span>
+                </div>
+            </div>
+
+            <div class="fin-stat-card">
+                <div class="fin-stat-header">
+                    <span class="fin-stat-title">Remaining Balance</span>
+                    <div class="fin-stat-icon purple"><i class='bx bx-rupee'></i></div>
+                </div>
+                <div>
+                    <div class="fin-stat-value" style="color: #7c3aed;">₹0.00</div>
+                    <span class="fin-stat-desc">Outstanding payable balance</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Guidance Banner -->
+        <div class="fin-alert-banner info">
+            <i class='bx bx-info-circle' style="font-size: 22px;"></i>
+            <div>
+                <strong>Procurement &amp; Invoice Settlement Rules:</strong>
+                <p style="margin: 4px 0 0 0; font-size: 13px;">
+                    Suppliers may submit invoices against active Purchase Orders after goods have been delivered and warehouse stock receipt (STOCK_IN) is recorded.
+                    Payments are recorded by Owners and Managers upon approval.
+                </p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -347,6 +347,16 @@ def create_supplier(data):
         """, (supplier_name, contact_person, phone, email, status, user_id))
 
         new_row = cursor.fetchone()
+
+        # Audit Log: CREATE_SUPPLIER
+        from app.services.team3.audit_service import log_audit_event
+        log_audit_event(
+            action="CREATE_SUPPLIER",
+            table_name="Suppliers",
+            record_id=new_row[0],
+            cursor=cursor
+        )
+
         conn.commit()
 
         created_supplier = {
@@ -479,6 +489,16 @@ def update_supplier(supplier_id, data):
 
         cursor.execute(update_query, tuple(params))
         updated_row = cursor.fetchone()
+
+        # Audit Log: UPDATE_SUPPLIER
+        from app.services.team3.audit_service import log_audit_event
+        log_audit_event(
+            action="UPDATE_SUPPLIER",
+            table_name="Suppliers",
+            record_id=updated_row[0],
+            cursor=cursor
+        )
+
         conn.commit()
 
         updated_supplier = {
@@ -538,6 +558,13 @@ def delete_supplier(supplier_id):
         if total_references > 0:
             # Soft-deactivate to preserve database integrity
             cursor.execute('UPDATE "Suppliers" SET status = %s WHERE supplier_id = %s', ("Inactive", supplier_id))
+            from app.services.team3.audit_service import log_audit_event
+            log_audit_event(
+                action="DELETE_SUPPLIER",
+                table_name="Suppliers",
+                record_id=supplier_id,
+                cursor=cursor
+            )
             conn.commit()
             return {
                 "supplier_id": supplier_id,
@@ -547,6 +574,13 @@ def delete_supplier(supplier_id):
             }, None
         else:
             # Safe to hard delete
+            from app.services.team3.audit_service import log_audit_event
+            log_audit_event(
+                action="DELETE_SUPPLIER",
+                table_name="Suppliers",
+                record_id=supplier_id,
+                cursor=cursor
+            )
             cursor.execute('DELETE FROM "Suppliers" WHERE supplier_id = %s', (supplier_id,))
             conn.commit()
             return {

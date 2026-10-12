@@ -89,6 +89,18 @@ def create_app():
     except (ImportError, AttributeError):
         pass
 
+    try:
+        from app.routes.team2.invoices import invoices_bp
+        app.register_blueprint(invoices_bp)
+    except (ImportError, AttributeError):
+        pass
+
+    try:
+        from app.routes.team2.payments import payments_bp
+        app.register_blueprint(payments_bp)
+    except (ImportError, AttributeError):
+        pass
+
     app.register_blueprint(reports_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(notifications_bp)

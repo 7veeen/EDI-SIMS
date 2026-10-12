@@ -1,0 +1,588 @@
+/* =========================================================
+   SIMS SUPPLIER INVOICES & PAYMENTS TRACKING
+   Phase 3: Financial Management Stylesheet
+   ========================================================= */
+
+/* Financial Tabs Navigation */
+.financial-tabs-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 22px;
+    border-bottom: 2px solid var(--border, #e2e8f0);
+    padding-bottom: 6px;
+    flex-wrap: wrap;
+}
+
+.financial-tab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    background: transparent;
+    border: none;
+    border-radius: 8px 8px 0 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary, #64748b);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -8px;
+}
+
+.financial-tab-btn:hover {
+    color: var(--primary, #078f72);
+    background: rgba(7, 143, 114, 0.04);
+}
+
+.financial-tab-btn.active {
+    color: var(--primary, #078f72);
+    border-bottom-color: var(--primary, #078f72);
+    background: rgba(7, 143, 114, 0.08);
+}
+
+.financial-tab-btn .tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 7px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    background: rgba(0, 0, 0, 0.06);
+    color: inherit;
+}
+
+.financial-tab-btn.active .tab-count {
+    background: var(--primary, #078f72);
+    color: #ffffff;
+}
+
+/* Financial Stat Cards Ribbon */
+.fin-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 16px;
+    margin: 18px 0 24px 0;
+}
+
+.fin-stat-card {
+    background: var(--card-bg, #ffffff);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 14px;
+    padding: 16px 20px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.fin-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+}
+
+.fin-stat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.fin-stat-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary, #64748b);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.fin-stat-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 19px;
+}
+
+.fin-stat-icon.primary { background: rgba(7, 143, 114, 0.12); color: #078f72; }
+.fin-stat-icon.warning { background: rgba(245, 158, 11, 0.12); color: #d97706; }
+.fin-stat-icon.info { background: rgba(59, 130, 246, 0.12); color: #2563eb; }
+.fin-stat-icon.success { background: rgba(16, 185, 129, 0.12); color: #059669; }
+.fin-stat-icon.purple { background: rgba(139, 92, 246, 0.12); color: #7c3aed; }
+.fin-stat-icon.danger { background: rgba(239, 68, 68, 0.12); color: #dc2626; }
+
+.fin-stat-value {
+    font-size: 24px;
+    font-weight: 800;
+    margin: 4px 0 2px 0;
+    color: var(--text, #1e293b);
+    letter-spacing: -0.5px;
+}
+
+.fin-stat-desc {
+    font-size: 12px;
+    color: var(--text-secondary, #64748b);
+}
+
+/* Status Badges */
+.fin-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    line-height: 1.4;
+}
+
+.fin-badge-submitted {
+    background: rgba(245, 158, 11, 0.12);
+    color: #b45309;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.fin-badge-approved {
+    background: rgba(59, 130, 246, 0.12);
+    color: #1d4ed8;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.fin-badge-partially-paid {
+    background: rgba(147, 51, 234, 0.12);
+    color: #7e22ce;
+    border: 1px solid rgba(147, 51, 234, 0.3);
+}
+
+.fin-badge-paid {
+    background: rgba(16, 185, 129, 0.12);
+    color: #047857;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.fin-badge-rejected {
+    background: rgba(239, 68, 68, 0.12);
+    color: #b91c1c;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.fin-badge-cancelled {
+    background: rgba(100, 116, 139, 0.12);
+    color: #475569;
+    border: 1px solid rgba(100, 116, 139, 0.3);
+}
+
+/* Method badge */
+.fin-method-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    background: rgba(7, 143, 114, 0.08);
+    color: var(--primary-dark, #06765f);
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+/* Action Button Styles */
+.fin-action-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    justify-content: flex-end;
+}
+
+.fin-btn-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    border: 1px solid var(--border, #e2e8f0);
+    background: var(--white, #ffffff);
+    color: var(--text-secondary, #64748b);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.fin-btn-icon:hover {
+    color: var(--primary, #078f72);
+    border-color: var(--primary, #078f72);
+    background: rgba(7, 143, 114, 0.06);
+}
+
+.fin-btn-icon.success:hover {
+    color: #059669;
+    border-color: #059669;
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.fin-btn-icon.danger:hover {
+    color: #dc2626;
+    border-color: #dc2626;
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.fin-btn-icon.pay:hover {
+    color: #7c3aed;
+    border-color: #7c3aed;
+    background: rgba(139, 92, 246, 0.1);
+}
+
+/* Form Styles */
+.fin-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+}
+
+.fin-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.fin-form-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text, #1e293b);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.fin-form-label .required {
+    color: #dc2626;
+    font-weight: 700;
+}
+
+.fin-form-input,
+.fin-form-select,
+.fin-form-textarea {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid var(--border, #cbd5e1);
+    border-radius: 8px;
+    background: var(--white, #ffffff);
+    color: var(--text, #1e293b);
+    font-size: 14px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    box-sizing: border-box;
+}
+
+.fin-form-input:focus,
+.fin-form-select:focus,
+.fin-form-textarea:focus {
+    border-color: var(--primary, #078f72);
+    box-shadow: 0 0 0 3px rgba(7, 143, 114, 0.15);
+}
+
+.fin-form-help {
+    font-size: 11px;
+    color: var(--text-secondary, #64748b);
+    margin-top: 2px;
+}
+
+/* Financial summary preview box */
+.fin-calc-preview {
+    background: rgba(7, 143, 114, 0.05);
+    border: 1px dashed var(--primary, #078f72);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin: 14px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.fin-calc-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.fin-calc-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary, #64748b);
+    text-transform: uppercase;
+}
+
+.fin-calc-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text, #1e293b);
+}
+
+.fin-calc-value.highlight {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--primary, #078f72);
+}
+
+/* Outstanding Balance Highlight Ribbon in Payment Modal */
+.fin-balance-ribbon {
+    background: #f8fafc;
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 18px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    text-align: center;
+}
+
+.fin-balance-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.fin-balance-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-secondary, #64748b);
+    margin-bottom: 4px;
+}
+
+.fin-balance-amt {
+    font-size: 17px;
+    font-weight: 800;
+    color: var(--text, #1e293b);
+}
+
+.fin-balance-amt.remaining {
+    color: #7c3aed;
+}
+
+/* Detail Modal Styles */
+.fin-detail-section {
+    margin-bottom: 20px;
+}
+
+.fin-detail-title {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary, #64748b);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.fin-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    background: #f8fafc;
+    padding: 14px 16px;
+    border-radius: 10px;
+    border: 1px solid var(--border, #e2e8f0);
+}
+
+.fin-detail-field {
+    display: flex;
+    flex-direction: column;
+}
+
+.fin-field-label {
+    font-size: 11px;
+    color: var(--text-secondary, #64748b);
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.fin-field-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text, #1e293b);
+    margin-top: 2px;
+}
+
+.fin-alert-banner {
+    padding: 12px 16px;
+    border-radius: 10px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+    font-size: 13px;
+}
+
+.fin-alert-banner.danger {
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    color: #b91c1c;
+}
+
+.fin-alert-banner.info {
+    background: rgba(59, 130, 246, 0.08);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    color: #1d4ed8;
+}
+
+.fin-alert-banner.warning {
+    background: rgba(245, 158, 11, 0.08);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    color: #b45309;
+}
+
+/* Payment Voucher Card */
+.fin-voucher-card {
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+}
+
+.fin-voucher-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--primary, #078f72), #3b82f6);
+}
+
+.fin-voucher-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 1px dashed var(--border, #e2e8f0);
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+}
+
+.fin-voucher-logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 800;
+    color: var(--primary, #078f72);
+    font-size: 16px;
+}
+
+.fin-voucher-amount {
+    text-align: right;
+}
+
+.fin-voucher-amount h2 {
+    font-size: 26px;
+    font-weight: 800;
+    color: #059669;
+    margin: 0;
+}
+
+/* Pagination container */
+.fin-pagination-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border-top: 1px solid var(--border, #e2e8f0);
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.fin-page-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--border, #e2e8f0);
+    background: var(--white, #ffffff);
+    color: var(--text, #1e293b);
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.fin-page-btn:hover:not(:disabled) {
+    background: var(--primary-light, #e5f3f0);
+    color: var(--primary, #078f72);
+    border-color: var(--primary, #078f72);
+}
+
+.fin-page-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+/* Dark mode overrides */
+body.dark .fin-stat-card,
+body.dark-theme .fin-stat-card,
+body.dark .fin-voucher-card,
+body.dark-theme .fin-voucher-card {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+body.dark .fin-stat-value,
+body.dark-theme .fin-stat-value {
+    color: #f1f5f9;
+}
+
+body.dark .fin-detail-grid,
+body.dark-theme .fin-detail-grid,
+body.dark .fin-balance-ribbon,
+body.dark-theme .fin-balance-ribbon {
+    background: #0f172a;
+    border-color: #334155;
+}
+
+body.dark .fin-field-value,
+body.dark-theme .fin-field-value,
+body.dark .fin-balance-amt,
+body.dark-theme .fin-balance-amt {
+    color: #f1f5f9;
+}
+
+body.dark .fin-calc-preview,
+body.dark-theme .fin-calc-preview {
+    background: rgba(7, 143, 114, 0.12);
+}
+
+body.dark .financial-tab-btn.active,
+body.dark-theme .financial-tab-btn.active {
+    background: rgba(7, 143, 114, 0.2);
+    color: #34d399;
+}
+
+body.dark .fin-form-input,
+body.dark-theme .fin-form-input,
+body.dark .fin-form-select,
+body.dark-theme .fin-form-select,
+body.dark .fin-form-textarea,
+body.dark-theme .fin-form-textarea {
+    background: #0f172a;
+    border-color: #334155;
+    color: #f1f5f9;
+}
+
+body.dark .fin-page-btn,
+body.dark-theme .fin-page-btn,
+body.dark .fin-btn-icon,
+body.dark-theme .fin-btn-icon {
+    background: #1e293b;
+    border-color: #334155;
+    color: #94a3b8;
+}

@@ -1,4 +1,6 @@
 import logging
+import math
+from datetime import datetime
 from flask import has_request_context, request
 from psycopg2 import Error
 
@@ -132,17 +134,109 @@ def log_audit_event(action, table_name, record_id=None, user_id=None, cursor=Non
                 conn.close()
 
 
-def get_all_audit_logs(limit=1000):
+def get_all_audit_logs(limit=50, page=1, search=None, action=None, table_name=None, start_date=None, end_date=None):
     """
-    Retrieves audit logs for the owner audit logs API endpoint.
+    Retrieves filtered and paginated audit logs for the owner audit logs API endpoint.
+    Supports search, action, table_name, start_date, end_date, and deterministic pagination.
     """
+    # 1. Validate page
+    try:
+        parsed_page = int(page)
+        if parsed_page < 1:
+            return None, "Invalid page: must be a positive integer"
+    except (ValueError, TypeError):
+        return None, "Invalid page: must be a positive integer"
+
+    # 2. Validate limit (default 50, maximum 100)
+    try:
+        parsed_limit = int(limit)
+        if parsed_limit < 1 or parsed_limit > 100:
+            return None, "Invalid limit: must be an integer between 1 and 100"
+    except (ValueError, TypeError):
+        return None, "Invalid limit: must be an integer between 1 and 100"
+
+    # 3. Validate start_date and end_date formats
+    clean_start_date = None
+    if start_date is not None and str(start_date).strip():
+        try:
+            datetime.strptime(str(start_date).strip(), "%Y-%m-%d")
+            clean_start_date = str(start_date).strip()
+        except ValueError:
+            return None, "Invalid start_date format. Expected YYYY-MM-DD"
+
+    clean_end_date = None
+    if end_date is not None and str(end_date).strip():
+        try:
+            datetime.strptime(str(end_date).strip(), "%Y-%m-%d")
+            clean_end_date = str(end_date).strip()
+        except ValueError:
+            return None, "Invalid end_date format. Expected YYYY-MM-DD"
+
+    if clean_start_date and clean_end_date and clean_start_date > clean_end_date:
+        return None, "Start date cannot be after end date"
+
+    # 4. Clean filter strings
+    clean_action = str(action).strip().upper() if (action and str(action).strip() and str(action).strip().lower() != "all") else None
+    clean_table = str(table_name).strip() if (table_name and str(table_name).strip() and str(table_name).strip().lower() != "all") else None
+    clean_search = str(search).strip() if (search and str(search).strip()) else None
+
+    # 5. Build parameterized query clauses
+    where_clauses = []
+    params = []
+
+    if clean_start_date:
+        where_clauses.append('al.action_time >= %s')
+        params.append(f"{clean_start_date} 00:00:00")
+
+    if clean_end_date:
+        # Inclusive end date through end of the selected calendar day
+        where_clauses.append('al.action_time <= %s')
+        params.append(f"{clean_end_date} 23:59:59.999999")
+
+    if clean_action:
+        where_clauses.append('UPPER(al.action) = %s')
+        params.append(clean_action)
+
+    if clean_table:
+        where_clauses.append('LOWER(al.table_name) = LOWER(%s)')
+        params.append(clean_table)
+
+    if clean_search:
+        search_pattern = f"%{clean_search}%"
+        where_clauses.append("""(
+            u.username ILIKE %s
+            OR al.action ILIKE %s
+            OR al.table_name ILIKE %s
+            OR CAST(al.record_id AS TEXT) ILIKE %s
+        )""")
+        params.extend([search_pattern, search_pattern, search_pattern, search_pattern])
+
+    where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
     conn = None
     cursor = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute(
-            '''
+
+        # 6. Execute Count Query for total matching records
+        count_query = f'''
+            SELECT COUNT(*)
+            FROM public."AuditLogs" al
+            LEFT JOIN public."Users" u ON al.user_id = u.user_id
+            LEFT JOIN public."Roles" r ON u.role_id = r.role_id
+            {where_sql}
+        '''
+        cursor.execute(count_query, tuple(params))
+        count_row = cursor.fetchone()
+        total_count = count_row[0] if count_row else 0
+
+        # 7. Compute total pages
+        total_pages = math.ceil(total_count / parsed_limit) if total_count > 0 else 0
+
+        # 8. Execute Data Query with pagination and role join
+        offset = (parsed_page - 1) * parsed_limit
+        data_query = f'''
             SELECT
                 al.log_id,
                 al.user_id,
@@ -151,15 +245,19 @@ def get_all_audit_logs(limit=1000):
                 al.record_id,
                 al.action_time,
                 al.ip_address,
-                COALESCE(u.username, CASE WHEN al.user_id IS NOT NULL THEN CONCAT('User #', al.user_id::text) ELSE 'System' END) AS username
+                COALESCE(u.username, CASE WHEN al.user_id IS NOT NULL THEN CONCAT('User #', al.user_id::text) ELSE 'System' END) AS username,
+                COALESCE(r.role_name, 'Unknown') AS role_name
             FROM public."AuditLogs" al
             LEFT JOIN public."Users" u ON al.user_id = u.user_id
-            ORDER BY al.log_id DESC
-            LIMIT %s
-            ''',
-            (limit,)
-        )
+            LEFT JOIN public."Roles" r ON u.role_id = r.role_id
+            {where_sql}
+            ORDER BY al.action_time DESC, al.log_id DESC
+            LIMIT %s OFFSET %s
+        '''
+        query_params = list(params) + [parsed_limit, offset]
+        cursor.execute(data_query, tuple(query_params))
         rows = cursor.fetchall()
+
         audit_logs = []
         for row in rows:
             audit_logs.append({
@@ -170,12 +268,21 @@ def get_all_audit_logs(limit=1000):
                 "record_id": row[4],
                 "action_time": row[5].isoformat() if hasattr(row[5], 'isoformat') and row[5] else str(row[5]),
                 "ip_address": row[6],
-                "username": row[7]
+                "username": row[7],
+                "role_name": row[8]
             })
-        return audit_logs, None
+
+        result = {
+            "logs": audit_logs,
+            "total": total_count,
+            "page": parsed_page,
+            "limit": parsed_limit,
+            "total_pages": total_pages
+        }
+        return result, None
     except Exception as e:
         logger.error(f"Failed to fetch audit logs: {e}")
-        return None, str(e)
+        return None, f"Database error: {str(e)}"
     finally:
         if cursor:
             cursor.close()

@@ -112,5 +112,73 @@ const Api = {
 
     async generateReport(data) {
         return this.post('/reports/generate', data);
+    },
+
+    // Invoices helpers (Phase 3)
+    async getInvoices(params = '') {
+        let query = '';
+        if (typeof params === 'string') {
+            query = params ? `?${params}` : '';
+        } else if (params && typeof params === 'object') {
+            const searchParams = new URLSearchParams();
+            Object.entries(params).forEach(([key, val]) => {
+                if (val !== undefined && val !== null && val !== '') {
+                    searchParams.append(key, val);
+                }
+            });
+            const qStr = searchParams.toString();
+            query = qStr ? `?${qStr}` : '';
+        }
+        return this.get(`/invoices${query}`);
+    },
+
+    async getInvoice(id) {
+        return this.get(`/invoices/${id}`);
+    },
+
+    async submitInvoice(data) {
+        return this.post('/invoices', data);
+    },
+
+    async approveInvoice(id) {
+        return this.patch(`/invoices/${id}/approve`, {});
+    },
+
+    async rejectInvoice(id, rejection_reason) {
+        return this.patch(`/invoices/${id}/reject`, { rejection_reason });
+    },
+
+    async cancelInvoice(id, reason = '') {
+        return this.patch(`/invoices/${id}/cancel`, { reason });
+    },
+
+    async getInvoicePayments(id) {
+        return this.get(`/invoices/${id}/payments`);
+    },
+
+    // Payments helpers (Phase 3)
+    async getPayments(params = '') {
+        let query = '';
+        if (typeof params === 'string') {
+            query = params ? `?${params}` : '';
+        } else if (params && typeof params === 'object') {
+            const searchParams = new URLSearchParams();
+            Object.entries(params).forEach(([key, val]) => {
+                if (val !== undefined && val !== null && val !== '') {
+                    searchParams.append(key, val);
+                }
+            });
+            const qStr = searchParams.toString();
+            query = qStr ? `?${qStr}` : '';
+        }
+        return this.get(`/payments${query}`);
+    },
+
+    async getPayment(id) {
+        return this.get(`/payments/${id}`);
+    },
+
+    async recordPayment(data) {
+        return this.post('/payments', data);
     }
 };

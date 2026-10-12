@@ -15,7 +15,8 @@ const App = {
         { path: 'purchase-orders', icon: 'bx-receipt', label: 'Purchase Orders', roles: ['Owner', 'Manager', 'Supplier'] },
         { path: 'shipments', icon: 'bx-car', label: 'Shipments', roles: ['Owner', 'Manager', 'Supplier', 'Employee'] },
         { path: 'stock-transactions', icon: 'bx-transfer', label: 'Stock Transactions', roles: ['Owner', 'Manager', 'Employee'] },
-        { path: 'payments', icon: 'bx-money', label: 'Payments', roles: ['Supplier'] },
+        { path: 'payments', icon: 'bx-credit-card-front', label: 'Invoices & Payments', roles: ['Owner', 'Manager', 'Supplier'] },
+        { path: 'supplier-invoices', icon: 'bx-receipt', label: 'Invoices & Payments', roles: ['Owner', 'Manager', 'Supplier'], hidden: true },
         { path: 'reports', icon: 'bx-bar-chart-alt-2', label: 'Reports', roles: ['Owner', 'Manager'] },
         { path: 'system-status', icon: 'bx-pulse', label: 'System Health', roles: ['Owner', 'Manager'] },
         { path: 'notifications', icon: 'bx-bell', label: 'Notifications', roles: ['Owner', 'Manager', 'Employee', 'Supplier'] },
@@ -96,7 +97,7 @@ const App = {
         navContainer.innerHTML = '<div class="nav-section-title">WORKSPACE</div>';
 
         this.routes.forEach(route => {
-            if (route.roles.includes(user.role)) {
+            if (route.roles.includes(user.role) && !route.hidden) {
                 // Add Management section title before reports
                 if (route.path === 'reports') {
                     const mgmtTitle = document.createElement('div');
@@ -186,7 +187,8 @@ const App = {
 
         // Update active nav
         document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-        const activeNav = document.querySelector(`.nav-item[data-path="${path}"]`);
+        const navLookupPath = path === 'supplier-invoices' ? 'payments' : path;
+        const activeNav = document.querySelector(`.nav-item[data-path="${navLookupPath}"]`);
         if (activeNav) activeNav.classList.add('active');
 
         // Load page content
@@ -454,14 +456,36 @@ const App = {
         }
     },
 
-    // Step 7C Safe Reference Navigation
+    // Improvement 4: Safe Reference Type Normalizer
+    normalizeReferenceType(type) {
+        if (!type || typeof type !== 'string') return null;
+        const clean = type.trim().toUpperCase().replace(/[\s_\-]+/g, '');
+        if (!clean) return null;
+
+        if (clean === 'SHIPMENT') return 'SHIPMENT';
+        if (clean === 'PURCHASEORDER' || clean === 'PO') return 'PURCHASEORDER';
+        if (clean === 'PRODUCT') return 'PRODUCT';
+        if (clean === 'QUOTATION' || clean === 'SUPPLIERQUOTATION') return 'QUOTATION';
+        if (clean === 'STOCKREQUEST') return 'STOCKREQUEST';
+        if (clean === 'STOCKTRANSACTION' || clean === 'TRANSACTION') return 'STOCKTRANSACTION';
+        if (clean === 'INVOICE' || clean === 'SUPPLIERINVOICE') return 'INVOICE';
+        if (clean === 'PAYMENT' || clean === 'SUPPLIERPAYMENT') return 'PAYMENT';
+
+        return null;
+    },
+
+    // Improvement 4: Safe Reference Deep-Link Navigation
     async navigateToReference(referenceType, referenceId, notificationId = null) {
+        // 1. Mark notification as read if a valid notification ID is provided
         if (notificationId) {
             try {
-                await Api.markNotificationRead(notificationId);
-                await this.notifications.updateUnreadCount();
-                if (window.location.hash.includes('notifications') && this.pages['notifications'] && this.pages['notifications'].loadNotifications) {
-                    this.pages['notifications'].loadNotifications();
+                const parsedNotifId = parseInt(notificationId, 10);
+                if (!isNaN(parsedNotifId)) {
+                    await Api.markNotificationRead(parsedNotifId);
+                    await this.notifications.updateUnreadCount();
+                    if (window.location.hash.includes('notifications') && this.pages['notifications'] && typeof this.pages['notifications'].loadNotifications === 'function') {
+                        this.pages['notifications'].loadNotifications();
+                    }
                 }
             } catch (e) {
                 // Ignore silent read errors during navigation
@@ -471,65 +495,144 @@ const App = {
         const user = Auth.getUser();
         if (!user) return;
 
-        if (!referenceType || !referenceId) {
-            window.location.hash = 'notifications';
+        // 2. Validate reference type and reference ID
+        const normType = this.normalizeReferenceType(referenceType);
+
+        if (!normType) {
+            if (referenceType && String(referenceType).trim()) {
+                Utils.showToast(`Direct link unavailable for reference type: ${referenceType}`, 'warning');
+            }
+            if (!window.location.hash || window.location.hash === '#') {
+                window.location.hash = 'notifications';
+            }
             return;
         }
 
-        const refType = referenceType.trim();
-        const refId = referenceId;
-
-        if (refType === 'Shipment') {
-            const shipmentRoute = this.routes.find(r => r.path === 'shipments');
-            if (shipmentRoute && shipmentRoute.roles.includes(user.role)) {
-                window.location.hash = 'shipments';
-                Utils.showToast(`Navigated to Shipment #${refId}`, 'info');
-                setTimeout(() => {
-                    if (this.pages['shipments'] && typeof this.pages['shipments'].openShipmentDetailsModal === 'function') {
-                        this.pages['shipments'].openShipmentDetailsModal(refId);
-                    }
-                }, 400);
-            } else {
-                Utils.showToast(`Shipment module is not accessible for role ${user.role}`, 'warning');
-            }
-        } else if (refType === 'PurchaseOrder') {
-            const poRoute = this.routes.find(r => r.path === 'purchase-orders');
-            if (poRoute && poRoute.roles.includes(user.role)) {
-                window.location.hash = 'purchase-orders';
-                Utils.showToast(`Navigated to Purchase Order #${refId}`, 'info');
-                setTimeout(() => {
-                    const searchInput = document.getElementById('po-search');
-                    if (searchInput) {
-                        searchInput.value = refId;
-                        if (this.pages['purchase-orders'] && typeof this.pages['purchase-orders'].loadPurchaseOrders === 'function') {
-                            this.pages['purchase-orders'].loadPurchaseOrders();
-                        }
-                    }
-                }, 400);
-            } else {
-                Utils.showToast(`Purchase Orders are restricted to Managers, Owners, and Suppliers`, 'warning');
-            }
-        } else if (refType === 'Product') {
-            const prodRoute = this.routes.find(r => r.path === 'products');
-            if (prodRoute && prodRoute.roles.includes(user.role)) {
-                window.location.hash = 'products';
-                Utils.showToast(`Navigated to Product #${refId}`, 'info');
-                setTimeout(() => {
-                    const searchInput = document.getElementById('product-search');
-                    if (searchInput) {
-                        searchInput.value = refId;
-                        if (this.pages['products'] && typeof this.pages['products'].loadProducts === 'function') {
-                            this.pages['products'].search = String(refId);
-                            this.pages['products'].loadProducts();
-                        }
-                    }
-                }, 400);
-            } else {
-                Utils.showToast(`Products module is not accessible for role ${user.role}`, 'warning');
-            }
-        } else {
-            window.location.hash = 'notifications';
+        if (referenceId === null || referenceId === undefined || String(referenceId).trim() === '') {
+            Utils.showToast(`Notification does not contain a valid record reference ID`, 'warning');
+            return;
         }
+
+        const rawRefId = String(referenceId).trim();
+        const parsedId = isNaN(Number(rawRefId)) ? rawRefId : Number(rawRefId);
+
+        // 3. Define target route and action mapping
+        const configMap = {
+            'SHIPMENT': {
+                path: 'shipments',
+                actionType: 'modal',
+                modalFn: 'openShipmentDetailsModal',
+                entityName: 'Shipment'
+            },
+            'PURCHASEORDER': {
+                path: 'purchase-orders',
+                actionType: 'modal',
+                modalFn: 'viewPODetails',
+                entityName: 'Purchase Order'
+            },
+            'PRODUCT': {
+                path: 'products',
+                actionType: 'modal',
+                modalFn: 'showProductModal',
+                entityName: 'Product'
+            },
+            'QUOTATION': {
+                path: 'quotations',
+                actionType: 'modal',
+                modalFn: 'openQuotationDetailsModal',
+                entityName: 'Quotation'
+            },
+            'STOCKREQUEST': {
+                path: 'stock-requests',
+                actionType: 'modal',
+                modalFn: 'openDetailsModal',
+                entityName: 'Stock Request'
+            },
+            'STOCKTRANSACTION': {
+                path: 'stock-transactions',
+                actionType: 'filter',
+                inputId: 'tx-search-input',
+                filterFn: 'applyFilters',
+                entityName: 'Stock Transaction'
+            },
+            'INVOICE': {
+                path: 'payments',
+                actionType: 'modal',
+                modalFn: 'viewInvoiceDetails',
+                entityName: 'Invoice'
+            },
+            'PAYMENT': {
+                path: 'payments',
+                actionType: 'modal',
+                modalFn: 'viewPaymentVoucher',
+                entityName: 'Payment Voucher'
+            }
+        };
+
+        const config = configMap[normType];
+        if (!config) {
+            Utils.showToast(`Direct link unavailable for reference type: ${referenceType}`, 'warning');
+            return;
+        }
+
+        // 4. Role-based access verification against App.routes
+        const route = this.routes.find(r => r.path === config.path);
+        if (!route || !route.roles.includes(user.role)) {
+            Utils.showToast(`${config.entityName} module is not accessible for role ${user.role}`, 'warning');
+            return;
+        }
+
+        // 5. Navigate to destination route
+        if (window.location.hash !== '#' + config.path) {
+            window.location.hash = config.path;
+        } else {
+            const contentArea = document.getElementById('content-area');
+            if (contentArea && contentArea.children.length === 0) {
+                this.navigate(config.path);
+            }
+        }
+
+        Utils.showToast(`Navigated to ${config.entityName} #${parsedId}`, 'info');
+
+        // 6. Polling dispatcher: cleanly wait for target page controller & modal function to be ready
+        let attempts = 0;
+        const maxAttempts = 15;
+        const dispatchInterval = 50;
+
+        const executeTargetAction = () => {
+            const page = this.pages[config.path];
+
+            if (config.actionType === 'modal') {
+                if (page && typeof page[config.modalFn] === 'function') {
+                    try {
+                        page[config.modalFn](parsedId);
+                    } catch (err) {
+                        console.error(`[Deep-Link Error] Failed to open modal for ${config.entityName}:`, err);
+                    }
+                    return;
+                }
+            } else if (config.actionType === 'filter') {
+                const searchInput = document.getElementById(config.inputId);
+                if (page && searchInput && typeof page[config.filterFn] === 'function') {
+                    try {
+                        searchInput.value = String(parsedId);
+                        page[config.filterFn]();
+                    } catch (err) {
+                        console.error(`[Deep-Link Error] Failed to filter ${config.entityName}:`, err);
+                    }
+                    return;
+                }
+            }
+
+            if (attempts < maxAttempts) {
+                attempts++;
+                setTimeout(executeTargetAction, dispatchInterval);
+            } else {
+                console.warn(`[Deep-Link Warning] Could not invoke action for ${config.entityName} #${parsedId} after ${maxAttempts * dispatchInterval}ms`);
+            }
+        };
+
+        setTimeout(executeTargetAction, 100);
     }
 };
 

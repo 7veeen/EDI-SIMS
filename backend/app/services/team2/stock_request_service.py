@@ -384,6 +384,16 @@ def create_stock_request(requested_by_user_id, data):
                 ) VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
             """, (stock_request_id, it["product_id"], it["requested_quantity"], it["notes"]))
 
+        # Audit Log: STOCK_REQUEST_CREATED
+        from app.services.team3.audit_service import log_audit_event
+        log_audit_event(
+            action="STOCK_REQUEST_CREATED",
+            table_name="StockRequests",
+            record_id=stock_request_id,
+            user_id=int(requested_by_user_id),
+            cursor=cursor
+        )
+
         conn.commit()
 
         created_request = {
@@ -531,6 +541,16 @@ def respond_to_stock_request(stock_request_id, user_id, role, data):
             RETURNING request_number, status, responded_at
         """, (new_status, notes, stock_request_id))
         upd = cursor.fetchone()
+
+        # Audit Log: STOCK_REQUEST_RESPONDED
+        from app.services.team3.audit_service import log_audit_event
+        log_audit_event(
+            action="STOCK_REQUEST_RESPONDED",
+            table_name="StockRequests",
+            record_id=stock_request_id,
+            user_id=int(user_id),
+            cursor=cursor
+        )
 
         conn.commit()
 
