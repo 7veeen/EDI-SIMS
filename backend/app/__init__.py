@@ -1,8 +1,9 @@
-from flask import Flask, request, make_response
+from flask import Flask, request, make_response, jsonify
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 
 from app.config import JWT_SECRET_KEY
+from app.extensions import init_db_pool, release_request_connection, PoolExhaustedError
 from app.routes.team1.auth import auth_bp
 from app.routes.team1.users import users_bp
 from app.routes.team1.categories import categories_bp
@@ -18,6 +19,20 @@ def create_app():
     app = Flask(__name__)
 
     app.config["JWT_SECRET_KEY"] = JWT_SECRET_KEY
+
+    # Initialize database connection pool
+    init_db_pool(app)
+
+    @app.teardown_appcontext
+    def teardown_db_connection(exception=None):
+        release_request_connection(exception=exception)
+
+    @app.errorhandler(PoolExhaustedError)
+    def handle_pool_exhausted(err):
+        return jsonify({
+            "error": "Service Unavailable",
+            "message": str(err)
+        }), 503
 
     CORS(
         app,
