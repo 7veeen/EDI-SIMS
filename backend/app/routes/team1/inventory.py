@@ -33,10 +33,15 @@ def list_inventory():
         except ValueError:
             return jsonify({"error": "category_id must be an integer"}), 400
 
+    page = request.args.get("page")
+    page_size = request.args.get("page_size") or request.args.get("limit")
+
     data, error = get_inventory(
         search=search,
         status_filter=status_filter,
-        category_id=category_id
+        category_id=category_id,
+        page=page,
+        page_size=page_size
     )
 
     if error:

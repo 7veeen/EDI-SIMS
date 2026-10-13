@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SIMS - Smart Inventory Management System</title>
     <!-- Early Pre-Render Theme Initialization (FOUC Prevention) -->
     <script>
-        (function() {
+        (function () {
             var saved = null;
             try {
                 saved = localStorage.getItem('sims_theme') || localStorage.getItem('theme') || localStorage.getItem('supplierTheme');
@@ -37,7 +38,7 @@
                 } else {
                     document.documentElement.classList.remove('dark', 'dark-theme');
                 }
-            } catch (domErr) {}
+            } catch (domErr) { }
         })();
     </script>
     <link rel="stylesheet" href="index.css?v=8">
@@ -45,13 +46,18 @@
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
     <!-- Boxicons for modern icons -->
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
     <style>
-        .hidden { display: none !important; }
+        .hidden {
+            display: none !important;
+        }
     </style>
 </head>
+
 <body>
 
     <!-- Notification Toast Container -->
@@ -70,8 +76,10 @@
         <!-- Flowing Bottom Wave -->
         <div class="login-bg-wave" aria-hidden="true">
             <svg viewBox="0 0 1440 260" fill="none" preserveAspectRatio="none">
-                <path d="M0,130 C280,210 520,70 820,120 C1120,170 1310,95 1440,110 L1440,260 L0,260 Z" class="wave-layer-back"/>
-                <path d="M0,170 C260,240 580,110 880,160 C1180,200 1350,150 1440,160 L1440,260 L0,260 Z" class="wave-layer-front"/>
+                <path d="M0,130 C280,210 520,70 820,120 C1120,170 1310,95 1440,110 L1440,260 L0,260 Z"
+                    class="wave-layer-back" />
+                <path d="M0,170 C260,240 580,110 880,160 C1180,200 1350,150 1440,160 L1440,260 L0,260 Z"
+                    class="wave-layer-front" />
             </svg>
         </div>
 
@@ -79,19 +87,19 @@
         <div class="login-bg-leaves" aria-hidden="true">
             <svg viewBox="0 0 220 220" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <!-- Leaf 1 (center large) -->
-                <path d="M0,220 C20,150 70,80 150,50 C130,100 100,160 0,220 Z" class="leaf-primary"/>
-                <path d="M0,220 C45,170 85,120 150,50" class="leaf-spine" stroke-width="2"/>
-                <path d="M40,175 C55,160 70,165 75,170" class="leaf-spine" stroke-width="1.5"/>
-                <path d="M70,140 C90,130 105,135 110,140" class="leaf-spine" stroke-width="1.5"/>
-                <path d="M100,105 C120,95 130,100 135,105" class="leaf-spine" stroke-width="1.5"/>
+                <path d="M0,220 C20,150 70,80 150,50 C130,100 100,160 0,220 Z" class="leaf-primary" />
+                <path d="M0,220 C45,170 85,120 150,50" class="leaf-spine" stroke-width="2" />
+                <path d="M40,175 C55,160 70,165 75,170" class="leaf-spine" stroke-width="1.5" />
+                <path d="M70,140 C90,130 105,135 110,140" class="leaf-spine" stroke-width="1.5" />
+                <path d="M100,105 C120,95 130,100 135,105" class="leaf-spine" stroke-width="1.5" />
                 <!-- Leaf 2 (upright) -->
-                <path d="M0,220 C10,140 25,60 70,10 C75,70 50,150 0,220 Z" class="leaf-secondary"/>
-                <path d="M0,220 C20,155 35,95 70,10" class="leaf-spine-sec" stroke-width="2"/>
+                <path d="M0,220 C10,140 25,60 70,10 C75,70 50,150 0,220 Z" class="leaf-secondary" />
+                <path d="M0,220 C20,155 35,95 70,10" class="leaf-spine-sec" stroke-width="2" />
                 <!-- Leaf 3 (broad right) -->
-                <path d="M0,220 C60,190 130,170 210,170 C160,200 90,215 0,220 Z" class="leaf-tertiary"/>
-                <path d="M0,220 C75,195 140,185 210,170" class="leaf-spine" stroke-width="2"/>
+                <path d="M0,220 C60,190 130,170 210,170 C160,200 90,215 0,220 Z" class="leaf-tertiary" />
+                <path d="M0,220 C75,195 140,185 210,170" class="leaf-spine" stroke-width="2" />
                 <!-- Leaf 4 (accent) -->
-                <path d="M0,220 C40,160 90,130 140,130 C100,170 60,200 0,220 Z" class="leaf-accent"/>
+                <path d="M0,220 C40,160 90,130 140,130 C100,170 60,200 0,220 Z" class="leaf-accent" />
             </svg>
         </div>
 
@@ -126,10 +134,12 @@
                 </div>
 
                 <div class="login-illustration-frame">
-                    <img src="assets/warehouse_illustration.jpg" alt="Smart Inventory Warehouse Operations with Manager and Stock Shelving" class="login-warehouse-img">
+                    <img src="assets/warehouse_illustration.jpg"
+                        alt="Smart Inventory Warehouse Operations with Manager and Stock Shelving"
+                        class="login-warehouse-img">
                     <div class="illustration-blend-curve" aria-hidden="true">
                         <svg viewBox="0 0 500 90" fill="none" preserveAspectRatio="none">
-                            <path d="M0,90 C120,40 320,60 500,20 L500,90 L0,90 Z" class="blend-fill"/>
+                            <path d="M0,90 C120,40 320,60 500,20 L500,90 L0,90 Z" class="blend-fill" />
                         </svg>
                     </div>
                 </div>
@@ -141,7 +151,8 @@
                     <div class="login-card-header">
                         <div class="login-card-logo">SI</div>
                         <h2 class="login-card-title">Smart Inventory</h2>
-                        <p class="login-card-subtitle">Sign in to manage your inventory and keep your business running smoothly.</p>
+                        <p class="login-card-subtitle">Sign in to manage your inventory and keep your business running
+                            smoothly.</p>
                     </div>
 
                     <form id="login-form" class="login-form">
@@ -149,7 +160,8 @@
                             <label for="username" class="login-field-label">Username</label>
                             <div class="login-input-box">
                                 <i class='bx bx-user login-icon-left'></i>
-                                <input type="text" id="username" name="username" required placeholder="owner" autocomplete="username">
+                                <input type="text" id="username" name="username" required placeholder="username"
+                                    autocomplete="username">
                             </div>
                         </div>
 
@@ -157,8 +169,10 @@
                             <label for="password" class="login-field-label">Password</label>
                             <div class="login-input-box">
                                 <i class='bx bx-lock-alt login-icon-left'></i>
-                                <input type="password" id="password" name="password" required placeholder="••••••••••••" autocomplete="current-password">
-                                <i class='bx bx-show login-icon-toggle' id="toggle-password" title="Toggle password visibility"></i>
+                                <input type="password" id="password" name="password" required placeholder="••••••••••••"
+                                    autocomplete="current-password">
+                                <i class='bx bx-show login-icon-toggle' id="toggle-password"
+                                    title="Toggle password visibility"></i>
                             </div>
                         </div>
 
@@ -258,18 +272,23 @@
                     <i class='bx bx-menu'></i>
                 </button>
 
-                <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar collapse" title="Toggle sidebar">
+                <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar collapse"
+                    title="Toggle sidebar">
                     <i class='bx bx-menu-alt-left'></i>
                 </button>
 
                 <div class="global-search" id="globalSearchContainer">
                     <i class='bx bx-search'></i>
-                    <input type="text" id="globalSearch" placeholder="Search anything..." autocomplete="off" aria-label="Search SIMS modules and records" aria-expanded="false" aria-controls="globalSearchResults">
-                    <button type="button" class="search-clear-btn" id="globalSearchClear" title="Clear search" aria-label="Clear search" style="display: none;">
+                    <input type="text" id="globalSearch" placeholder="Search anything..." autocomplete="off"
+                        aria-label="Search SIMS modules and records" aria-expanded="false"
+                        aria-controls="globalSearchResults">
+                    <button type="button" class="search-clear-btn" id="globalSearchClear" title="Clear search"
+                        aria-label="Clear search" style="display: none;">
                         <i class='bx bx-x'></i>
                     </button>
                     <kbd id="globalSearchKbd">Ctrl K</kbd>
-                    <div class="global-search-results" id="globalSearchResults" style="display: none;" role="listbox" aria-label="Search results"></div>
+                    <div class="global-search-results" id="globalSearchResults" style="display: none;" role="listbox"
+                        aria-label="Search results"></div>
                 </div>
 
                 <div class="top-actions">
@@ -278,17 +297,20 @@
                     </button>
 
                     <div class="notification-dropdown-wrapper" id="notificationDropdownWrapper">
-                        <button class="top-action notification-button" id="notificationButton" title="Notifications" aria-label="Notifications" aria-expanded="false" aria-haspopup="true">
+                        <button class="top-action notification-button" id="notificationButton" title="Notifications"
+                            aria-label="Notifications" aria-expanded="false" aria-haspopup="true">
                             <i class='bx bx-bell'></i>
                             <span class="notification-dot" style="display: none;" id="notification-badge">0</span>
                         </button>
-                        <div class="notification-dropdown" id="notificationDropdown" style="display: none;" role="region" aria-label="Notifications preview">
+                        <div class="notification-dropdown" id="notificationDropdown" style="display: none;"
+                            role="region" aria-label="Notifications preview">
                             <!-- Populated dynamically via App.notifications -->
                         </div>
                     </div>
 
                     <div class="top-profile-wrapper" id="topProfileWrapper">
-                        <button type="button" class="top-profile-btn" id="topProfileBtn" aria-label="User account menu" aria-haspopup="true" aria-expanded="false" aria-controls="profileDropdown">
+                        <button type="button" class="top-profile-btn" id="topProfileBtn" aria-label="User account menu"
+                            aria-haspopup="true" aria-expanded="false" aria-controls="profileDropdown">
                             <div class="top-avatar"><i class='bx bx-user'></i></div>
                             <div class="top-profile-text">
                                 <strong id="topbar-display-name">User</strong>
@@ -297,7 +319,8 @@
                             <i class='bx bx-chevron-down' id="topProfileChevron"></i>
                         </button>
 
-                        <div class="profile-dropdown" id="profileDropdown" style="display: none;" role="menu" aria-label="User profile options">
+                        <div class="profile-dropdown" id="profileDropdown" style="display: none;" role="menu"
+                            aria-label="User profile options">
                             <div class="profile-dropdown-header">
                                 <div class="profile-dropdown-avatar"><i class='bx bx-user'></i></div>
                                 <div class="profile-dropdown-info">
@@ -306,17 +329,20 @@
                                 </div>
                             </div>
                             <div class="profile-dropdown-body">
-                                <button type="button" class="profile-dropdown-item" id="change-password-btn" role="menuitem">
+                                <button type="button" class="profile-dropdown-item" id="change-password-btn"
+                                    role="menuitem">
                                     <i class='bx bx-key'></i>
                                     <span>Change Password</span>
                                 </button>
-                                <button type="button" class="profile-dropdown-item" id="profileThemeToggle" role="menuitem" title="Toggle theme" aria-label="Toggle theme">
+                                <button type="button" class="profile-dropdown-item" id="profileThemeToggle"
+                                    role="menuitem" title="Toggle theme" aria-label="Toggle theme">
                                     <i class='bx bx-moon'></i>
                                     <span id="profile-theme-text">Dark Mode</span>
                                 </button>
                             </div>
                             <div class="profile-dropdown-footer">
-                                <button type="button" class="profile-dropdown-item logout-item" id="profile-logout-btn" role="menuitem">
+                                <button type="button" class="profile-dropdown-item logout-item" id="profile-logout-btn"
+                                    role="menuitem">
                                     <i class='bx bx-log-out'></i>
                                     <span>Sign out</span>
                                 </button>
@@ -341,7 +367,8 @@
     <script src="js/api/api.js?v=30"></script>
     <script src="js/auth/auth.js?v=9"></script>
     <script src="js/components/modal.js?v=23"></script>
-    
+    <script src="js/components/pagination.js?v=1"></script>
+
     <!-- Core App Logic -->
     <script src="js/app.js?v=25"></script>
 
@@ -355,7 +382,7 @@
     <script src="js/pages/audit-logs.js?v=3"></script>
     <script src="js/pages/backups.js?v=9"></script>
     <script src="js/pages/system-status.js?v=1"></script>
-    
+
     <!-- Active Catalog, Inventory & Procurement Scripts -->
     <script src="js/pages/products.js?v=30"></script>
     <script src="js/pages/inventory.js?v=25"></script>
@@ -363,7 +390,7 @@
     <script src="js/pages/purchase-orders.js?v=70"></script>
     <script src="js/pages/quotations.js?v=70"></script>
     <script src="js/pages/shipments.js?v=26"></script>
-    
+
     <!-- Skeleton Page Scripts -->
     <script src="js/pages/stock-transactions.js?v=10"></script>
     <script src="js/pages/stock-requests.js?v=26"></script>
@@ -371,4 +398,5 @@
     <script src="js/pages/supplier-invoices.js?v=1"></script>
 
 </body>
+
 </html>

@@ -60,7 +60,7 @@ def list_payments():
     date_to = request.args.get("date_to") or request.args.get("end_date")
     search = request.args.get("search")
     page = request.args.get("page", 1)
-    limit = request.args.get("limit", 50)
+    limit = request.args.get("page_size") or request.args.get("limit", 50)
 
     result, error, status_code = get_payments(
         user_id=user_id,

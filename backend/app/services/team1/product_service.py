@@ -53,7 +53,10 @@ def get_products(search=None, category_id=None, status=None, page=None, page_siz
         }
         order_col = sort_map.get((sort_by or "").lower(), "p.product_id")
         order_dir = "DESC" if str(sort_order).upper() == "DESC" else "ASC"
-        order_clause = f" ORDER BY {order_col} {order_dir}"
+        if order_col != "p.product_id":
+            order_clause = f" ORDER BY {order_col} {order_dir}, p.product_id ASC"
+        else:
+            order_clause = f" ORDER BY {order_col} {order_dir}"
 
         query = f'''
             SELECT

@@ -1,0 +1,52 @@
+[
+  {
+    "entity": "Purchase Orders",
+    "unpag_size": 52720,
+    "pag_size": 9834,
+    "size_reduction_pct": 81.3,
+    "unpag_records": 110,
+    "pag_records": 20,
+    "unpag_median_ms": 875.92,
+    "pag_median_ms": 868.15
+  },
+  {
+    "entity": "Shipments",
+    "unpag_size": 55385,
+    "pag_size": 18933,
+    "size_reduction_pct": 65.8,
+    "unpag_records": 59,
+    "pag_records": 20,
+    "unpag_median_ms": 991.78,
+    "pag_median_ms": 881.27
+  },
+  {
+    "entity": "Inventory",
+    "unpag_size": 4180,
+    "pag_size": 4180,
+    "size_reduction_pct": 0.0,
+    "unpag_records": 13,
+    "pag_records": 13,
+    "unpag_median_ms": 859.76,
+    "pag_median_ms": 877.53
+  },
+  {
+    "entity": "Stock Requests",
+    "unpag_size": 5477,
+    "pag_size": 5480,
+    "size_reduction_pct": -0.1,
+    "unpag_records": 7,
+    "pag_records": 7,
+    "unpag_median_ms": 1115.76,
+    "pag_median_ms": 986.27
+  },
+  {
+    "entity": "Notifications",
+    "unpag_size": 33966,
+    "pag_size": 6017,
+    "size_reduction_pct": 82.3,
+    "unpag_records": 105,
+    "pag_records": 20,
+    "unpag_median_ms": 998.31,
+    "pag_median_ms": 762.04
+  }
+]

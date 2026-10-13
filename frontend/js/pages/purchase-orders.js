@@ -4,6 +4,13 @@ App.pages['purchase-orders'] = {
     currentOrders: [],
     availableSuppliers: [],
     availableProducts: [],
+    page: 1,
+    pageSize: 20,
+    total: 0,
+    totalPages: 1,
+    search: '',
+    status: '',
+    requestId: 0,
 
     render() {
         const container = document.createElement('div');
@@ -126,12 +133,16 @@ App.pages['purchase-orders'] = {
                     </tbody>
                 </table>
             </div>
+            <div id="po-pagination-container"></div>
         `;
 
         return container;
     },
 
     async init() {
+        this.page = 1;
+        this.search = '';
+        this.status = '';
         this.loadPurchaseOrders();
 
         const searchInput = document.getElementById('po-search');
@@ -140,7 +151,9 @@ App.pages['purchase-orders'] = {
             searchInput.addEventListener('input', (e) => {
                 clearTimeout(timeout);
                 timeout = setTimeout(() => {
-                    this.loadPurchaseOrders(e.target.value, document.getElementById('po-status-filter')?.value);
+                    this.page = 1;
+                    this.search = e.target.value;
+                    this.loadPurchaseOrders();
                 }, 300);
             });
         }
@@ -148,14 +161,16 @@ App.pages['purchase-orders'] = {
         const filterSelect = document.getElementById('po-status-filter');
         if (filterSelect) {
             filterSelect.addEventListener('change', (e) => {
-                this.loadPurchaseOrders(document.getElementById('po-search')?.value, e.target.value);
+                this.page = 1;
+                this.status = e.target.value;
+                this.loadPurchaseOrders();
             });
         }
 
         const refreshBtn = document.getElementById('btn-refresh-pos');
         if (refreshBtn) {
             refreshBtn.addEventListener('click', () => {
-                this.loadPurchaseOrders(document.getElementById('po-search')?.value, document.getElementById('po-status-filter')?.value);
+                this.loadPurchaseOrders();
             });
         }
 
@@ -167,18 +182,37 @@ App.pages['purchase-orders'] = {
         }
     },
 
-    async loadPurchaseOrders(search = '', status = '') {
+    goToPage(newPage) {
+        if (newPage < 1 || newPage > this.totalPages || newPage === this.page) return;
+        this.page = newPage;
+        this.loadPurchaseOrders();
+    },
+
+    async loadPurchaseOrders(search = null, status = null) {
+        if (search !== null) this.search = search;
+        if (status !== null) this.status = status;
+
+        const thisReq = ++this.requestId;
         const tbody = document.querySelector('#pos-table tbody');
         const countIndicator = document.getElementById('po-count-indicator');
+        const paginationContainer = document.getElementById('po-pagination-container');
+
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 32px; color: var(--text-secondary);"><i class='bx bx-loader-alt bx-spin' style='margin-right: 6px; font-size: 16px;'></i> Loading purchase orders...</td></tr>`;
+        }
 
         try {
-            let url = '/purchase-orders/?';
-            if (search) url += `search=${encodeURIComponent(search)}&`;
-            if (status) url += `status=${encodeURIComponent(status)}&`;
+            let url = `/purchase-orders/?page=${this.page}&page_size=${this.pageSize}`;
+            if (this.search) url += `&search=${encodeURIComponent(this.search)}`;
+            if (this.status) url += `&status=${encodeURIComponent(this.status)}`;
 
             const data = await Api.get(url);
+            if (thisReq !== this.requestId) return; // Discard stale response
+
             const orders = data.purchase_orders || [];
             this.currentOrders = orders;
+            this.total = data.total !== undefined ? data.total : (data.stats ? data.stats.total_orders : orders.length);
+            this.totalPages = data.total_pages || Math.max(1, Math.ceil(this.total / this.pageSize));
 
             // Update stats
             if (data.stats) {
@@ -194,76 +228,97 @@ App.pages['purchase-orders'] = {
             }
 
             if (countIndicator) {
-                countIndicator.textContent = `Showing ${orders.length} order${orders.length === 1 ? '' : 's'}`;
+                const start = this.total > 0 ? (this.page - 1) * this.pageSize + 1 : 0;
+                const end = Math.min(this.page * this.pageSize, this.total);
+                countIndicator.textContent = this.total > 0 ? `Showing ${start}–${end} of ${this.total} orders` : 'No orders';
             }
 
             if (orders.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="8" style="text-align: center; padding: 40px 16px;">
-                            ${Utils.emptyState('bx-receipt', 'No Purchase Orders Found', search || status ? 'No orders match your filter criteria.' : 'No purchase orders have been placed yet.')}
-                        </td>
-                    </tr>
-                `;
+                if (tbody) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="8" style="text-align: center; padding: 40px 16px;">
+                                ${Utils.emptyState('bx-receipt', 'No Purchase Orders Found', this.search || this.status ? 'No orders match your filter criteria.' : 'No purchase orders have been placed yet.')}
+                            </td>
+                        </tr>
+                    `;
+                }
+                if (paginationContainer) paginationContainer.innerHTML = '';
                 return;
             }
 
             const user = Auth.getUser();
             const isSupplier = user && user.role === 'Supplier';
 
-            tbody.innerHTML = orders.map(po => {
-                let badgeClass = 'status-pending';
-                if (po.status === 'Accepted' || po.status === 'Delivered') badgeClass = 'status-active';
-                else if (po.status === 'Rejected') badgeClass = 'status-inactive';
+            if (tbody) {
+                tbody.innerHTML = orders.map(po => {
+                    let badgeClass = 'status-pending';
+                    if (po.status === 'Accepted' || po.status === 'Delivered') badgeClass = 'status-active';
+                    else if (po.status === 'Rejected') badgeClass = 'status-inactive';
 
-                const formattedDelivery = po.expected_delivery || 'Not specified';
-                const formattedDate = po.order_date || 'N/A';
-                const canRespond = isSupplier && (po.status === 'Pending' || po.supplier_response === 'Pending');
+                    const formattedDelivery = po.expected_delivery || 'Not specified';
+                    const formattedDate = po.order_date || 'N/A';
+                    const canRespond = isSupplier && (po.status === 'Pending' || po.supplier_response === 'Pending');
 
-                return `
-                    <tr>
-                        <td>
-                            <strong style="color: var(--primary); font-family: monospace; font-size: 14px;">${po.po_number || `#${po.purchase_order_id}`}</strong>
-                        </td>
-                        <td>
-                            <div style="font-weight: 600; color: var(--text);">${Utils.escapeHtml(po.supplier_name)}</div>
-                            <div style="font-size: 11px; color: var(--text-secondary);">${Utils.escapeHtml(po.contact_person || '')}</div>
-                        </td>
-                        <td style="font-size: 13px;">${formattedDate}</td>
-                        <td style="font-size: 13px; color: var(--text-secondary);">${formattedDelivery}</td>
-                        <td>
-                            <span class="badge" style="background: #f1f5f9; color: #334155; font-weight: 600;">
-                                ${po.total_items || 0} Items
-                            </span>
-                        </td>
-                        <td><strong style="font-size: 14px;">₹${(po.total_amount || 0).toFixed(2)}</strong></td>
-                        <td>
-                            <span class="status-badge ${badgeClass}">
-                                ${po.status}
-                            </span>
-                        </td>
-                        <td style="text-align: right;">
-                            <div class="action-buttons" style="justify-content: flex-end;">
-                                <button class="btn-icon text-primary" onclick="App.pages['purchase-orders'].viewPODetails(${po.purchase_order_id})" title="View Details">
-                                    <i class='bx bx-show'></i>
-                                </button>
-                                ${canRespond ? `
-                                    <button class="btn-icon text-success" style="color: #059669;" onclick="App.pages['purchase-orders'].respondPO(${po.purchase_order_id}, 'Accepted')" title="Accept Order">
-                                        <i class='bx bx-check-circle'></i>
+                    return `
+                        <tr>
+                            <td>
+                                <strong style="color: var(--primary); font-family: monospace; font-size: 14px;">${po.po_number || `#${po.purchase_order_id}`}</strong>
+                            </td>
+                            <td>
+                                <div style="font-weight: 600; color: var(--text);">${Utils.escapeHtml(po.supplier_name)}</div>
+                                <div style="font-size: 11px; color: var(--text-secondary);">${Utils.escapeHtml(po.contact_person || '')}</div>
+                            </td>
+                            <td style="font-size: 13px;">${formattedDate}</td>
+                            <td style="font-size: 13px; color: var(--text-secondary);">${formattedDelivery}</td>
+                            <td>
+                                <span class="badge" style="background: #f1f5f9; color: #334155; font-weight: 600;">
+                                    ${po.total_items || 0} Items
+                                </span>
+                            </td>
+                            <td><strong style="font-size: 14px;">₹${(po.total_amount || 0).toFixed(2)}</strong></td>
+                            <td>
+                                <span class="status-badge ${badgeClass}">
+                                    ${po.status}
+                                </span>
+                            </td>
+                            <td style="text-align: right;">
+                                <div class="action-buttons" style="justify-content: flex-end;">
+                                    <button class="btn-icon text-primary" onclick="App.pages['purchase-orders'].viewPODetails(${po.purchase_order_id})" title="View Details">
+                                        <i class='bx bx-show'></i>
                                     </button>
-                                    <button class="btn-icon text-danger" onclick="App.pages['purchase-orders'].promptRejectPO(${po.purchase_order_id})" title="Reject Order">
-                                        <i class='bx bx-x-circle'></i>
-                                    </button>
-                                ` : ''}
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
+                                    ${canRespond ? `
+                                        <button class="btn-icon text-success" style="color: #059669;" onclick="App.pages['purchase-orders'].respondPO(${po.purchase_order_id}, 'Accepted')" title="Accept Order">
+                                            <i class='bx bx-check-circle'></i>
+                                        </button>
+                                        <button class="btn-icon text-danger" onclick="App.pages['purchase-orders'].promptRejectPO(${po.purchase_order_id})" title="Reject Order">
+                                            <i class='bx bx-x-circle'></i>
+                                        </button>
+                                    ` : ''}
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            // Render pagination controls
+            if (paginationContainer && window.PaginationComponent) {
+                paginationContainer.innerHTML = PaginationComponent.render({
+                    total: this.total,
+                    page: this.page,
+                    pageSize: this.pageSize,
+                    totalPages: this.totalPages,
+                    label: 'orders',
+                    onPageChangeName: "App.pages['purchase-orders'].goToPage"
+                });
+            }
 
         } catch (error) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-danger" style="text-align: center; padding: 24px;">Failed to load purchase orders: ${error.message}</td></tr>`;
+            if (thisReq !== this.requestId) return;
+            if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-danger" style="text-align: center; padding: 24px;">Failed to load purchase orders: ${error.message}</td></tr>`;
             if (countIndicator) countIndicator.textContent = 'Error loading orders';
+            if (paginationContainer) paginationContainer.innerHTML = '';
         }
     },
 

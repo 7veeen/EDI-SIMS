@@ -3,6 +3,13 @@
 App.pages['shipments'] = {
     currentShipments: [],
     eligiblePOs: [],
+    page: 1,
+    pageSize: 20,
+    total: 0,
+    totalPages: 1,
+    search: '',
+    status: '',
+    requestId: 0,
 
     render() {
         const container = document.createElement('div');
@@ -133,6 +140,7 @@ App.pages['shipments'] = {
                     </tbody>
                 </table>
             </div>
+            <div id="shipments-pagination-container"></div>
         `;
 
         setTimeout(() => this.init(container), 0);
@@ -140,6 +148,10 @@ App.pages['shipments'] = {
     },
 
     async init(container) {
+        this.page = 1;
+        this.search = '';
+        this.status = '';
+
         container = container || document.getElementById('content-area') || document;
         const refreshBtn = container.querySelector('#btn-refresh-shipments');
         if (refreshBtn) refreshBtn.addEventListener('click', () => this.loadShipments());
@@ -149,13 +161,21 @@ App.pages['shipments'] = {
             let debounceTimer;
             searchInput.addEventListener('input', (e) => {
                 clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(() => this.loadShipments(e.target.value), 300);
+                debounceTimer = setTimeout(() => {
+                    this.page = 1;
+                    this.search = e.target.value;
+                    this.loadShipments();
+                }, 300);
             });
         }
 
         const statusFilter = container.querySelector('#ship-status-filter');
         if (statusFilter) {
-            statusFilter.addEventListener('change', (e) => this.loadShipments(searchInput ? searchInput.value : '', e.target.value));
+            statusFilter.addEventListener('change', (e) => {
+                this.page = 1;
+                this.status = e.target.value;
+                this.loadShipments();
+            });
         }
 
         const createBtn = container.querySelector('#btn-create-shipment');
@@ -166,29 +186,70 @@ App.pages['shipments'] = {
         await this.loadShipments();
     },
 
-    async loadShipments(searchTerm = '', statusFilterVal = '') {
+    goToPage(newPage) {
+        if (newPage < 1 || newPage > this.totalPages || newPage === this.page) return;
+        this.page = newPage;
+        this.loadShipments();
+    },
+
+    async loadShipments(searchTerm = null, statusFilterVal = null) {
+        if (searchTerm !== null) this.search = searchTerm;
+        if (statusFilterVal !== null) this.status = statusFilterVal;
+
+        const thisReq = ++this.requestId;
+        const tbody = document.getElementById('shipments-tbody');
+        const countBadge = document.getElementById('ship-count-badge');
+        const paginationContainer = document.getElementById('shipments-pagination-container');
+
+        if (tbody) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="9" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                        <i class='bx bx-loader-alt bx-spin' style="font-size: 24px; margin-bottom: 8px;"></i>
+                        <div>Loading shipments...</div>
+                    </td>
+                </tr>
+            `;
+        }
+
         try {
-            let url = '/shipments/';
-            const params = new URLSearchParams();
-            if (searchTerm && searchTerm.trim()) params.append('search', searchTerm.trim());
-            if (statusFilterVal && statusFilterVal.trim()) params.append('status', statusFilterVal.trim());
-            if (params.toString()) url += `?${params.toString()}`;
+            let url = `/shipments/?page=${this.page}&page_size=${this.pageSize}`;
+            if (this.search && this.search.trim()) url += `&search=${encodeURIComponent(this.search.trim())}`;
+            if (this.status && this.status.trim()) url += `&status=${encodeURIComponent(this.status.trim())}`;
 
             const response = await Api.get(url);
+            if (thisReq !== this.requestId) return; // Discard stale response
+
             const shipments = response.shipments || [];
             const stats = response.stats || {};
 
             this.currentShipments = shipments;
+            this.total = response.total !== undefined ? response.total : (stats.total_shipments || shipments.length);
+            this.totalPages = response.total_pages || Math.max(1, Math.ceil(this.total / this.pageSize));
+
             this.updateStats(stats);
             this.renderTable(shipments);
 
-            const countBadge = document.getElementById('ship-count-badge');
             if (countBadge) {
-                countBadge.textContent = `${shipments.length} shipment${shipments.length === 1 ? '' : 's'}`;
+                const start = this.total > 0 ? (this.page - 1) * this.pageSize + 1 : 0;
+                const end = Math.min(this.page * this.pageSize, this.total);
+                countBadge.textContent = this.total > 0 ? `Showing ${start}–${end} of ${this.total} shipments` : 'No shipments';
+            }
+
+            // Render pagination controls
+            if (paginationContainer && window.PaginationComponent) {
+                paginationContainer.innerHTML = PaginationComponent.render({
+                    total: this.total,
+                    page: this.page,
+                    pageSize: this.pageSize,
+                    totalPages: this.totalPages,
+                    label: 'shipments',
+                    onPageChangeName: "App.pages['shipments'].goToPage"
+                });
             }
         } catch (error) {
+            if (thisReq !== this.requestId) return;
             console.error('Failed to load shipments:', error);
-            const tbody = document.getElementById('shipments-tbody');
             if (tbody) {
                 tbody.innerHTML = `
                     <tr>
@@ -199,6 +260,7 @@ App.pages['shipments'] = {
                     </tr>
                 `;
             }
+            if (paginationContainer) paginationContainer.innerHTML = '';
         }
     },
 

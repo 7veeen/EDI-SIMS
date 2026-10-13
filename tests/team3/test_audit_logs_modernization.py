@@ -381,25 +381,26 @@ class AuditLogsModernizationTestCase(unittest.TestCase):
         mock_conn, mock_cursor = self._create_mock_conn()
         mock_get_conn.return_value = mock_conn
 
-        # Mock sequence of fetchall and fetchone for get_owner_dashboard
-        mock_cursor.fetchall.side_effect = [
-            [], # 1. Users breakdown
-            [], # 5. PurchaseOrders breakdown
-            [], # 7. Recent purchase orders
-            [], # 11A. Pending quotations
-            [], # 11B. Low stock products
-            [], # 11C. Pending purchase orders
-            [(1, "STOCK_IN", "demo_owner", datetime.now(), "StockTransactions", 101, "127.0.0.1")] # 12. Recent audit logs
-        ]
-        mock_cursor.fetchone.side_effect = [
-            (5,), # 2. Total suppliers
-            (10, 50, 1000.0, 2, 0), # 3. Inventory health
-            (10, 5, 15), # 4. Stock movement throughput
-            (1,), # 6. Pending quotations count
-            (1, 1, 1, 3), # 8. Shipments
-            None, # 9. Latest backup
-            (1, "Database", "Healthy", 100, "OK", datetime.now()) # 10. System health
-        ]
+        # Mock consolidated 2-query sequence for get_owner_dashboard
+        mock_m_row = (
+            [], # 1. users_breakdown
+            5,  # 2. total_suppliers
+            {"total_products": 10, "total_units": 50, "total_inventory_value": 1000.0, "low_stock_count": 2, "out_of_stock_count": 0}, # 3. inventory_health
+            {"received_units": 10, "issued_units": 5, "total_transactions": 15}, # 4. stock_tx_health
+            [], # 5. po_breakdown
+            1,  # 6. pending_quotations_count
+            {"ready": 1, "in_transit": 1, "delivered": 1, "total": 3}, # 7. shipment_stats
+            None, # 8. latest_backup
+            {"status_id": 1, "module_name": "Database", "status": "Healthy", "progress": 100, "message": "OK", "updated_at": "2026-10-12T10:00:00"} # 9. system_status
+        )
+        mock_l_row = (
+            [], # 1. recent_orders
+            [], # 2. attention_quotations
+            [], # 3. attention_low_stock
+            [], # 4. attention_pending_pos
+            [{"log_id": 1, "action": "STOCK_IN", "username": "demo_owner", "action_time": "2026-10-12T10:00:00", "table_name": "StockTransactions", "record_id": 101, "ip_address": "127.0.0.1"}] # 5. recent_audits
+        )
+        mock_cursor.fetchone.side_effect = [mock_m_row, mock_l_row]
 
         stats = get_owner_dashboard()
         self.assertIn("recent_audits", stats)

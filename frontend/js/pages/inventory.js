@@ -2,6 +2,13 @@
 
 App.pages['inventory'] = {
     currentInventory: [],
+    page: 1,
+    pageSize: 20,
+    total: 0,
+    totalPages: 1,
+    search: '',
+    status: '',
+    requestId: 0,
 
     render() {
         const container = document.createElement('div');
@@ -91,7 +98,7 @@ App.pages['inventory'] = {
             </div>
             
             <!-- Inventory Table -->
-            <div class="card table-responsive" style="margin-top: 20px;">
+            <div class="card table-responsive" style="margin-top: 20px; overflow: hidden;">
                 <table class="table" id="inventory-table">
                     <thead>
                         <tr>
@@ -109,12 +116,16 @@ App.pages['inventory'] = {
                         <tr><td colspan="8" style="text-align: center; padding: 24px; color: var(--text-secondary);">Loading inventory...</td></tr>
                     </tbody>
                 </table>
+                <div id="inventory-pagination-container"></div>
             </div>
         `;
         return container;
     },
 
     async init() {
+        this.page = 1;
+        this.search = '';
+        this.status = '';
         this.loadInventory();
 
         const searchInput = document.getElementById('inventory-search');
@@ -123,7 +134,9 @@ App.pages['inventory'] = {
             searchInput.addEventListener('input', (e) => {
                 clearTimeout(timeout);
                 timeout = setTimeout(() => {
-                    this.loadInventory(e.target.value, document.getElementById('inventory-status-filter')?.value);
+                    this.page = 1;
+                    this.search = e.target.value;
+                    this.loadInventory();
                 }, 300);
             });
         }
@@ -131,14 +144,16 @@ App.pages['inventory'] = {
         const filterSelect = document.getElementById('inventory-status-filter');
         if (filterSelect) {
             filterSelect.addEventListener('change', (e) => {
-                this.loadInventory(document.getElementById('inventory-search')?.value, e.target.value);
+                this.page = 1;
+                this.status = e.target.value;
+                this.loadInventory();
             });
         }
 
         const refreshBtn = document.getElementById('btn-refresh-inventory');
         if (refreshBtn) {
             refreshBtn.addEventListener('click', () => {
-                this.loadInventory(document.getElementById('inventory-search')?.value, document.getElementById('inventory-status-filter')?.value);
+                this.loadInventory();
             });
         }
 
@@ -164,27 +179,54 @@ App.pages['inventory'] = {
         }
     },
 
-    async loadInventory(search = '', status = '') {
+    goToPage(newPage) {
+        if (newPage < 1 || newPage > this.totalPages || newPage === this.page) return;
+        this.page = newPage;
+        this.loadInventory();
+    },
+
+    async loadInventory(search = null, status = null) {
+        if (search !== null) this.search = search;
+        if (status !== null) this.status = status;
+
+        const thisReq = ++this.requestId;
         const tbody = document.querySelector('#inventory-table tbody');
+        const paginationContainer = document.getElementById('inventory-pagination-container');
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 24px; color: var(--text-secondary);"><i class='bx bx-loader-alt bx-spin' style='margin-right: 6px; font-size: 16px;'></i> Loading inventory...</td></tr>`;
+        }
+
         try {
-            let url = '/inventory/?';
-            if (search) url += `search=${encodeURIComponent(search)}&`;
-            if (status) url += `status=${encodeURIComponent(status)}&`;
+            let url = `/inventory/?page=${this.page}&page_size=${this.pageSize}`;
+            if (this.search) url += `&search=${encodeURIComponent(this.search)}`;
+            if (this.status) url += `&status=${encodeURIComponent(this.status)}`;
 
             const data = await Api.get(url);
+            if (thisReq !== this.requestId) return; // Discard stale response
+
             const items = data.inventory || [];
             this.currentInventory = items;
+            this.total = data.total !== undefined ? data.total : (data.stats ? data.stats.total_items : items.length);
+            this.totalPages = data.total_pages || Math.max(1, Math.ceil(this.total / this.pageSize));
 
             // Update stats
             if (data.stats) {
-                document.getElementById('stat-total-items').textContent = data.stats.total_items ?? 0;
-                document.getElementById('stat-in-stock').textContent = data.stats.in_stock ?? 0;
-                document.getElementById('stat-low-stock').textContent = data.stats.low_stock ?? 0;
-                document.getElementById('stat-total-units').textContent = data.stats.total_quantity ?? 0;
+                const s = data.stats;
+                const totEl = document.getElementById('stat-total-items');
+                if (totEl) totEl.textContent = s.total_items ?? 0;
+                const inEl = document.getElementById('stat-in-stock');
+                if (inEl) inEl.textContent = s.in_stock ?? 0;
+                const lowEl = document.getElementById('stat-low-stock');
+                if (lowEl) lowEl.textContent = s.low_stock ?? 0;
+                const unitsEl = document.getElementById('stat-total-units');
+                if (unitsEl) unitsEl.textContent = s.total_quantity ?? 0;
             }
 
             if (items.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 24px; color: var(--text-secondary);">No inventory items found matching criteria.</td></tr>`;
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 28px; color: var(--text-secondary);">${Utils.emptyState('bx-package', 'No Inventory Items', 'No inventory items match your current filter or search criteria.')}</td></tr>`;
+                }
+                if (paginationContainer) paginationContainer.innerHTML = '';
                 return;
             }
 
@@ -192,52 +234,72 @@ App.pages['inventory'] = {
             const canStockOut = user && ['Owner', 'Manager', 'Employee'].includes(user.role);
             const canAdjust = user && ['Owner', 'Manager'].includes(user.role);
 
-            tbody.innerHTML = items.map(item => {
-                let badgeClass = 'status-active';
-                if (item.stock_status === 'Low Stock') badgeClass = 'status-pending';
-                if (item.stock_status === 'Out of Stock') badgeClass = 'status-inactive';
+            if (tbody) {
+                tbody.innerHTML = items.map(item => {
+                    let badgeClass = 'status-active';
+                    if (item.stock_status === 'Low Stock') badgeClass = 'status-pending';
+                    if (item.stock_status === 'Out of Stock') badgeClass = 'status-inactive';
 
-                const formattedDate = item.last_updated ? new Date(item.last_updated).toLocaleString() : 'N/A';
+                    const formattedDate = item.last_updated ? new Date(item.last_updated).toLocaleString() : 'N/A';
 
-                return `
-                    <tr>
-                        <td><strong>${Utils.escapeHtml(item.sku)}</strong></td>
-                        <td>${Utils.escapeHtml(item.product_name)}</td>
-                        <td><span class="badge" style="background: #e0e0e0; color: #333;">${Utils.escapeHtml(item.category_name || 'N/A')}</span></td>
-                        <td><strong style="font-size: 15px; color: ${item.quantity_available <= item.reorder_level ? 'var(--red)' : 'var(--text)'};">${item.quantity_available}</strong></td>
-                        <td>${item.reorder_level}</td>
-                        <td>
-                            <span class="status-badge ${badgeClass}">
-                                ${item.stock_status}
-                            </span>
-                        </td>
-                        <td style="font-size: 12px; color: var(--text-secondary);">${formattedDate}</td>
-                        <td style="text-align: center;">
-                            <div style="display: inline-flex; gap: 6px; align-items: center; justify-content: center;">
-                                ${canStockOut ? `
-                                    <button class="btn-icon" onclick="App.pages['inventory'].showStockOutModal(${item.product_id})" title="Stock-Out / Issue Stock"
-                                            style="background: white; border: 1px solid #fed7aa; color: #ea580c; border-radius: 6px; padding: 4px 8px; cursor: pointer; font-size: 14px;">
-                                        <i class='bx bx-upload'></i>
+                    return `
+                        <tr>
+                            <td><strong>${Utils.escapeHtml(item.sku)}</strong></td>
+                            <td>${Utils.escapeHtml(item.product_name)}</td>
+                            <td><span class="badge" style="background: #e0e0e0; color: #333;">${Utils.escapeHtml(item.category_name || 'N/A')}</span></td>
+                            <td><strong style="font-size: 15px; color: ${item.quantity_available <= item.reorder_level ? 'var(--red)' : 'var(--text)'};">${item.quantity_available}</strong></td>
+                            <td>${item.reorder_level}</td>
+                            <td>
+                                <span class="status-badge ${badgeClass}">
+                                    ${item.stock_status}
+                                </span>
+                            </td>
+                            <td style="font-size: 12px; color: var(--text-secondary);">${formattedDate}</td>
+                            <td style="text-align: center;">
+                                <div style="display: inline-flex; gap: 6px; align-items: center; justify-content: center;">
+                                    ${canStockOut ? `
+                                        <button class="btn-icon" onclick="App.pages['inventory'].showStockOutModal(${item.product_id})" title="Stock-Out / Issue Stock"
+                                                style="background: white; border: 1px solid #fed7aa; color: #ea580c; border-radius: 6px; padding: 4px 8px; cursor: pointer; font-size: 14px;">
+                                            <i class='bx bx-upload'></i>
+                                        </button>
+                                    ` : ''}
+                                    <button class="btn-icon" onclick="App.pages['inventory'].showTransactionHistory(${item.product_id})" title="Transaction History"
+                                            style="background: white; border: 1px solid var(--border); color: #4b5563; border-radius: 6px; padding: 4px 8px; cursor: pointer; font-size: 14px;">
+                                        <i class='bx bx-history'></i>
                                     </button>
-                                ` : ''}
-                                <button class="btn-icon" onclick="App.pages['inventory'].showTransactionHistory(${item.product_id})" title="Transaction History"
-                                        style="background: white; border: 1px solid var(--border); color: #4b5563; border-radius: 6px; padding: 4px 8px; cursor: pointer; font-size: 14px;">
-                                    <i class='bx bx-history'></i>
-                                </button>
-                                ${canAdjust ? `
-                                    <button class="btn-icon" onclick="App.pages['inventory'].showAdjustModal(${item.inventory_id})" title="Adjust Stock"
-                                            style="background: white; border: 1px solid var(--border); color: var(--primary); border-radius: 6px; padding: 4px 8px; cursor: pointer; font-size: 14px;">
-                                        <i class='bx bx-transfer'></i>
-                                    </button>
-                                ` : ''}
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
+                                    ${canAdjust ? `
+                                        <button class="btn-icon" onclick="App.pages['inventory'].showAdjustModal(${item.inventory_id})" title="Adjust Stock"
+                                                style="background: white; border: 1px solid var(--border); color: var(--primary); border-radius: 6px; padding: 4px 8px; cursor: pointer; font-size: 14px;">
+                                            <i class='bx bx-transfer'></i>
+                                        </button>
+                                    ` : ''}
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            // Render pagination controls
+            if (paginationContainer && window.PaginationComponent) {
+                paginationContainer.innerHTML = PaginationComponent.render({
+                    total: this.total,
+                    page: this.page,
+                    pageSize: this.pageSize,
+                    totalPages: this.totalPages,
+                    label: 'items',
+                    onPageChangeName: "App.pages['inventory'].goToPage"
+                });
+            }
 
         } catch (error) {
-            tbody.innerHTML = `<tr><td colspan="8" class="text-danger" style="text-align: center;">Failed to load inventory: ${error.message}</td></tr>`;
+            if (thisReq !== this.requestId) return;
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="8" class="text-danger" style="text-align: center; padding: 24px;">Failed to load inventory: ${Utils.escapeHtml(error.message || 'Error')}</td></tr>`;
+            }
+            if (paginationContainer) paginationContainer.innerHTML = '';
+        }
+    },>`;
         }
     },
 

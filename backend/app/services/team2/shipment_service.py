@@ -34,7 +34,7 @@ def get_supplier_id_for_user(user_id):
             conn.close()
 
 
-def get_shipments(user_id=None, role=None, po_id=None, supplier_id_filter=None, status_filter=None, search=None, employee_id_filter=None):
+def get_shipments(user_id=None, role=None, po_id=None, supplier_id_filter=None, status_filter=None, search=None, employee_id_filter=None, page=None, page_size=None):
     """
     List shipments with role-based access control.
     - Supplier strictly sees only their own shipments.
@@ -56,13 +56,22 @@ def get_shipments(user_id=None, role=None, po_id=None, supplier_id_filter=None, 
             cursor.execute('SELECT supplier_id FROM "Suppliers" WHERE user_id = %s', (int(user_id),))
             s_row = cursor.fetchone()
             if not s_row:
-                return [], {
+                empty_stats = {
                     "total_shipments": 0,
                     "ready": 0,
                     "in_transit": 0,
                     "delivered": 0,
                     "delayed": 0
-                }, None
+                }
+                empty_meta = {
+                    "page": 1,
+                    "page_size": 20,
+                    "limit": 20,
+                    "total": 0,
+                    "total_count": 0,
+                    "total_pages": 1
+                }
+                return [], empty_stats, empty_meta, None
             resolved_supplier_id = s_row[0]
         elif role == 'Employee':
             # Strict assignment isolation for employees
@@ -79,7 +88,67 @@ def get_shipments(user_id=None, role=None, po_id=None, supplier_id_filter=None, 
                 except (ValueError, TypeError):
                     resolved_employee_id = None
 
-        query = """
+        base_where = " WHERE 1=1"
+        params = []
+
+        if resolved_supplier_id:
+            base_where += " AND shp.supplier_id = %s"
+            params.append(resolved_supplier_id)
+
+        if resolved_employee_id:
+            base_where += " AND shp.assigned_employee_id = %s"
+            params.append(resolved_employee_id)
+
+        if po_id:
+            try:
+                base_where += " AND shp.purchase_order_id = %s"
+                params.append(int(po_id))
+            except (ValueError, TypeError):
+                pass
+
+        if status_filter and status_filter.strip():
+            base_where += " AND shp.status ILIKE %s"
+            params.append(status_filter.strip())
+
+        if search and search.strip():
+            search_param = f"%{search.strip()}%"
+            base_where += """
+                AND (
+                    shp.shipment_number ILIKE %s
+                    OR shp.tracking_number ILIKE %s
+                    OR shp.carrier ILIKE %s
+                    OR s.supplier_name ILIKE %s
+                    OR shp.purchase_order_id::text ILIKE %s
+                )
+            """
+            params.extend([search_param, search_param, search_param, search_param, search_param])
+
+        # 1. Total count & KPI stats query across all matching shipments
+        stats_query = f"""
+            SELECT 
+                COUNT(*) as total_shipments,
+                COUNT(CASE WHEN LOWER(shp.status) IN ('ready for shipment', 'pending', 'created') THEN 1 END) as ready,
+                COUNT(CASE WHEN LOWER(shp.status) IN ('in transit', 'dispatched', 'shipped') THEN 1 END) as in_transit,
+                COUNT(CASE WHEN LOWER(shp.status) = 'delivered' THEN 1 END) as delivered,
+                COUNT(CASE WHEN LOWER(shp.status) = 'delayed' THEN 1 END) as delayed
+            FROM "Shipments" shp
+            JOIN "Suppliers" s ON shp.supplier_id = s.supplier_id
+            JOIN "PurchaseOrders" po ON shp.purchase_order_id = po.purchase_order_id
+            {base_where}
+        """
+        cursor.execute(stats_query, tuple(params))
+        s_row = cursor.fetchone()
+        total_shipments = s_row[0] or 0
+        stats = {
+            "total_shipments": total_shipments,
+            "ready": s_row[1] or 0,
+            "in_transit": s_row[2] or 0,
+            "delivered": s_row[3] or 0,
+            "delayed": s_row[4] or 0
+        }
+
+        # 2. Paginated rows query with deterministic ordering
+        data_query = f"""
             SELECT 
                 shp.shipment_id,
                 shp.shipment_number,
@@ -126,69 +195,34 @@ def get_shipments(user_id=None, role=None, po_id=None, supplier_id_filter=None, 
                 FROM "PurchaseOrderItems"
                 GROUP BY purchase_order_id
             ) poi_exp ON shp.purchase_order_id = poi_exp.purchase_order_id
-            WHERE 1=1
+            {base_where}
+            ORDER BY shp.shipment_id DESC
         """
-        params = []
+        data_params = list(params)
 
-        if resolved_supplier_id:
-            query += " AND shp.supplier_id = %s"
-            params.append(resolved_supplier_id)
-
-        if resolved_employee_id:
-            query += " AND shp.assigned_employee_id = %s"
-            params.append(resolved_employee_id)
-
-        if po_id:
+        if page is not None or page_size is not None:
             try:
-                query += " AND shp.purchase_order_id = %s"
-                params.append(int(po_id))
+                page_num = max(1, int(page or 1))
             except (ValueError, TypeError):
-                pass
+                page_num = 1
+            try:
+                ps_num = max(1, min(100, int(page_size or 20)))
+            except (ValueError, TypeError):
+                ps_num = 20
+            offset = (page_num - 1) * ps_num
+            data_query += " LIMIT %s OFFSET %s"
+            data_params.extend([ps_num, offset])
+        else:
+            page_num = 1
+            ps_num = total_shipments if total_shipments > 0 else 20
 
-        if status_filter and status_filter.strip():
-            query += " AND shp.status ILIKE %s"
-            params.append(status_filter.strip())
-
-        if search and search.strip():
-            search_param = f"%{search.strip()}%"
-            query += """
-                AND (
-                    shp.shipment_number ILIKE %s
-                    OR shp.tracking_number ILIKE %s
-                    OR shp.carrier ILIKE %s
-                    OR s.supplier_name ILIKE %s
-                    OR shp.purchase_order_id::text ILIKE %s
-                )
-            """
-            params.extend([search_param, search_param, search_param, search_param, search_param])
-
-        query += " ORDER BY shp.shipment_id DESC"
-
-        cursor.execute(query, tuple(params))
+        cursor.execute(data_query, tuple(data_params))
         rows = cursor.fetchall()
 
         shipments = []
-        stats = {
-            "total_shipments": 0,
-            "ready": 0,
-            "in_transit": 0,
-            "delivered": 0,
-            "delayed": 0
-        }
-
         for r in rows:
             st = r[11] or "Ready for Shipment"
             st_lower = st.lower()
-
-            stats["total_shipments"] += 1
-            if st_lower in ("ready for shipment", "pending", "created"):
-                stats["ready"] += 1
-            elif st_lower in ("in transit", "dispatched", "shipped"):
-                stats["in_transit"] += 1
-            elif st_lower == "delivered":
-                stats["delivered"] += 1
-            elif st_lower == "delayed":
-                stats["delayed"] += 1
 
             exp_qty = int(r[29] or 0)
             rec_qty = int(r[28] or 0)
@@ -242,7 +276,17 @@ def get_shipments(user_id=None, role=None, po_id=None, supplier_id_filter=None, 
                 "total_remaining_quantity": rem_qty
             })
 
-        return shipments, stats, None
+        total_pages = (total_shipments + ps_num - 1) // ps_num if (total_shipments > 0 and ps_num > 0) else 1
+        pagination_meta = {
+            "page": page_num,
+            "page_size": ps_num,
+            "limit": ps_num,
+            "total": total_shipments,
+            "total_count": total_shipments,
+            "total_pages": total_pages
+        }
+
+        return shipments, stats, pagination_meta, None
 
     except Exception as e:
         return None, None, f"Database error: {str(e)}"

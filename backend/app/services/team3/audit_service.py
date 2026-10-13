@@ -134,11 +134,13 @@ def log_audit_event(action, table_name, record_id=None, user_id=None, cursor=Non
                 conn.close()
 
 
-def get_all_audit_logs(limit=50, page=1, search=None, action=None, table_name=None, start_date=None, end_date=None):
+def get_all_audit_logs(limit=50, page=1, search=None, action=None, table_name=None, start_date=None, end_date=None, page_size=None):
     """
     Retrieves filtered and paginated audit logs for the owner audit logs API endpoint.
     Supports search, action, table_name, start_date, end_date, and deterministic pagination.
     """
+    if page_size is not None:
+        limit = page_size
     # 1. Validate page
     try:
         parsed_page = int(page)
@@ -277,7 +279,16 @@ def get_all_audit_logs(limit=50, page=1, search=None, action=None, table_name=No
             "total": total_count,
             "page": parsed_page,
             "limit": parsed_limit,
-            "total_pages": total_pages
+            "page_size": parsed_limit,
+            "total_pages": total_pages,
+            "pagination": {
+                "page": parsed_page,
+                "limit": parsed_limit,
+                "page_size": parsed_limit,
+                "total": total_count,
+                "total_count": total_count,
+                "total_pages": total_pages
+            }
         }
         return result, None
     except Exception as e:

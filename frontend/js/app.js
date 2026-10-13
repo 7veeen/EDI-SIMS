@@ -287,9 +287,9 @@ const App = {
         isOpen: false,
         isLoading: false,
 
-        async init() {
+        init() {
             this.setupDropdownListeners();
-            await this.updateUnreadCount();
+            // Note: Initial unread count is authoritatively fetched by App.navigate() during initial route bootstrap
         },
 
         setupDropdownListeners() {

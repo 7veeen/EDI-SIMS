@@ -28,22 +28,36 @@ def list_purchase_orders():
     search = request.args.get("search")
     status = request.args.get("status")
     supplier_id_filter = request.args.get("supplier_id")
+    page = request.args.get("page")
+    page_size = request.args.get("page_size") or request.args.get("limit")
 
-    orders, stats, error = get_purchase_orders(
+    orders, stats, pagination_meta, error = get_purchase_orders(
         user_id=user_id,
         role=user_role,
         search=search,
         status=status,
-        supplier_id_filter=supplier_id_filter
+        supplier_id_filter=supplier_id_filter,
+        page=page,
+        page_size=page_size
     )
 
     if error:
         return jsonify({"error": error}), 500
 
-    return jsonify({
+    resp = {
         "purchase_orders": orders,
         "stats": stats
-    }), 200
+    }
+    if pagination_meta:
+        resp.update({
+            "total": pagination_meta["total"],
+            "page": pagination_meta["page"],
+            "page_size": pagination_meta["page_size"],
+            "total_pages": pagination_meta["total_pages"],
+            "pagination": pagination_meta
+        })
+
+    return jsonify(resp), 200
 
 
 # View Single Purchase Order Details

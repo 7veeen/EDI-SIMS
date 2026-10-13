@@ -33,7 +33,7 @@ def get_supplier_id_for_user(user_id):
             conn.close()
 
 
-def get_purchase_orders(user_id=None, role=None, search=None, status=None, supplier_id_filter=None):
+def get_purchase_orders(user_id=None, role=None, search=None, status=None, supplier_id_filter=None, page=None, page_size=None):
     """
     List purchase orders with role-based access control.
     Suppliers strictly see only their own assigned purchase orders.
@@ -52,13 +52,22 @@ def get_purchase_orders(user_id=None, role=None, search=None, status=None, suppl
             s_row = cursor.fetchone()
             if not s_row:
                 # User is a Supplier but has no linked supplier profile
-                return [], {
+                empty_stats = {
                     "total_orders": 0,
                     "pending": 0,
                     "accepted": 0,
                     "rejected": 0,
                     "total_value": 0.0
-                }, None
+                }
+                empty_meta = {
+                    "page": 1,
+                    "page_size": 20,
+                    "limit": 20,
+                    "total": 0,
+                    "total_count": 0,
+                    "total_pages": 1
+                }
+                return [], empty_stats, empty_meta, None
             supplier_id = s_row[0]
         elif supplier_id_filter:
             try:
@@ -66,7 +75,51 @@ def get_purchase_orders(user_id=None, role=None, search=None, status=None, suppl
             except (ValueError, TypeError):
                 supplier_id = None
 
-        query = """
+        base_where = " WHERE 1=1"
+        params = []
+
+        if supplier_id:
+            base_where += " AND po.supplier_id = %s"
+            params.append(supplier_id)
+
+        if status and status.strip():
+            base_where += " AND po.status = %s"
+            params.append(status.strip())
+
+        if search and search.strip():
+            search_param = f"%{search.strip()}%"
+            base_where += """
+                AND (
+                    po.purchase_order_id::text ILIKE %s
+                    OR s.supplier_name ILIKE %s
+                    OR u.username ILIKE %s
+                )
+            """
+            params.extend([search_param, search_param, search_param])
+
+        # 1. Aggregate KPI stats query across all matching records
+        stats_query = f"""
+            SELECT 
+                COUNT(*) as total_orders,
+                COUNT(CASE WHEN po.status = 'Pending' THEN 1 END) as pending,
+                COUNT(CASE WHEN po.status IN ('Accepted', 'Delivered') THEN 1 END) as accepted,
+                COUNT(CASE WHEN po.status = 'Rejected' THEN 1 END) as rejected,
+                COALESCE(SUM(po.total_amount), 0.0) as total_value
+            FROM "PurchaseOrders" po
+            JOIN "Suppliers" s ON po.supplier_id = s.supplier_id
+            JOIN "Users" u ON po.ordered_by = u.user_id
+            {base_where}
+        """
+        cursor.execute(stats_query, tuple(params))
+        s_row = cursor.fetchone()
+        total_orders = s_row[0] or 0
+        pending_count = s_row[1] or 0
+        accepted_count = s_row[2] or 0
+        rejected_count = s_row[3] or 0
+        total_value = float(s_row[4] or 0.0)
+
+        # 2. Paginated rows query with deterministic ordering
+        data_query = f"""
             SELECT 
                 po.purchase_order_id,
                 po.supplier_id,
@@ -88,30 +141,7 @@ def get_purchase_orders(user_id=None, role=None, search=None, status=None, suppl
             JOIN "Suppliers" s ON po.supplier_id = s.supplier_id
             JOIN "Users" u ON po.ordered_by = u.user_id
             LEFT JOIN "PurchaseOrderItems" poi ON po.purchase_order_id = poi.purchase_order_id
-            WHERE 1=1
-        """
-        params = []
-
-        if supplier_id:
-            query += " AND po.supplier_id = %s"
-            params.append(supplier_id)
-
-        if status and status.strip():
-            query += " AND po.status = %s"
-            params.append(status.strip())
-
-        if search and search.strip():
-            search_param = f"%{search.strip()}%"
-            query += """
-                AND (
-                    po.purchase_order_id::text ILIKE %s
-                    OR s.supplier_name ILIKE %s
-                    OR u.username ILIKE %s
-                )
-            """
-            params.extend([search_param, search_param, search_param])
-
-        query += """
+            {base_where}
             GROUP BY 
                 po.purchase_order_id,
                 s.supplier_name,
@@ -121,27 +151,31 @@ def get_purchase_orders(user_id=None, role=None, search=None, status=None, suppl
                 u.username
             ORDER BY po.purchase_order_id DESC
         """
+        data_params = list(params)
 
-        cursor.execute(query, tuple(params))
+        if page is not None or page_size is not None:
+            try:
+                page_num = max(1, int(page or 1))
+            except (ValueError, TypeError):
+                page_num = 1
+            try:
+                ps_num = max(1, min(100, int(page_size or 20)))
+            except (ValueError, TypeError):
+                ps_num = 20
+            offset = (page_num - 1) * ps_num
+            data_query += " LIMIT %s OFFSET %s"
+            data_params.extend([ps_num, offset])
+        else:
+            page_num = 1
+            ps_num = total_orders if total_orders > 0 else 20
+
+        cursor.execute(data_query, tuple(data_params))
         rows = cursor.fetchall()
 
         orders = []
-        total_value = Decimal('0.00')
-        pending_count = 0
-        accepted_count = 0
-        rejected_count = 0
-
         for r in rows:
             amt = float(r[10]) if r[10] is not None else 0.0
             order_status = r[11]
-
-            total_value += Decimal(str(amt))
-            if order_status == 'Pending':
-                pending_count += 1
-            elif order_status in ['Accepted', 'Delivered']:
-                accepted_count += 1
-            elif order_status == 'Rejected':
-                rejected_count += 1
 
             orders.append({
                 "purchase_order_id": r[0],
@@ -164,14 +198,24 @@ def get_purchase_orders(user_id=None, role=None, search=None, status=None, suppl
             })
 
         stats = {
-            "total_orders": len(orders),
+            "total_orders": total_orders,
             "pending": pending_count,
             "accepted": accepted_count,
             "rejected": rejected_count,
-            "total_value": float(total_value)
+            "total_value": total_value
         }
 
-        return orders, stats, None
+        total_pages = (total_orders + ps_num - 1) // ps_num if (total_orders > 0 and ps_num > 0) else 1
+        pagination_meta = {
+            "page": page_num,
+            "page_size": ps_num,
+            "limit": ps_num,
+            "total": total_orders,
+            "total_count": total_orders,
+            "total_pages": total_pages
+        }
+
+        return orders, stats, pagination_meta, None
 
     except Exception as e:
         return None, None, f"Database error: {str(e)}"

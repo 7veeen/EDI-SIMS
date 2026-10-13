@@ -4,7 +4,7 @@ from datetime import datetime
 from app.extensions import get_db_connection
 
 
-def get_inventory(search=None, status_filter=None, category_id=None):
+def get_inventory(search=None, status_filter=None, category_id=None, page=None, page_size=None):
     conn = None
     cursor = None
 
@@ -12,7 +12,49 @@ def get_inventory(search=None, status_filter=None, category_id=None):
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        query = '''
+        base_where = ' WHERE 1=1'
+        params = []
+
+        if search:
+            base_where += ' AND (p.product_name ILIKE %s OR p.sku ILIKE %s)'
+            params.extend([f"%{search}%", f"%{search}%"])
+
+        if category_id:
+            base_where += ' AND p.category_id = %s'
+            params.append(category_id)
+
+        if status_filter:
+            norm_filter = str(status_filter).lower().strip()
+            if norm_filter in ['low_stock', 'low']:
+                base_where += ' AND (i.quantity_available > 0 AND i.quantity_available <= p.reorder_level)'
+            elif norm_filter in ['out_of_stock', 'out']:
+                base_where += ' AND (i.quantity_available <= 0)'
+            elif norm_filter in ['in_stock', 'in']:
+                base_where += ' AND (i.quantity_available > p.reorder_level)'
+
+        # 1. Total count & KPI stats query across all matching records
+        stats_query = f'''
+            SELECT
+                COUNT(*) as total_items,
+                COUNT(CASE WHEN i.quantity_available > p.reorder_level THEN 1 END) as in_stock,
+                COUNT(CASE WHEN i.quantity_available > 0 AND i.quantity_available <= p.reorder_level THEN 1 END) as low_stock,
+                COUNT(CASE WHEN i.quantity_available <= 0 THEN 1 END) as out_of_stock,
+                COALESCE(SUM(i.quantity_available), 0) as total_quantity
+            FROM public."Inventory" i
+            JOIN public."Products" p ON i.product_id = p.product_id
+            JOIN public."Categories" c ON p.category_id = c.category_id
+            {base_where}
+        '''
+        cursor.execute(stats_query, tuple(params))
+        s_row = cursor.fetchone()
+        total_items = s_row[0] or 0
+        in_stock_count = s_row[1] or 0
+        low_stock_count = s_row[2] or 0
+        out_of_stock_count = s_row[3] or 0
+        total_quantity = s_row[4] or 0
+
+        # 2. Paginated rows query with deterministic ordering
+        data_query = f'''
             SELECT
                 i.inventory_id,
                 i.product_id,
@@ -28,52 +70,41 @@ def get_inventory(search=None, status_filter=None, category_id=None):
             FROM public."Inventory" i
             JOIN public."Products" p ON i.product_id = p.product_id
             JOIN public."Categories" c ON p.category_id = c.category_id
-            WHERE 1=1
+            {base_where}
+            ORDER BY p.product_name ASC, p.product_id ASC
         '''
-        params = []
+        data_params = list(params)
 
-        if search:
-            query += ' AND (p.product_name ILIKE %s OR p.sku ILIKE %s)'
-            params.extend([f"%{search}%", f"%{search}%"])
+        if page is not None or page_size is not None:
+            try:
+                page_num = max(1, int(page or 1))
+            except (ValueError, TypeError):
+                page_num = 1
+            try:
+                ps_num = max(1, min(100, int(page_size or 20)))
+            except (ValueError, TypeError):
+                ps_num = 20
+            offset = (page_num - 1) * ps_num
+            data_query += ' LIMIT %s OFFSET %s'
+            data_params.extend([ps_num, offset])
+        else:
+            page_num = 1
+            ps_num = total_items if total_items > 0 else 20
 
-        if category_id:
-            query += ' AND p.category_id = %s'
-            params.append(category_id)
-
-        if status_filter:
-            norm_filter = str(status_filter).lower().strip()
-            if norm_filter in ['low_stock', 'low']:
-                query += ' AND (i.quantity_available > 0 AND i.quantity_available <= p.reorder_level)'
-            elif norm_filter in ['out_of_stock', 'out']:
-                query += ' AND (i.quantity_available <= 0)'
-            elif norm_filter in ['in_stock', 'in']:
-                query += ' AND (i.quantity_available > p.reorder_level)'
-
-        query += ' ORDER BY p.product_name ASC'
-
-        cursor.execute(query, tuple(params))
+        cursor.execute(data_query, tuple(data_params))
         rows = cursor.fetchall()
 
         items = []
-        in_stock_count = 0
-        low_stock_count = 0
-        out_of_stock_count = 0
-        total_quantity = 0
-
         for r in rows:
             qty = r[6]
             reorder = r[7]
-            total_quantity += qty
 
             if qty <= 0:
                 stock_status = "Out of Stock"
-                out_of_stock_count += 1
             elif qty <= reorder:
                 stock_status = "Low Stock"
-                low_stock_count += 1
             else:
                 stock_status = "In Stock"
-                in_stock_count += 1
 
             price_val = float(r[9]) if isinstance(r[9], Decimal) else float(r[9] or 0)
             last_up = r[10].isoformat() if isinstance(r[10], datetime) else str(r[10])
@@ -94,14 +125,33 @@ def get_inventory(search=None, status_filter=None, category_id=None):
             })
 
         stats = {
-            "total_items": len(items),
+            "total_items": total_items,
             "in_stock": in_stock_count,
             "low_stock": low_stock_count,
             "out_of_stock": out_of_stock_count,
             "total_quantity": total_quantity
         }
 
-        return {"inventory": items, "stats": stats}, None
+        total_pages = (total_items + ps_num - 1) // ps_num if (total_items > 0 and ps_num > 0) else 1
+
+        result = {
+            "inventory": items,
+            "stats": stats,
+            "total": total_items,
+            "page": page_num,
+            "page_size": ps_num,
+            "total_pages": total_pages,
+            "pagination": {
+                "page": page_num,
+                "page_size": ps_num,
+                "limit": ps_num,
+                "total": total_items,
+                "total_count": total_items,
+                "total_pages": total_pages
+            }
+        }
+
+        return result, None
 
     except Error as e:
         return None, "Database error"

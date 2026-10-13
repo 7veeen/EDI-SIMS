@@ -66,6 +66,14 @@ def list_products():
         response_data["page"] = p_num
         response_data["page_size"] = ps_num
         response_data["total_pages"] = total_pages
+        response_data["pagination"] = {
+            "page": p_num,
+            "page_size": ps_num,
+            "limit": ps_num,
+            "total": total,
+            "total_count": total,
+            "total_pages": total_pages
+        }
 
     return jsonify(response_data), 200
 

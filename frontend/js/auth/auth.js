@@ -45,6 +45,9 @@ const Auth = {
     },
 
     logout() {
+        if (typeof Api !== 'undefined' && typeof Api.clearInFlightRequests === 'function') {
+            Api.clearInFlightRequests();
+        }
         localStorage.removeItem('sims_token');
         localStorage.removeItem('sims_access_token');
         localStorage.removeItem('sims_user');

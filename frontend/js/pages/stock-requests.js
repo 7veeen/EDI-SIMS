@@ -4,6 +4,11 @@ App.pages['stock-requests'] = {
     currentRequests: [],
     suppliersList: [],
     productsList: [],
+    page: 1,
+    pageSize: 20,
+    total: 0,
+    totalPages: 1,
+    requestId: 0,
     filters: {
         search: '',
         status: 'All Status',
@@ -163,12 +168,21 @@ App.pages['stock-requests'] = {
                     </tbody>
                 </table>
             </div>
+            <div id="sr-pagination-container"></div>
         `;
 
+        this.page = 1;
         this.initEventListeners(container);
         this.fetchStockRequests(container);
 
         return container;
+    },
+
+    goToPage(newPage) {
+        if (newPage < 1 || newPage > this.totalPages || newPage === this.page) return;
+        this.page = newPage;
+        const container = document.querySelector('.page.active') || document;
+        this.fetchStockRequests(container);
     },
 
     initEventListeners(container) {
@@ -198,8 +212,9 @@ App.pages['stock-requests'] = {
             searchInput.addEventListener('input', (e) => {
                 clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(() => {
+                    this.page = 1;
                     this.filters.search = e.target.value.toLowerCase().trim();
-                    this.applyFiltersAndRender(container);
+                    this.fetchStockRequests(container);
                 }, 200);
             });
         }
@@ -207,16 +222,18 @@ App.pages['stock-requests'] = {
         const statusSelect = container.querySelector('#sr-filter-status');
         if (statusSelect) {
             statusSelect.addEventListener('change', (e) => {
+                this.page = 1;
                 this.filters.status = e.target.value;
-                this.applyFiltersAndRender(container);
+                this.fetchStockRequests(container);
             });
         }
 
         const prioritySelect = container.querySelector('#sr-filter-priority');
         if (prioritySelect) {
             prioritySelect.addEventListener('change', (e) => {
+                this.page = 1;
                 this.filters.priority = e.target.value;
-                this.applyFiltersAndRender(container);
+                this.fetchStockRequests(container);
             });
         }
 
@@ -230,19 +247,52 @@ App.pages['stock-requests'] = {
     },
 
     async fetchStockRequests(container) {
+        const thisReq = ++this.requestId;
         const tbody = container.querySelector('#stock-requests-tbody');
         const counterEl = container.querySelector('#sr-table-counter');
+        const paginationContainer = container.querySelector('#sr-pagination-container');
+
+        if (tbody) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" style="text-align: center; padding: 40px; color: var(--text-light);">
+                        <i class='bx bx-loader-alt bx-spin' style="font-size: 28px; display: block; margin-bottom: 8px;"></i>
+                        Loading stock requests...
+                    </td>
+                </tr>
+            `;
+        }
 
         try {
-            // Fetch real database records from dedicated Stock Requests API
-            const response = await Api.get('/stock-requests/');
-            const requests = response?.stock_requests || (Array.isArray(response) ? response : []);
+            let url = `/stock-requests/?page=${this.page}&page_size=${this.pageSize}`;
+            if (this.filters.search) url += `&search=${encodeURIComponent(this.filters.search)}`;
+            if (this.filters.status && this.filters.status !== 'All Status') url += `&status=${encodeURIComponent(this.filters.status)}`;
+            if (this.filters.priority && this.filters.priority !== 'All Priority') url += `&priority=${encodeURIComponent(this.filters.priority)}`;
 
+            const response = await Api.get(url);
+            if (thisReq !== this.requestId) return; // Discard stale response
+
+            const requests = response?.stock_requests || (Array.isArray(response) ? response : []);
             this.currentRequests = requests;
+            this.total = response?.total !== undefined ? response.total : requests.length;
+            this.totalPages = response?.total_pages || Math.max(1, Math.ceil(this.total / this.pageSize));
+
             this.updateKPIs(container, requests);
             this.applyFiltersAndRender(container);
 
+            if (paginationContainer && window.PaginationComponent) {
+                paginationContainer.innerHTML = PaginationComponent.render({
+                    total: this.total,
+                    page: this.page,
+                    pageSize: this.pageSize,
+                    totalPages: this.totalPages,
+                    label: 'requests',
+                    onPageChangeName: "App.pages['stock-requests'].goToPage"
+                });
+            }
+
         } catch (error) {
+            if (thisReq !== this.requestId) return;
             console.error("Error fetching stock requests:", error);
             if (tbody) {
                 tbody.innerHTML = `
@@ -263,6 +313,7 @@ App.pages['stock-requests'] = {
             if (counterEl) {
                 counterEl.innerHTML = `<span style="color: #ef4444;">Connection failed</span>`;
             }
+            if (paginationContainer) paginationContainer.innerHTML = '';
         }
     },
 

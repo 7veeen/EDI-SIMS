@@ -24,21 +24,38 @@ def list_stock_requests():
     priority = request.args.get("priority")
     search = request.args.get("search")
     supplier_id = request.args.get("supplier_id")
+    page = request.args.get("page")
+    page_size = request.args.get("page_size") or request.args.get("limit")
 
-    requests_list, error = get_stock_requests(
+    requests_list, meta, error = get_stock_requests(
         user_id=user_id,
         role=role,
         status=status,
         priority=priority,
         search=search,
-        supplier_id=supplier_id
+        supplier_id=supplier_id,
+        page=page,
+        page_size=page_size,
+        return_meta=True
     )
 
     if error:
         status_code = 403 if "Access denied" in error else 500
         return jsonify({"error": error}), status_code
 
-    return jsonify({"stock_requests": requests_list}), 200
+    resp = {
+        "stock_requests": requests_list
+    }
+    if meta:
+        resp.update({
+            "total": meta["total"],
+            "page": meta["page"],
+            "page_size": meta["page_size"],
+            "total_pages": meta["total_pages"],
+            "pagination": meta
+        })
+
+    return jsonify(resp), 200
 
 
 @stock_requests_bp.route("/<int:stock_request_id>", methods=["GET"])

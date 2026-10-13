@@ -2,7 +2,7 @@ from datetime import datetime
 from app.extensions import get_db_connection
 
 
-def get_user_notifications(user_id, is_read=None, limit=None, offset=None):
+def get_user_notifications(user_id, is_read=None, limit=None, offset=None, page=None, page_size=None):
     """
     Retrieve notifications strictly scoped to the authenticated user.
     Enforces complete user isolation: never returns notifications belonging to another user.
@@ -14,6 +14,15 @@ def get_user_notifications(user_id, is_read=None, limit=None, offset=None):
         uid = int(user_id)
     except (ValueError, TypeError):
         return None, "Invalid user_id", 400
+
+    if page is not None or page_size is not None:
+        try:
+            p_num = max(1, int(page or 1))
+            ps_num = max(1, min(100, int(page_size or limit or 20)))
+            limit = ps_num
+            offset = (p_num - 1) * ps_num
+        except (ValueError, TypeError):
+            pass
 
     conn = None
     cursor = None

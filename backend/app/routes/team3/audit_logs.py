@@ -16,7 +16,7 @@ audit_logs_bp = Blueprint(
 @role_required("Owner")
 def get_audit_logs():
     page = request.args.get("page", default=1)
-    limit = request.args.get("limit", default=50)
+    limit = request.args.get("page_size") or request.args.get("limit", default=50)
     search = request.args.get("search")
     action = request.args.get("action")
     table_name = request.args.get("table_name")

@@ -31,23 +31,37 @@ def list_shipments():
     supplier_id = request.args.get("supplier_id")
     status = request.args.get("status")
     search = request.args.get("search")
+    page = request.args.get("page")
+    page_size = request.args.get("page_size") or request.args.get("limit")
 
-    shipments, stats, error = get_shipments(
+    shipments, stats, pagination_meta, error = get_shipments(
         user_id=user_id,
         role=user_role,
         po_id=po_id,
         supplier_id_filter=supplier_id,
         status_filter=status,
-        search=search
+        search=search,
+        page=page,
+        page_size=page_size
     )
 
     if error:
         return jsonify({"error": error}), 500
 
-    return jsonify({
+    resp = {
         "shipments": shipments,
         "stats": stats
-    }), 200
+    }
+    if pagination_meta:
+        resp.update({
+            "total": pagination_meta["total"],
+            "page": pagination_meta["page"],
+            "page_size": pagination_meta["page_size"],
+            "total_pages": pagination_meta["total_pages"],
+            "pagination": pagination_meta
+        })
+
+    return jsonify(resp), 200
 
 
 # View Single Shipment Details

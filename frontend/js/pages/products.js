@@ -82,8 +82,11 @@ App.pages['products'] = {
         this.sortOrder = 'asc';
 
         this.setupSortingHeaders();
-        this.loadCategoryFilter();
-        this.loadProducts();
+        // Parallelize independent category filter and product catalog queries
+        await Promise.all([
+            this.loadCategoryFilter(),
+            this.loadProducts()
+        ]);
 
         const searchInput = document.getElementById('product-search');
         if (searchInput) {

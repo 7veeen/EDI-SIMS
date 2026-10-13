@@ -171,8 +171,11 @@ App.pages['reports'] = {
     },
 
     async init() {
-        this.checkInventoryStatus();
-        this.loadReports();
+        // Parallelize independent status check and reports list query
+        await Promise.allSettled([
+            this.checkInventoryStatus(),
+            this.loadReports()
+        ]);
 
         document.getElementById('btn-generate-report')?.addEventListener('click', () => {
             this.openGenerateReportModal();

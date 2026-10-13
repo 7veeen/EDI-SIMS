@@ -9,7 +9,7 @@ def resolve_supplier_id_for_user(cursor, user_id):
     return row[0] if row else None
 
 
-def get_stock_requests(user_id=None, role=None, status=None, priority=None, search=None, supplier_id=None):
+def get_stock_requests(user_id=None, role=None, status=None, priority=None, search=None, supplier_id=None, page=None, page_size=None, return_meta=False):
     """
     Get list of stock requests with strict role-based access and supplier isolation.
     - Owner / Manager: can view all requests or filter by supplier_id.
@@ -17,7 +17,8 @@ def get_stock_requests(user_id=None, role=None, status=None, priority=None, sear
     - Employee: access denied.
     """
     if role not in ("Owner", "Manager", "Supplier"):
-        return None, "Access denied. Only Owners, Managers, and Suppliers can view stock requests."
+        err = "Access denied. Only Owners, Managers, and Suppliers can view stock requests."
+        return (None, None, err) if return_meta else (None, err)
 
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -27,12 +28,56 @@ def get_stock_requests(user_id=None, role=None, status=None, priority=None, sear
         if role == "Supplier":
             auth_supplier_id = resolve_supplier_id_for_user(cursor, user_id)
             if not auth_supplier_id:
-                return [], None
+                empty_meta = {"page": 1, "page_size": 20, "limit": 20, "total": 0, "total_count": 0, "total_pages": 1}
+                return ([], empty_meta, None) if return_meta else ([], None)
             filter_supplier_id = auth_supplier_id
         else:
             filter_supplier_id = int(supplier_id) if supplier_id else None
 
-        query = """
+        base_where = " WHERE 1=1"
+        params = []
+
+        if filter_supplier_id:
+            base_where += " AND sr.supplier_id = %s"
+            params.append(filter_supplier_id)
+
+        if status and status.strip() and status != "All Status":
+            base_where += " AND sr.status ILIKE %s"
+            params.append(status.strip())
+
+        if priority and priority.strip() and priority != "All Priority":
+            base_where += " AND sr.priority ILIKE %s"
+            params.append(priority.strip())
+
+        if search and search.strip():
+            term = f"%{search.strip()}%"
+            base_where += """ AND (
+                sr.request_number ILIKE %s
+                OR s.supplier_name ILIKE %s
+                OR sr.notes ILIKE %s
+                OR EXISTS (
+                    SELECT 1 FROM "StockRequestItems" item
+                    JOIN "Products" prod ON item.product_id = prod.product_id
+                    WHERE item.stock_request_id = sr.stock_request_id
+                    AND (prod.product_name ILIKE %s OR prod.sku ILIKE %s)
+                )
+            )"""
+            params.extend([term, term, term, term, term])
+
+        # 1. Total count query
+        count_query = f"""
+            SELECT COUNT(DISTINCT sr.stock_request_id)
+            FROM "StockRequests" sr
+            JOIN "Suppliers" s ON sr.supplier_id = s.supplier_id
+            JOIN "Users" u ON sr.requested_by = u.user_id
+            {base_where}
+        """
+        cursor.execute(count_query, tuple(params))
+        c_row = cursor.fetchone()
+        total_count = c_row[0] if c_row else 0
+
+        # 2. Paginated rows query with deterministic ordering
+        data_query = f"""
             SELECT
                 sr.stock_request_id,
                 sr.request_number,
@@ -56,65 +101,53 @@ def get_stock_requests(user_id=None, role=None, status=None, priority=None, sear
             JOIN "Suppliers" s ON sr.supplier_id = s.supplier_id
             JOIN "Users" u ON sr.requested_by = u.user_id
             LEFT JOIN "StockRequestItems" sri ON sr.stock_request_id = sri.stock_request_id
-            WHERE 1=1
-        """
-        params = []
-
-        if filter_supplier_id:
-            query += " AND sr.supplier_id = %s"
-            params.append(filter_supplier_id)
-
-        if status and status.strip() and status != "All Status":
-            query += " AND sr.status ILIKE %s"
-            params.append(status.strip())
-
-        if priority and priority.strip() and priority != "All Priority":
-            query += " AND sr.priority ILIKE %s"
-            params.append(priority.strip())
-
-        if search and search.strip():
-            term = f"%{search.strip()}%"
-            query += """ AND (
-                sr.request_number ILIKE %s
-                OR s.supplier_name ILIKE %s
-                OR sr.notes ILIKE %s
-                OR EXISTS (
-                    SELECT 1 FROM "StockRequestItems" item
-                    JOIN "Products" prod ON item.product_id = prod.product_id
-                    WHERE item.stock_request_id = sr.stock_request_id
-                    AND (prod.product_name ILIKE %s OR prod.sku ILIKE %s)
-                )
-            )"""
-            params.extend([term, term, term, term, term])
-
-        query += """
+            {base_where}
             GROUP BY sr.stock_request_id, u.username, s.supplier_name, s.email, s.phone
-            ORDER BY sr.created_at DESC
+            ORDER BY sr.created_at DESC, sr.stock_request_id DESC
         """
+        data_params = list(params)
 
-        cursor.execute(query, tuple(params))
+        if page is not None or page_size is not None:
+            try:
+                page_num = max(1, int(page or 1))
+            except (ValueError, TypeError):
+                page_num = 1
+            try:
+                ps_num = max(1, min(100, int(page_size or 20)))
+            except (ValueError, TypeError):
+                ps_num = 20
+            offset = (page_num - 1) * ps_num
+            data_query += " LIMIT %s OFFSET %s"
+            data_params.extend([ps_num, offset])
+        else:
+            page_num = 1
+            ps_num = total_count if total_count > 0 else 20
+
+        cursor.execute(data_query, tuple(data_params))
         rows = cursor.fetchall()
+
+        # 3. Batch-fetch all items for the returned page to avoid N+1 queries
+        items_by_req = {}
+        if rows:
+            req_ids = [r[0] for r in rows]
+            cursor.execute("""
+                SELECT sri.stock_request_id, p.product_name, p.sku, sri.requested_quantity
+                FROM "StockRequestItems" sri
+                JOIN "Products" p ON sri.product_id = p.product_id
+                WHERE sri.stock_request_id = ANY(%s)
+                ORDER BY sri.stock_request_item_id ASC
+            """, (req_ids,))
+            for ir in cursor.fetchall():
+                items_by_req.setdefault(ir[0], []).append({
+                    "product_name": ir[1],
+                    "sku": ir[2] or "",
+                    "requested_quantity": ir[3]
+                })
 
         results = []
         for r in rows:
             req_id = r[0]
-            # Fetch product summary for this request
-            cursor.execute("""
-                SELECT p.product_name, p.sku, sri.requested_quantity
-                FROM "StockRequestItems" sri
-                JOIN "Products" p ON sri.product_id = p.product_id
-                WHERE sri.stock_request_id = %s
-                ORDER BY sri.stock_request_item_id ASC
-            """, (req_id,))
-            items_raw = cursor.fetchall()
-            items_list = []
-            for ir in items_raw:
-                items_list.append({
-                    "product_name": ir[0],
-                    "sku": ir[1] or "",
-                    "requested_quantity": ir[2]
-                })
-
+            items_list = items_by_req.get(req_id, [])
             primary_product = items_list[0]["product_name"] if items_list else "General Restock"
 
             results.append({
@@ -140,10 +173,23 @@ def get_stock_requests(user_id=None, role=None, status=None, priority=None, sear
                 "items": items_list
             })
 
+        total_pages = (total_count + ps_num - 1) // ps_num if (total_count > 0 and ps_num > 0) else 1
+        meta = {
+            "page": page_num,
+            "page_size": ps_num,
+            "limit": ps_num,
+            "total": total_count,
+            "total_count": total_count,
+            "total_pages": total_pages
+        }
+
+        if return_meta:
+            return results, meta, None
         return results, None
 
     except Exception as e:
-        return None, f"Database error: {str(e)}"
+        err = f"Database error: {str(e)}"
+        return (None, None, err) if return_meta else (None, err)
     finally:
         cursor.close()
         conn.close()

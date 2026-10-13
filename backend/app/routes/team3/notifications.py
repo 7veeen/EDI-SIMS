@@ -34,12 +34,16 @@ def list_notifications():
 
     limit = request.args.get("limit")
     offset = request.args.get("offset")
+    page = request.args.get("page")
+    page_size = request.args.get("page_size")
 
     notifications, error, status_code = get_user_notifications(
         user_id=user_id,
         is_read=is_read,
         limit=limit,
-        offset=offset
+        offset=offset,
+        page=page,
+        page_size=page_size
     )
 
     if error:

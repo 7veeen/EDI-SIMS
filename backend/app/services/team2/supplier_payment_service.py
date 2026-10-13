@@ -286,7 +286,7 @@ def record_payment(user_id, role, data):
 
 def get_payments(user_id, role, supplier_id_filter=None, invoice_id_filter=None,
                  payment_method_filter=None, date_from=None, date_to=None,
-                 search=None, page=1, limit=50):
+                 search=None, page=1, limit=50, page_size=None):
     """
     List supplier payment records with role-based access control and supplier isolation.
     - Owner/Manager: Full organization-wide visibility with optional filters.
@@ -306,7 +306,8 @@ def get_payments(user_id, role, supplier_id_filter=None, invoice_id_filter=None,
         if role == "Supplier":
             auth_supplier_id = resolve_supplier_id_for_user(cursor, user_id)
             if not auth_supplier_id:
-                return {"payments": [], "stats": {"total_payments": 0, "total_disbursed": 0.0}, "total_count": 0}, None, 200
+                empty_meta = {"page": 1, "page_size": 50, "limit": 50, "total": 0, "total_count": 0, "total_pages": 1}
+                return {"payments": [], "stats": {"total_payments": 0, "total_disbursed": 0.0}, "total_count": 0, "pagination": empty_meta}, None, 200
             target_supplier_id = auth_supplier_id
         else:
             try:
@@ -314,7 +315,66 @@ def get_payments(user_id, role, supplier_id_filter=None, invoice_id_filter=None,
             except (ValueError, TypeError):
                 target_supplier_id = None
 
-        query = '''
+        base_where = ' WHERE 1=1'
+        params = []
+
+        if target_supplier_id is not None:
+            base_where += ' AND sp.supplier_id = %s'
+            params.append(target_supplier_id)
+
+        if invoice_id_filter:
+            try:
+                base_where += ' AND sp.invoice_id = %s'
+                params.append(int(invoice_id_filter))
+            except (ValueError, TypeError):
+                pass
+
+        if payment_method_filter:
+            base_where += ' AND sp.payment_method = %s'
+            params.append(str(payment_method_filter).strip())
+
+        if date_from:
+            base_where += ' AND sp.payment_date >= %s'
+            params.append(str(date_from).split("T")[0])
+
+        if date_to:
+            base_where += ' AND sp.payment_date <= %s'
+            params.append(str(date_to).split("T")[0])
+
+        if search:
+            search_param = f"%{str(search).strip()}%"
+            base_where += ' AND (si.invoice_number ILIKE %s OR sp.payment_reference ILIKE %s OR s.supplier_name ILIKE %s)'
+            params.extend([search_param, search_param, search_param])
+
+        # Pagination calculations
+        effective_limit = page_size if page_size is not None else limit
+        try:
+            page_num = max(1, int(page or 1))
+            limit_num = max(1, min(200, int(effective_limit or 50)))
+        except (ValueError, TypeError):
+            page_num = 1
+            limit_num = 50
+
+        offset_num = (page_num - 1) * limit_num
+
+        # 1. Total count & KPI stats query in SQL
+        stats_query = f'''
+            SELECT 
+                COUNT(*) as total_payments,
+                COALESCE(SUM(sp.amount_paid), 0.0) as total_disbursed
+            FROM public."SupplierPayments" sp
+            JOIN public."SupplierInvoices" si ON sp.invoice_id = si.invoice_id
+            JOIN public."Suppliers" s ON sp.supplier_id = s.supplier_id
+            JOIN public."Users" u ON sp.recorded_by = u.user_id
+            {base_where}
+        '''
+        cursor.execute(stats_query, tuple(params))
+        s_row = cursor.fetchone()
+        total_count = s_row[0] if (s_row and len(s_row) > 0 and s_row[0] is not None) else 0
+        total_disbursed = Decimal(str(s_row[1])) if (s_row and len(s_row) > 1 and s_row[1] is not None) else Decimal("0.0")
+
+        # 2. Paginated rows query with deterministic ordering
+        data_query = f'''
             SELECT 
                 sp.payment_id,
                 sp.invoice_id,
@@ -335,63 +395,13 @@ def get_payments(user_id, role, supplier_id_filter=None, invoice_id_filter=None,
             JOIN public."SupplierInvoices" si ON sp.invoice_id = si.invoice_id
             JOIN public."Suppliers" s ON sp.supplier_id = s.supplier_id
             JOIN public."Users" u ON sp.recorded_by = u.user_id
-            WHERE 1=1
+            {base_where}
+            ORDER BY sp.payment_date DESC, sp.created_at DESC, sp.payment_id DESC
+            LIMIT %s OFFSET %s
         '''
-        params = []
-
-        if target_supplier_id is not None:
-            query += ' AND sp.supplier_id = %s'
-            params.append(target_supplier_id)
-
-        if invoice_id_filter:
-            try:
-                query += ' AND sp.invoice_id = %s'
-                params.append(int(invoice_id_filter))
-            except (ValueError, TypeError):
-                pass
-
-        if payment_method_filter:
-            query += ' AND sp.payment_method = %s'
-            params.append(str(payment_method_filter).strip())
-
-        if date_from:
-            query += ' AND sp.payment_date >= %s'
-            params.append(str(date_from).split("T")[0])
-
-        if date_to:
-            query += ' AND sp.payment_date <= %s'
-            params.append(str(date_to).split("T")[0])
-
-        if search:
-            search_param = f"%{str(search).strip()}%"
-            query += ' AND (si.invoice_number ILIKE %s OR sp.payment_reference ILIKE %s OR s.supplier_name ILIKE %s)'
-            params.extend([search_param, search_param, search_param])
-
-        query += ' ORDER BY sp.payment_date DESC, sp.created_at DESC'
-
-        cursor.execute(query, tuple(params))
-        all_rows = cursor.fetchall()
-        total_count = len(all_rows)
-
-        # Pagination
-        try:
-            page = max(1, int(page))
-            limit = max(1, min(200, int(limit)))
-        except (ValueError, TypeError):
-            page = 1
-            limit = 50
-
-        offset = (page - 1) * limit
-        paged_rows = all_rows[offset : offset + limit]
-
-        total_disbursed = Decimal("0.00")
-        method_counts = {}
-
-        for r in all_rows:
-            p_amt = Decimal(str(r[8]))
-            total_disbursed += p_amt
-            pm = r[9]
-            method_counts[pm] = method_counts.get(pm, 0) + 1
+        data_params = list(params) + [limit_num, offset_num]
+        cursor.execute(data_query, tuple(data_params))
+        paged_rows = cursor.fetchall()
 
         payments_list = []
         for r in paged_rows:
@@ -413,15 +423,36 @@ def get_payments(user_id, role, supplier_id_filter=None, invoice_id_filter=None,
                 "created_at": _format_date(r[14])
             })
 
+        total_pages = (total_count + limit_num - 1) // limit_num if (total_count > 0 and limit_num > 0) else 1
         stats = {
             "total_payments": total_count,
             "total_disbursed": _format_decimal(total_disbursed),
-            "method_counts": method_counts,
-            "page": page,
-            "limit": limit
+            "page": page_num,
+            "limit": limit_num,
+            "page_size": limit_num,
+            "total_count": total_count,
+            "total_pages": total_pages
+        }
+        pagination = {
+            "page": page_num,
+            "limit": limit_num,
+            "page_size": limit_num,
+            "total": total_count,
+            "total_count": total_count,
+            "total_pages": total_pages
         }
 
-        return {"payments": payments_list, "stats": stats, "total_count": total_count}, None, 200
+        return {
+            "payments": payments_list,
+            "stats": stats,
+            "total_count": total_count,
+            "total": total_count,
+            "page": page_num,
+            "limit": limit_num,
+            "page_size": limit_num,
+            "total_pages": total_pages,
+            "pagination": pagination
+        }, None, 200
 
     except Error as db_err:
         return None, f"Database error listing payments: {str(db_err)}", 500

@@ -6,6 +6,9 @@ def get_employee_dashboard(user_id=None):
     Get live database-driven dashboard metrics for the authenticated Employee.
     Strictly isolated: queries assigned shipments, awaiting Stock-In tasks,
     employee-specific stock transactions, and relevant notifications.
+    Consolidated into two optimized round-trips:
+      1. System-wide catalog and inventory aggregates
+      2. Authenticated employee scoped tasks, shipments, and transaction metrics
     Preserves backward-compatible keys: total_products, total_stock, stock_in,
     stock_out, low_stock_products, tasks.
     """
@@ -13,63 +16,53 @@ def get_employee_dashboard(user_id=None):
     cursor = conn.cursor()
 
     try:
-        # Total number of products (System-wide)
-        cursor.execute('SELECT COUNT(*) FROM "Products"')
-        total_products = int(cursor.fetchone()[0] or 0)
+        # Query 1: System-wide metrics & catalog low-stock items
+        q_system = '''
+        SELECT
+          (SELECT COUNT(*) FROM "Products") AS total_products,
+          (SELECT COALESCE(SUM(quantity_available), 0) FROM "Inventory") AS total_stock,
+          (SELECT COALESCE(SUM(quantity), 0) FROM "StockTransactions" WHERE transaction_type = 'STOCK_IN') AS stock_in,
+          (SELECT COALESCE(SUM(quantity), 0) FROM "StockTransactions" WHERE transaction_type = 'STOCK_OUT') AS stock_out,
+          (SELECT json_agg(lsp_row) FROM (
+             SELECT
+               p.product_id,
+               p.product_name,
+               p.sku,
+               COALESCE(c.category_name, 'General') AS category_name,
+               i.quantity_available,
+               COALESCE(p.reorder_level, 10) AS reorder_level
+             FROM "Products" p
+             JOIN "Inventory" i ON p.product_id = i.product_id
+             LEFT JOIN "Categories" c ON p.category_id = c.category_id
+             WHERE i.quantity_available <= COALESCE(p.reorder_level, 10)
+             ORDER BY i.quantity_available ASC
+           ) lsp_row) AS low_stock_products;
+        '''
 
-        # Total available stock (System-wide)
-        cursor.execute('SELECT COALESCE(SUM(quantity_available), 0) FROM "Inventory"')
-        total_stock = int(cursor.fetchone()[0] or 0)
+        cursor.execute(q_system)
+        sys_row = cursor.fetchone()
 
-        # Enterprise-wide stock in & out (preserved for backward compatibility with existing tests)
-        cursor.execute('''
-            SELECT COALESCE(SUM(quantity), 0)
-            FROM "StockTransactions"
-            WHERE transaction_type = 'STOCK_IN'
-        ''')
-        stock_in = int(cursor.fetchone()[0] or 0)
+        total_products = int(sys_row[0] or 0)
+        total_stock = int(sys_row[1] or 0)
+        stock_in = int(sys_row[2] or 0)
+        stock_out = int(sys_row[3] or 0)
 
-        cursor.execute('''
-            SELECT COALESCE(SUM(quantity), 0)
-            FROM "StockTransactions"
-            WHERE transaction_type = 'STOCK_OUT'
-        ''')
-        stock_out = int(cursor.fetchone()[0] or 0)
-
-        # Low-stock products using dynamic reorder level with enriched catalog fields
-        cursor.execute('''
-            SELECT
-                p.product_id,
-                p.product_name,
-                p.sku,
-                COALESCE(c.category_name, 'General') AS category_name,
-                i.quantity_available,
-                COALESCE(p.reorder_level, 10) AS reorder_level
-            FROM "Products" p
-            JOIN "Inventory" i
-                ON p.product_id = i.product_id
-            LEFT JOIN "Categories" c
-                ON p.category_id = c.category_id
-            WHERE i.quantity_available <= COALESCE(p.reorder_level, 10)
-            ORDER BY i.quantity_available ASC
-        ''')
-        low_stock_rows = cursor.fetchall()
         low_stock_products = []
-        for row in low_stock_rows:
-            qty = int(row[4] or 0)
-            reorder = int(row[5] or 10)
+        for row in (sys_row[4] or []):
+            qty = int(row['quantity_available'] or 0)
+            reorder = int(row['reorder_level'] or 10)
             stock_status = "Out of Stock" if qty <= 0 else "Low Stock"
             low_stock_products.append({
-                "product_id": row[0],
-                "product_name": row[1],
-                "sku": row[2] or "",
-                "category_name": row[3],
+                "product_id": row['product_id'],
+                "product_name": row['product_name'],
+                "sku": row['sku'] or "",
+                "category_name": row['category_name'],
                 "quantity_available": qty,
                 "reorder_level": reorder,
                 "stock_status": stock_status
             })
 
-        # Employee Identity & Isolation
+        # Employee Identity & Isolation defaults
         employee_name = "Employee"
         tasks = []
         assigned_shipments = []
@@ -93,33 +86,34 @@ def get_employee_dashboard(user_id=None):
                 uid = None
 
         if uid:
-            # 1. Resolve employee username
-            cursor.execute('SELECT username FROM "Users" WHERE user_id = %s', (uid,))
-            u_row = cursor.fetchone()
-            if u_row:
-                employee_name = u_row[0]
-
-            # 2. Unread notifications for this employee
-            cursor.execute('''
-                SELECT notification_id, title, message, created_at, is_read
-                FROM "Notifications"
-                WHERE user_id = %s AND is_read = false
-                ORDER BY created_at DESC
-                LIMIT 10
-            ''', (uid,))
-            notif_rows = cursor.fetchall()
-            for row in notif_rows:
-                tasks.append({
-                    "notification_id": row[0],
-                    "title": row[1],
-                    "message": row[2],
-                    "created_at": row[3].isoformat() if row[3] else None,
-                    "is_read": row[4]
-                })
-
-            # 3. Shipments assigned to this authenticated employee
-            cursor.execute('''
-                SELECT 
+            # Query 2: Consolidated employee tasks, shipments, stock actions, and transactions
+            q_employee = '''
+            WITH
+              emp_user AS (
+                SELECT username FROM "Users" WHERE user_id = %s
+              ),
+              emp_notifs AS (
+                SELECT json_agg(n_row) AS data FROM (
+                  SELECT notification_id, title, message, created_at, is_read
+                  FROM "Notifications"
+                  WHERE user_id = %s AND is_read = false
+                  ORDER BY created_at DESC
+                  LIMIT 10
+                ) n_row
+              ),
+              emp_stock_in AS (
+                SELECT COUNT(*) AS cnt, COALESCE(SUM(quantity), 0) AS qty
+                FROM "StockTransactions"
+                WHERE user_id = %s AND transaction_type = 'STOCK_IN'
+              ),
+              emp_stock_out AS (
+                SELECT COUNT(*) AS cnt, COALESCE(SUM(quantity), 0) AS qty
+                FROM "StockTransactions"
+                WHERE user_id = %s AND transaction_type = 'STOCK_OUT'
+              ),
+              emp_shipments AS (
+                SELECT json_agg(shp_row) AS data FROM (
+                  SELECT 
                     shp.shipment_id,
                     shp.shipment_number,
                     shp.purchase_order_id,
@@ -133,33 +127,86 @@ def get_employee_dashboard(user_id=None):
                     shp.created_at,
                     COALESCE(poi_exp.total_expected, 0) AS total_expected,
                     COALESCE(st_rec.total_received, 0) AS total_received
-                FROM "Shipments" shp
-                JOIN "Suppliers" s ON shp.supplier_id = s.supplier_id
-                LEFT JOIN (
+                  FROM "Shipments" shp
+                  JOIN "Suppliers" s ON shp.supplier_id = s.supplier_id
+                  LEFT JOIN (
                     SELECT shipment_id, SUM(quantity) AS total_received
                     FROM "StockTransactions"
                     WHERE transaction_type = 'STOCK_IN' AND shipment_id IS NOT NULL
                     GROUP BY shipment_id
-                ) st_rec ON shp.shipment_id = st_rec.shipment_id
-                LEFT JOIN (
+                  ) st_rec ON shp.shipment_id = st_rec.shipment_id
+                  LEFT JOIN (
                     SELECT purchase_order_id, SUM(quantity) AS total_expected
                     FROM "PurchaseOrderItems"
                     GROUP BY purchase_order_id
-                ) poi_exp ON shp.purchase_order_id = poi_exp.purchase_order_id
-                WHERE shp.assigned_employee_id = %s
-                ORDER BY shp.shipment_id DESC
-            ''', (uid,))
-            shp_rows = cursor.fetchall()
+                  ) poi_exp ON shp.purchase_order_id = poi_exp.purchase_order_id
+                  WHERE shp.assigned_employee_id = %s
+                  ORDER BY shp.shipment_id DESC
+                ) shp_row
+              ),
+              emp_recent_tx AS (
+                SELECT json_agg(tx_row) AS data FROM (
+                  SELECT 
+                    st.transaction_id,
+                    st.product_id,
+                    p.product_name,
+                    p.sku,
+                    st.transaction_type,
+                    st.quantity,
+                    st.transaction_date,
+                    st.shipment_id,
+                    shp.shipment_number,
+                    st.notes
+                  FROM "StockTransactions" st
+                  JOIN "Products" p ON st.product_id = p.product_id
+                  LEFT JOIN "Shipments" shp ON st.shipment_id = shp.shipment_id
+                  WHERE st.user_id = %s
+                  ORDER BY st.transaction_date DESC, st.transaction_id DESC
+                  LIMIT 5
+                ) tx_row
+              )
+            SELECT
+              (SELECT username FROM emp_user) AS employee_name,
+              (SELECT data FROM emp_notifs) AS notifications,
+              (SELECT row_to_json(emp_stock_in.*) FROM emp_stock_in) AS stock_in_stats,
+              (SELECT row_to_json(emp_stock_out.*) FROM emp_stock_out) AS stock_out_stats,
+              (SELECT data FROM emp_shipments) AS shipments,
+              (SELECT data FROM emp_recent_tx) AS recent_transactions;
+            '''
 
+            cursor.execute(q_employee, (uid, uid, uid, uid, uid, uid))
+            emp_res = cursor.fetchone()
+
+            if emp_res[0]:
+                employee_name = emp_res[0]
+
+            for row in (emp_res[1] or []):
+                tasks.append({
+                    "notification_id": row['notification_id'],
+                    "title": row['title'],
+                    "message": row['message'],
+                    "created_at": row['created_at'],
+                    "is_read": row['is_read']
+                })
+
+            si_stats = emp_res[2] or {}
+            completed_stock_ins_count = int(si_stats.get('cnt', 0))
+            completed_stock_ins_qty = int(si_stats.get('qty', 0))
+
+            so_stats = emp_res[3] or {}
+            completed_stock_outs_count = int(so_stats.get('cnt', 0))
+            completed_stock_outs_qty = int(so_stats.get('qty', 0))
+
+            shp_rows = emp_res[4] or []
             assigned_shipments_count = len(shp_rows)
             for r in shp_rows:
-                s_id = r[0]
-                s_num = r[1]
-                po_id = r[2]
-                s_status = r[7] or "Ready for Shipment"
-                rec_status = r[8] or "Pending Receipt"
-                exp_qty = int(r[11] or 0)
-                rec_qty = int(r[12] or 0)
+                s_id = r['shipment_id']
+                s_num = r['shipment_number']
+                po_id = r['purchase_order_id']
+                s_status = r['status'] or "Ready for Shipment"
+                rec_status = r['receiving_status'] or "Pending Receipt"
+                exp_qty = int(r['total_expected'] or 0)
+                rec_qty = int(r['total_received'] or 0)
                 rem_qty = max(0, exp_qty - rec_qty)
                 is_delivered = (s_status.lower() == 'delivered')
                 can_stock_in = is_delivered and rem_qty > 0
@@ -168,14 +215,14 @@ def get_employee_dashboard(user_id=None):
                     "shipment_id": s_id,
                     "shipment_number": s_num,
                     "purchase_order_id": po_id,
-                    "supplier_id": r[3],
-                    "supplier_name": r[4],
-                    "carrier": r[5] or "Standard Courier",
-                    "tracking_number": r[6] or "",
+                    "supplier_id": r['supplier_id'],
+                    "supplier_name": r['supplier_name'],
+                    "carrier": r['carrier'] or "Standard Courier",
+                    "tracking_number": r['tracking_number'] or "",
                     "status": s_status,
                     "receiving_status": rec_status,
-                    "expected_delivery": str(r[9]) if r[9] else None,
-                    "created_at": r[10].isoformat() if r[10] else None,
+                    "expected_delivery": str(r['expected_delivery']) if r['expected_delivery'] else None,
+                    "created_at": r['created_at'],
                     "total_expected_quantity": exp_qty,
                     "total_received_quantity": rec_qty,
                     "total_remaining_quantity": rem_qty,
@@ -197,72 +244,31 @@ def get_employee_dashboard(user_id=None):
                         "shipment_id": s_id,
                         "shipment_number": s_num,
                         "purchase_order_id": po_id,
-                        "supplier_name": r[4],
+                        "supplier_name": r['supplier_name'],
                         "status": s_status,
                         "receiving_status": rec_status,
                         "total_expected": exp_qty,
                         "total_received": rec_qty,
                         "total_remaining": rem_qty,
                         "title": f"Shipment {s_num} Ready for Stock-In",
-                        "description": f"Delivered by {r[4]} (PO #{po_id}). {rem_qty} of {exp_qty} units awaiting goods receipt.",
+                        "description": f"Delivered by {r['supplier_name']} (PO #{po_id}). {rem_qty} of {exp_qty} units awaiting goods receipt.",
                         "priority": "Urgent" if rem_qty >= 20 else "Action Required",
                         "action_label": "Receive Stock →",
                         "target_page": "shipments"
                     })
 
-            # 4. Completed stock-in metrics performed by this employee
-            cursor.execute('''
-                SELECT COUNT(*), COALESCE(SUM(quantity), 0)
-                FROM "StockTransactions"
-                WHERE user_id = %s AND transaction_type = 'STOCK_IN'
-            ''', (uid,))
-            si_row = cursor.fetchone()
-            completed_stock_ins_count = int(si_row[0] or 0)
-            completed_stock_ins_qty = int(si_row[1] or 0)
-
-            # 5. Completed stock-out metrics performed by this employee
-            cursor.execute('''
-                SELECT COUNT(*), COALESCE(SUM(quantity), 0)
-                FROM "StockTransactions"
-                WHERE user_id = %s AND transaction_type = 'STOCK_OUT'
-            ''', (uid,))
-            so_row = cursor.fetchone()
-            completed_stock_outs_count = int(so_row[0] or 0)
-            completed_stock_outs_qty = int(so_row[1] or 0)
-
-            # 6. Latest 5 StockTransactions performed by this employee
-            cursor.execute('''
-                SELECT 
-                    st.transaction_id,
-                    st.product_id,
-                    p.product_name,
-                    p.sku,
-                    st.transaction_type,
-                    st.quantity,
-                    st.transaction_date,
-                    st.shipment_id,
-                    shp.shipment_number,
-                    st.notes
-                FROM "StockTransactions" st
-                JOIN "Products" p ON st.product_id = p.product_id
-                LEFT JOIN "Shipments" shp ON st.shipment_id = shp.shipment_id
-                WHERE st.user_id = %s
-                ORDER BY st.transaction_date DESC, st.transaction_id DESC
-                LIMIT 5
-            ''', (uid,))
-            tx_rows = cursor.fetchall()
-            for t in tx_rows:
+            for t in (emp_res[5] or []):
                 recent_transactions.append({
-                    "transaction_id": t[0],
-                    "product_id": t[1],
-                    "product_name": t[2],
-                    "sku": t[3] or "",
-                    "transaction_type": t[4],
-                    "quantity": int(t[5] or 0),
-                    "transaction_date": t[6].isoformat() if t[6] else None,
-                    "shipment_id": t[7],
-                    "shipment_number": t[8] or "",
-                    "notes": t[9] or ""
+                    "transaction_id": t['transaction_id'],
+                    "product_id": t['product_id'],
+                    "product_name": t['product_name'],
+                    "sku": t['sku'] or "",
+                    "transaction_type": t['transaction_type'],
+                    "quantity": int(t['quantity'] or 0),
+                    "transaction_date": t['transaction_date'],
+                    "shipment_id": t['shipment_id'],
+                    "shipment_number": t['shipment_number'] or "",
+                    "notes": t['notes'] or ""
                 })
 
         return {
@@ -300,6 +306,9 @@ def get_supplier_dashboard(user_id=None):
     """
     Get live database-driven dashboard metrics for the authenticated Supplier.
     Strictly isolated: never aggregates data belonging to other suppliers.
+    Consolidated into two optimized round-trips:
+      1. Supplier identity, profile fields, order/quotation/shipment aggregate counts and rates
+      2. Attention items and recent orders/requests/audit history
     """
     if not user_id:
         return None, "Authenticated user identity required."
@@ -308,342 +317,299 @@ def get_supplier_dashboard(user_id=None):
     cursor = conn.cursor()
 
     try:
-        # Resolve supplier_id from authenticated JWT user_id
-        cursor.execute("""
+        uid = int(user_id)
+
+        # Query 1: Supplier profile and all scalar aggregates
+        q_metrics = '''
+        WITH
+          sup_profile AS (
             SELECT supplier_id, supplier_name, contact_person, phone, email, status
             FROM "Suppliers"
-            WHERE user_id = %s
-        """, (int(user_id),))
-        sup = cursor.fetchone()
+            WHERE user_id = %(uid)s
+          ),
+          req_stats AS (
+            SELECT 
+              COUNT(CASE WHEN status IN ('Pending', 'Open') THEN 1 END) AS open_requests,
+              COUNT(*) AS total_requests
+            FROM "StockRequests"
+            WHERE supplier_id = (SELECT supplier_id FROM sup_profile)
+          ),
+          quo_stats AS (
+            SELECT
+              COUNT(CASE WHEN status IN ('Pending', 'Submitted', 'Under Review') THEN 1 END) AS pending_quotations,
+              COUNT(CASE WHEN status IN ('Approved', 'Accepted') THEN 1 END) AS approved_quotations,
+              COUNT(CASE WHEN status IN ('Approved', 'Accepted', 'Rejected') THEN 1 END) AS resolved_quotations,
+              COUNT(*) AS total_quotations
+            FROM "SupplierQuotations"
+            WHERE supplier_id = (SELECT supplier_id FROM sup_profile)
+          ),
+          po_stats AS (
+            SELECT
+              COUNT(CASE WHEN status NOT IN ('Completed', 'Rejected', 'Cancelled') THEN 1 END) AS active_pos,
+              COUNT(*) AS total_purchase_orders,
+              COALESCE(SUM(total_amount), 0) AS total_order_value,
+              COUNT(CASE WHEN supplier_response = 'Accepted' THEN 1 END) AS po_accepted,
+              COUNT(CASE WHEN supplier_response IN ('Accepted', 'Rejected') THEN 1 END) AS po_responded
+            FROM "PurchaseOrders"
+            WHERE supplier_id = (SELECT supplier_id FROM sup_profile)
+          ),
+          ship_counts AS (
+            SELECT status, COUNT(*) AS cnt
+            FROM "Shipments"
+            WHERE supplier_id = (SELECT supplier_id FROM sup_profile)
+            GROUP BY status
+          ),
+          ship_stats AS (
+            SELECT
+              COUNT(CASE WHEN status NOT IN ('Delivered', 'Cancelled') AND expected_delivery < CURRENT_DATE THEN 1 END) AS delayed,
+              COUNT(CASE WHEN status NOT IN ('Delivered', 'Cancelled') THEN 1 END) AS pending_deliveries,
+              COUNT(CASE WHEN status = 'Delivered' AND delivered_at IS NOT NULL AND (expected_delivery IS NULL OR delivered_at::date <= expected_delivery) THEN 1 END) AS on_time_deliveries,
+              COUNT(CASE WHEN status = 'Delivered' AND delivered_at IS NOT NULL THEN 1 END) AS total_delivered_deliveries
+            FROM "Shipments"
+            WHERE supplier_id = (SELECT supplier_id FROM sup_profile)
+          )
+        SELECT
+          (SELECT row_to_json(sup_profile.*) FROM sup_profile) AS profile,
+          (SELECT row_to_json(req_stats.*) FROM req_stats) AS req_stats,
+          (SELECT row_to_json(quo_stats.*) FROM quo_stats) AS quo_stats,
+          (SELECT row_to_json(po_stats.*) FROM po_stats) AS po_stats,
+          (SELECT json_object_agg(status, cnt) FROM ship_counts) AS raw_ship_counts,
+          (SELECT row_to_json(ship_stats.*) FROM ship_stats) AS ship_stats;
+        '''
 
+        cursor.execute(q_metrics, {'uid': uid})
+        m_row = cursor.fetchone()
+
+        sup = m_row[0]
         if not sup:
             return None, "Supplier profile not found for authenticated user."
 
-        supplier_id = sup[0]
-        supplier_name = sup[1]
-        contact_person = sup[2] or ""
-        phone = sup[3] or ""
-        email = sup[4] or ""
-        status = sup[5] or "Active"
+        supplier_id = sup['supplier_id']
+        supplier_name = sup['supplier_name']
+        contact_person = sup['contact_person'] or ""
+        phone = sup['phone'] or ""
+        email = sup['email'] or ""
+        status = sup['status'] or "Active"
 
-        # 1. Open Requests (from StockRequests)
-        cursor.execute("""
-            SELECT COUNT(*)
-            FROM "StockRequests"
-            WHERE supplier_id = %s AND status IN ('Pending', 'Open')
-        """, (supplier_id,))
-        open_requests = cursor.fetchone()[0]
+        req_stats = m_row[1] or {}
+        open_requests = int(req_stats.get('open_requests', 0))
+        total_requests = int(req_stats.get('total_requests', 0))
 
-        cursor.execute("""
-            SELECT COUNT(*)
-            FROM "StockRequests"
-            WHERE supplier_id = %s
-        """, (supplier_id,))
-        total_requests = cursor.fetchone()[0]
-
-        # 2. Pending Quotations (from SupplierQuotations)
-        cursor.execute("""
-            SELECT COUNT(*)
-            FROM "SupplierQuotations"
-            WHERE supplier_id = %s AND status IN ('Pending', 'Submitted', 'Under Review')
-        """, (supplier_id,))
-        pending_quotations = cursor.fetchone()[0]
-
-        cursor.execute("""
-            SELECT COUNT(*)
-            FROM "SupplierQuotations"
-            WHERE supplier_id = %s AND status IN ('Approved', 'Accepted')
-        """, (supplier_id,))
-        approved_quotations = cursor.fetchone()[0]
-
-        cursor.execute("""
-            SELECT COUNT(*)
-            FROM "SupplierQuotations"
-            WHERE supplier_id = %s
-        """, (supplier_id,))
-        total_quotations = cursor.fetchone()[0]
-
-        # 3. Active POs (Purchase Orders belonging to this supplier not Completed, Rejected, or Cancelled)
-        cursor.execute("""
-            SELECT COUNT(*)
-            FROM "PurchaseOrders"
-            WHERE supplier_id = %s AND status NOT IN ('Completed', 'Rejected', 'Cancelled')
-        """, (supplier_id,))
-        active_pos = cursor.fetchone()[0]
-
-        cursor.execute("""
-            SELECT COUNT(*)
-            FROM "PurchaseOrders"
-            WHERE supplier_id = %s
-        """, (supplier_id,))
-        total_purchase_orders = cursor.fetchone()[0]
-
-        cursor.execute("""
-            SELECT COALESCE(SUM(total_amount), 0)
-            FROM "PurchaseOrders"
-            WHERE supplier_id = %s
-        """, (supplier_id,))
-        total_order_value = float(cursor.fetchone()[0])
-
-        # 4. Pending Payments
-        # Note: Database does not have a Payments/Invoices table yet. We explicitly report this.
-        pending_payments = None
-        has_payment_module = False
-
-        # 5. On-time Delivery Rate
-        # Calculate from actual delivered shipments where expected_delivery is set
-        cursor.execute("""
-            SELECT expected_delivery, delivered_at
-            FROM "Shipments"
-            WHERE supplier_id = %s AND status = 'Delivered' AND delivered_at IS NOT NULL
-        """, (supplier_id,))
-        shipment_rows = cursor.fetchall()
-
-        total_deliveries = len(shipment_rows)
-        on_time_count = 0
-        for s_row in shipment_rows:
-            exp_date = s_row[0]
-            deliv_time = s_row[1]
-            if exp_date and deliv_time:
-                # If delivered on or before the expected delivery date
-                if deliv_time.date() <= exp_date:
-                    on_time_count += 1
-            else:
-                on_time_count += 1  # Count as on-time if no target date was breached
-
-        on_time_delivery_rate = round((on_time_count / total_deliveries) * 100, 1) if total_deliveries > 0 else None
-
-        # 6. Quotation Acceptance Rate
-        cursor.execute("""
-            SELECT
-                COUNT(*) FILTER (WHERE status IN ('Approved', 'Accepted')) AS approved,
-                COUNT(*) FILTER (WHERE status IN ('Approved', 'Accepted', 'Rejected')) AS resolved,
-                COUNT(*) AS total
-            FROM "SupplierQuotations"
-            WHERE supplier_id = %s
-        """, (supplier_id,))
-        q_stats = cursor.fetchone()
-        quotation_approved = q_stats[0] or 0
-        quotation_resolved = q_stats[1] or 0
+        quo_stats = m_row[2] or {}
+        pending_quotations = int(quo_stats.get('pending_quotations', 0))
+        approved_quotations = int(quo_stats.get('approved_quotations', 0))
+        total_quotations = int(quo_stats.get('total_quotations', 0))
+        quotation_approved = approved_quotations
+        quotation_resolved = int(quo_stats.get('resolved_quotations', 0))
         quotation_acceptance_rate = round((quotation_approved / quotation_resolved) * 100, 1) if quotation_resolved > 0 else (
             100.0 if quotation_approved > 0 else None
         )
 
-        # 7. Order Acceptance Rate
-        cursor.execute("""
-            SELECT
-                COUNT(*) FILTER (WHERE supplier_response = 'Accepted') AS accepted,
-                COUNT(*) FILTER (WHERE supplier_response IN ('Accepted', 'Rejected')) AS responded,
-                COUNT(*) AS total
-            FROM "PurchaseOrders"
-            WHERE supplier_id = %s
-        """, (supplier_id,))
-        po_stats = cursor.fetchone()
-        po_accepted = po_stats[0] or 0
-        po_responded = po_stats[1] or 0
+        po_stats = m_row[3] or {}
+        active_pos = int(po_stats.get('active_pos', 0))
+        total_purchase_orders = int(po_stats.get('total_purchase_orders', 0))
+        total_order_value = float(po_stats.get('total_order_value', 0.0))
+        po_accepted = int(po_stats.get('po_accepted', 0))
+        po_responded = int(po_stats.get('po_responded', 0))
         order_acceptance_rate = round((po_accepted / po_responded) * 100, 1) if po_responded > 0 else (
             100.0 if po_accepted > 0 else None
         )
 
-        # 8. Profile Completion Rate
+        raw_ship_counts = m_row[4] or {}
+        ship_stats_raw = m_row[5] or {}
+        pending_deliveries = int(ship_stats_raw.get('pending_deliveries', 0))
+        delayed_deliveries = int(ship_stats_raw.get('delayed', 0))
+        on_time_count = int(ship_stats_raw.get('on_time_deliveries', 0))
+        total_deliveries = int(ship_stats_raw.get('total_delivered_deliveries', 0))
+        on_time_delivery_rate = round((on_time_count / total_deliveries) * 100, 1) if total_deliveries > 0 else None
+
+        shipment_stats = {
+            "ready_for_shipment": int(raw_ship_counts.get("Ready for Shipment", 0)),
+            "dispatched": int(raw_ship_counts.get("Dispatched", 0)),
+            "in_transit": int(raw_ship_counts.get("In Transit", 0)),
+            "delayed": delayed_deliveries,
+            "delivered": int(raw_ship_counts.get("Delivered", 0)),
+            "total": sum(int(v) for v in raw_ship_counts.values())
+        }
+
+        # Profile Completion Rate
         profile_fields = [supplier_name, contact_person, phone, email, status]
         filled_count = sum(1 for f in profile_fields if f and str(f).strip())
         profile_completion = int(round((filled_count / len(profile_fields)) * 100))
 
-        # Recent pending stock requests for actionable dashboard list
-        cursor.execute("""
-            SELECT
-                sr.stock_request_id,
-                sr.request_number,
-                sr.priority,
-                sr.required_date,
-                sr.created_at,
-                COALESCE(SUM(sri.requested_quantity), 0) AS total_qty,
-                (
-                    SELECT p.product_name
-                    FROM "StockRequestItems" sri2
-                    JOIN "Products" p ON sri2.product_id = p.product_id
-                    WHERE sri2.stock_request_id = sr.stock_request_id
-                    LIMIT 1
-                ) AS primary_product
-            FROM "StockRequests" sr
-            LEFT JOIN "StockRequestItems" sri ON sr.stock_request_id = sri.stock_request_id
-            WHERE sr.supplier_id = %s AND sr.status IN ('Pending', 'Open')
-            GROUP BY sr.stock_request_id
-            ORDER BY sr.created_at DESC
-            LIMIT 5
-        """, (supplier_id,))
-        recent_req_rows = cursor.fetchall()
+        # Payments placeholder
+        pending_payments = None
+        has_payment_module = False
+
+        # Query 2: Lists & Attention items
+        q_lists = '''
+        SELECT
+          -- recent_stock_requests (limit 5)
+          (SELECT json_agg(sr_row) FROM (
+             SELECT
+                 sr.stock_request_id,
+                 sr.request_number,
+                 sr.priority,
+                 sr.required_date,
+                 sr.created_at,
+                 COALESCE(SUM(sri.requested_quantity), 0) AS total_qty,
+                 (
+                     SELECT p.product_name
+                     FROM "StockRequestItems" sri2
+                     JOIN "Products" p ON sri2.product_id = p.product_id
+                     WHERE sri2.stock_request_id = sr.stock_request_id
+                     LIMIT 1
+                 ) AS primary_product
+             FROM "StockRequests" sr
+             LEFT JOIN "StockRequestItems" sri ON sr.stock_request_id = sri.stock_request_id
+             WHERE sr.supplier_id = %(sid)s AND sr.status IN ('Pending', 'Open')
+             GROUP BY sr.stock_request_id
+             ORDER BY sr.created_at DESC
+             LIMIT 5
+           ) sr_row) AS recent_stock_requests,
+
+          -- recent_orders (limit 5)
+          (SELECT json_agg(po_row) FROM (
+             SELECT
+                 purchase_order_id,
+                 order_date,
+                 expected_delivery,
+                 total_amount,
+                 status,
+                 supplier_response
+             FROM "PurchaseOrders"
+             WHERE supplier_id = %(sid)s
+             ORDER BY order_date DESC
+             LIMIT 5
+           ) po_row) AS recent_orders,
+
+          -- attention_stock_requests (limit 5)
+          (SELECT json_agg(asr_row) FROM (
+             SELECT sr.stock_request_id, sr.request_number, sr.priority, sr.required_date, sr.created_at,
+                    COALESCE((
+                        SELECT p.product_name 
+                        FROM "StockRequestItems" sri 
+                        JOIN "Products" p ON sri.product_id = p.product_id 
+                        WHERE sri.stock_request_id = sr.stock_request_id 
+                        LIMIT 1
+                    ), 'Restock Request') AS primary_product
+             FROM "StockRequests" sr
+             WHERE sr.supplier_id = %(sid)s AND sr.status IN ('Pending', 'Open')
+             ORDER BY CASE WHEN sr.priority = 'Urgent' THEN 1 WHEN sr.priority = 'High' THEN 2 ELSE 3 END, sr.created_at DESC
+             LIMIT 5
+           ) asr_row) AS attention_stock_requests,
+
+          -- attention_orders (limit 5)
+          (SELECT json_agg(apo_row) FROM (
+             SELECT po.purchase_order_id, po.order_date, po.total_amount, po.status, po.supplier_response
+             FROM "PurchaseOrders" po
+             WHERE po.supplier_id = %(sid)s AND (po.supplier_response = 'Pending' OR po.supplier_response IS NULL) AND po.status NOT IN ('Cancelled', 'Rejected', 'Delivered')
+             ORDER BY po.order_date DESC
+             LIMIT 5
+           ) apo_row) AS attention_orders,
+
+          -- attention_delayed_shipments (limit 5)
+          (SELECT json_agg(ash_row) FROM (
+             SELECT s.shipment_id, s.shipment_number, s.expected_delivery, s.status, s.purchase_order_id
+             FROM "Shipments" s
+             WHERE s.supplier_id = %(sid)s AND s.status NOT IN ('Delivered', 'Cancelled') AND s.expected_delivery < CURRENT_DATE
+             ORDER BY s.expected_delivery ASC
+             LIMIT 5
+           ) ash_row) AS attention_delayed_shipments,
+
+          -- recent_activity (limit 6)
+          (SELECT json_agg(act_row) FROM (
+             SELECT history_id, purchase_order_id, shipment_id, status, previous_status, action, notes, changed_by, created_at
+             FROM "OrderStatusHistory"
+             WHERE supplier_id = %(sid)s
+             ORDER BY created_at DESC
+             LIMIT 6
+           ) act_row) AS recent_activity;
+        '''
+
+        cursor.execute(q_lists, {'sid': supplier_id})
+        l_row = cursor.fetchone()
 
         recent_stock_requests = []
-        for rr in recent_req_rows:
+        for rr in (l_row[0] or []):
             recent_stock_requests.append({
-                "stock_request_id": rr[0],
-                "request_number": rr[1],
-                "priority": rr[2] or "Medium",
-                "required_date": rr[3].isoformat() if rr[3] else None,
-                "created_at": rr[4].isoformat() if rr[4] else None,
-                "total_quantity": int(rr[5]),
-                "primary_product": rr[6] or "General Catalog"
+                "stock_request_id": rr['stock_request_id'],
+                "request_number": rr['request_number'],
+                "priority": rr['priority'] or "Medium",
+                "required_date": rr['required_date'],
+                "created_at": rr['created_at'],
+                "total_quantity": int(rr['total_qty']),
+                "primary_product": rr['primary_product'] or "General Catalog"
             })
-
-        # Recent purchase orders for this supplier
-        cursor.execute("""
-            SELECT
-                purchase_order_id,
-                order_date,
-                expected_delivery,
-                total_amount,
-                status,
-                supplier_response
-            FROM "PurchaseOrders"
-            WHERE supplier_id = %s
-            ORDER BY order_date DESC
-            LIMIT 5
-        """, (supplier_id,))
-        recent_po_rows = cursor.fetchall()
 
         recent_orders = []
-        for rpo in recent_po_rows:
+        for rpo in (l_row[1] or []):
             recent_orders.append({
-                "purchase_order_id": rpo[0],
-                "order_date": rpo[1].isoformat() if rpo[1] else None,
-                "expected_delivery": rpo[2].isoformat() if rpo[2] else None,
-                "total_amount": float(rpo[3]) if rpo[3] is not None else 0.0,
-                "status": rpo[4],
-                "supplier_response": rpo[5] or "Pending"
+                "purchase_order_id": rpo['purchase_order_id'],
+                "order_date": rpo['order_date'],
+                "expected_delivery": rpo['expected_delivery'],
+                "total_amount": float(rpo['total_amount']) if rpo['total_amount'] is not None else 0.0,
+                "status": rpo['status'],
+                "supplier_response": rpo['supplier_response'] or "Pending"
             })
 
-        # 4. Pending Deliveries (Shipments not yet delivered or cancelled)
-        cursor.execute("""
-            SELECT COUNT(*)
-            FROM "Shipments"
-            WHERE supplier_id = %s AND status NOT IN ('Delivered', 'Cancelled')
-        """, (supplier_id,))
-        pending_deliveries = cursor.fetchone()[0]
-
-        # Detailed shipment status counts (Step 5 statuses)
-        cursor.execute("""
-            SELECT status, COUNT(*)
-            FROM "Shipments"
-            WHERE supplier_id = %s
-            GROUP BY status
-        """, (supplier_id,))
-        raw_ship_counts = dict(cursor.fetchall())
-
-        cursor.execute("""
-            SELECT COUNT(*)
-            FROM "Shipments"
-            WHERE supplier_id = %s AND status NOT IN ('Delivered', 'Cancelled') AND expected_delivery < CURRENT_DATE
-        """, (supplier_id,))
-        delayed_deliveries = cursor.fetchone()[0]
-
-        shipment_stats = {
-            "ready_for_shipment": raw_ship_counts.get("Ready for Shipment", 0),
-            "dispatched": raw_ship_counts.get("Dispatched", 0),
-            "in_transit": raw_ship_counts.get("In Transit", 0),
-            "delayed": delayed_deliveries,
-            "delivered": raw_ship_counts.get("Delivered", 0),
-            "total": sum(raw_ship_counts.values())
-        }
-
-        # 5. Actionable Items for "Needs Your Attention"
         attention_items = []
-
-        # (a) Stock Requests awaiting response
-        cursor.execute("""
-            SELECT sr.stock_request_id, sr.request_number, sr.priority, sr.required_date, sr.created_at,
-                   COALESCE((
-                       SELECT p.product_name 
-                       FROM "StockRequestItems" sri 
-                       JOIN "Products" p ON sri.product_id = p.product_id 
-                       WHERE sri.stock_request_id = sr.stock_request_id 
-                       LIMIT 1
-                   ), 'Restock Request') AS primary_product
-            FROM "StockRequests" sr
-            WHERE sr.supplier_id = %s AND sr.status IN ('Pending', 'Open')
-            ORDER BY CASE WHEN sr.priority = 'Urgent' THEN 1 WHEN sr.priority = 'High' THEN 2 ELSE 3 END, sr.created_at DESC
-            LIMIT 5
-        """, (supplier_id,))
-        for sr in cursor.fetchall():
+        for sr in (l_row[2] or []):
             attention_items.append({
                 "type": "stock_request",
-                "id": sr[0],
-                "reference": sr[1],
-                "title": f"Stock Request {sr[1]} needs response",
-                "description": f"Priority: {sr[2]} • Product: {sr[5]}",
-                "date": sr[3].isoformat() if sr[3] else None,
+                "id": sr['stock_request_id'],
+                "reference": sr['request_number'],
+                "title": f"Stock Request {sr['request_number']} needs response",
+                "description": f"Priority: {sr['priority']} • Product: {sr['primary_product']}",
+                "date": sr['required_date'],
                 "status": "Pending",
-                "priority": sr[2],
+                "priority": sr['priority'],
                 "target_page": "stock-requests",
                 "action_label": "Review"
             })
 
-        # (b) Purchase Orders awaiting supplier response/acceptance
-        cursor.execute("""
-            SELECT po.purchase_order_id, po.order_date, po.total_amount, po.status, po.supplier_response
-            FROM "PurchaseOrders" po
-            WHERE po.supplier_id = %s AND (po.supplier_response = 'Pending' OR po.supplier_response IS NULL) AND po.status NOT IN ('Cancelled', 'Rejected', 'Delivered')
-            ORDER BY po.order_date DESC
-            LIMIT 5
-        """, (supplier_id,))
-        for po in cursor.fetchall():
+        for po in (l_row[3] or []):
+            order_date_val = po['order_date']
             attention_items.append({
                 "type": "purchase_order",
-                "id": po[0],
-                "reference": f"PO #{po[0]}",
-                "title": f"PO #{po[0]} is awaiting your acceptance",
-                "description": f"Order value: ₹{float(po[2]):,.2f} • Ordered: {po[1]}",
-                "date": po[1].isoformat() if po[1] else None,
+                "id": po['purchase_order_id'],
+                "reference": f"PO #{po['purchase_order_id']}",
+                "title": f"PO #{po['purchase_order_id']} is awaiting your acceptance",
+                "description": f"Order value: ₹{float(po['total_amount']):,.2f} • Ordered: {order_date_val}",
+                "date": order_date_val,
                 "status": "Awaiting Acceptance",
                 "priority": "High",
                 "target_page": "purchase-orders",
                 "action_label": "Review"
             })
 
-        # (c) Delayed Shipments
-        cursor.execute("""
-            SELECT s.shipment_id, s.shipment_number, s.expected_delivery, s.status, s.purchase_order_id
-            FROM "Shipments" s
-            WHERE s.supplier_id = %s AND s.status NOT IN ('Delivered', 'Cancelled') AND s.expected_delivery < CURRENT_DATE
-            ORDER BY s.expected_delivery ASC
-            LIMIT 5
-        """, (supplier_id,))
-        for sh in cursor.fetchall():
+        for sh in (l_row[4] or []):
+            exp_date_val = sh['expected_delivery']
             attention_items.append({
                 "type": "delayed_shipment",
-                "id": sh[0],
-                "reference": sh[1],
-                "title": f"Shipment {sh[1]} is delayed",
-                "description": f"Expected on {sh[2]} for PO #{sh[4]}",
-                "date": sh[2].isoformat() if sh[2] else None,
+                "id": sh['shipment_id'],
+                "reference": sh['shipment_number'],
+                "title": f"Shipment {sh['shipment_number']} is delayed",
+                "description": f"Expected on {exp_date_val} for PO #{sh['purchase_order_id']}",
+                "date": exp_date_val,
                 "status": "Delayed",
                 "priority": "Urgent",
                 "target_page": "shipments",
                 "action_label": "Track"
             })
 
-        # 6. Recent Activity from OrderStatusHistory
-        cursor.execute("""
-            SELECT history_id, purchase_order_id, shipment_id, status, previous_status, action, notes, changed_by, created_at
-            FROM "OrderStatusHistory"
-            WHERE supplier_id = %s
-            ORDER BY created_at DESC
-            LIMIT 6
-        """, (supplier_id,))
-        history_rows = cursor.fetchall()
         recent_activity = []
-        for h in history_rows:
+        for h in (l_row[5] or []):
             recent_activity.append({
-                "history_id": h[0],
-                "purchase_order_id": h[1],
-                "shipment_id": h[2],
-                "status": h[3],
-                "previous_status": h[4],
-                "action": h[5] or "UPDATE",
-                "notes": h[6] or "",
-                "changed_by": h[7] or "System",
-                "created_at": h[8].isoformat() if h[8] else None
+                "history_id": h['history_id'],
+                "purchase_order_id": h['purchase_order_id'],
+                "shipment_id": h['shipment_id'],
+                "status": h['status'],
+                "previous_status": h['previous_status'],
+                "action": h['action'] or "UPDATE",
+                "notes": h['notes'] or "",
+                "changed_by": h['changed_by'] or "System",
+                "created_at": h['created_at']
             })
 
         return {
@@ -661,7 +627,7 @@ def get_supplier_dashboard(user_id=None):
             "active_pos": active_pos,
             "total_purchase_orders": total_purchase_orders,
             "received_orders": total_purchase_orders,
-            "completed_orders": raw_ship_counts.get("Delivered", 0),
+            "completed_orders": int(raw_ship_counts.get("Delivered", 0)),
             "total_order_value": total_order_value,
             "total_purchase_amount": total_order_value,
             "pending_deliveries": pending_deliveries,
@@ -686,123 +652,226 @@ def get_supplier_dashboard(user_id=None):
 
 
 def get_manager_dashboard():
+    """
+    Get live database-driven dashboard metrics for the Manager role.
+    Consolidated into two optimized round-trips:
+      1. Scalar metrics: active POs, low stock count, pending quotations, pending deliveries,
+         shipment status counts, stock requests overview, and 30-day stock movement
+      2. Lists: attention quotations, attention low stock, attention deliveries,
+         recent purchase orders, critical low stock, recent stock requests,
+         recent stock transactions, and recent operational activity
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
 
     try:
-        # 1. Active purchase orders (orders that are not Completed, Rejected, or Cancelled)
-        cursor.execute('''
-            SELECT COUNT(*)
+        q_metrics = '''
+        WITH
+          po_stats AS (
+            SELECT 
+                COUNT(*) AS active_pos, 
+                COALESCE(SUM(total_amount), 0) AS pending_po_value
             FROM "PurchaseOrders"
             WHERE status NOT IN ('Completed', 'Rejected', 'Cancelled')
-        ''')
-        active_pos = cursor.fetchone()[0]
-
-        # 2. Pending purchase order value (value of purchase orders awaiting fulfillment)
-        cursor.execute('''
-            SELECT COALESCE(SUM(total_amount), 0)
-            FROM "PurchaseOrders"
-            WHERE status NOT IN ('Completed', 'Rejected', 'Cancelled')
-        ''')
-        pending_po_value = float(cursor.fetchone()[0])
-
-        # 3. Low-stock count using dynamic reorder level from Products
-        cursor.execute('''
-            SELECT COUNT(*)
+          ),
+          ls_stats AS (
+            SELECT COUNT(*) AS low_stock_count
             FROM "Products" p
-            JOIN "Inventory" i
-                ON p.product_id = i.product_id
+            JOIN "Inventory" i ON p.product_id = i.product_id
             WHERE i.quantity_available <= COALESCE(p.reorder_level, 10)
-        ''')
-        low_stock_count = cursor.fetchone()[0]
-
-        # 4. Pending Quotations awaiting Manager review/approval
-        cursor.execute('''
-            SELECT COUNT(*)
+          ),
+          quo_stats AS (
+            SELECT COUNT(*) AS pending_quotations
             FROM "SupplierQuotations"
             WHERE status IN ('Submitted', 'Pending', 'Under Review')
-        ''')
-        pending_quotations = cursor.fetchone()[0]
-
-        # 5. Pending Deliveries (Delivered shipments awaiting receiving / Stock-In)
-        cursor.execute('''
-            SELECT COUNT(*)
+          ),
+          deliv_stats AS (
+            SELECT COUNT(*) AS pending_deliveries
             FROM "Shipments"
             WHERE status = 'Delivered' AND (receiving_status IS NULL OR receiving_status NOT IN ('Fully Received', 'Received'))
-        ''')
-        pending_deliveries = cursor.fetchone()[0]
-
-        # 6. Detailed Shipment Status counts
-        cursor.execute('''
-            SELECT status, COUNT(*)
+          ),
+          ship_counts AS (
+            SELECT status, COUNT(*) AS cnt
             FROM "Shipments"
             GROUP BY status
-        ''')
-        raw_ship_counts = dict(cursor.fetchall())
-
-        cursor.execute('''
-            SELECT COUNT(*)
+          ),
+          ship_delayed AS (
+            SELECT COUNT(*) AS delayed
             FROM "Shipments"
             WHERE status NOT IN ('Delivered', 'Cancelled') AND expected_delivery < CURRENT_DATE
-        ''')
-        delayed_shipments = cursor.fetchone()[0]
+          ),
+          sr_counts AS (
+            SELECT status, COUNT(*) AS cnt
+            FROM "StockRequests"
+            GROUP BY status
+          ),
+          movement_stats AS (
+            SELECT COALESCE(SUM(quantity), 0) AS recent_stock_movement
+            FROM "StockTransactions"
+            WHERE transaction_date >= CURRENT_DATE - INTERVAL '30 days'
+          )
+        SELECT 
+          (SELECT row_to_json(po_stats.*) FROM po_stats) AS po_stats,
+          (SELECT low_stock_count FROM ls_stats) AS low_stock_count,
+          (SELECT pending_quotations FROM quo_stats) AS pending_quotations,
+          (SELECT pending_deliveries FROM deliv_stats) AS pending_deliveries,
+          (SELECT json_object_agg(status, cnt) FROM ship_counts) AS ship_counts,
+          (SELECT delayed FROM ship_delayed) AS delayed_shipments,
+          (SELECT json_object_agg(status, cnt) FROM sr_counts) AS sr_counts,
+          (SELECT recent_stock_movement FROM movement_stats) AS recent_stock_movement;
+        '''
+
+        q_lists = '''
+        SELECT
+          -- Quotations awaiting Manager approval (limit 4)
+          (SELECT json_agg(q_row) FROM (
+             SELECT q.quotation_id, q.quotation_number, sup.supplier_name, q.total_amount, q.status, q.quotation_date
+             FROM "SupplierQuotations" q
+             LEFT JOIN "Suppliers" sup ON q.supplier_id = sup.supplier_id
+             WHERE q.status IN ('Submitted', 'Pending', 'Under Review')
+             ORDER BY q.quotation_date DESC NULLS LAST
+             LIMIT 4
+           ) q_row) AS attention_quotations,
+
+          -- Low-Stock critical products requiring replenishment (limit 4)
+          (SELECT json_agg(als_row) FROM (
+             SELECT p.product_id, p.product_name, p.sku, i.quantity_available, p.reorder_level
+             FROM "Products" p
+             JOIN "Inventory" i ON p.product_id = i.product_id
+             WHERE i.quantity_available <= COALESCE(p.reorder_level, 10)
+             ORDER BY (i.quantity_available - COALESCE(p.reorder_level, 10)) ASC
+             LIMIT 4
+           ) als_row) AS attention_low_stock,
+
+          -- Delivered shipments awaiting receiving / Stock-In (limit 4)
+          (SELECT json_agg(d_row) FROM (
+             SELECT s.shipment_id, s.shipment_number, s.purchase_order_id, sup.supplier_name, s.status, s.receiving_status, s.delivered_at
+             FROM "Shipments" s
+             LEFT JOIN "Suppliers" sup ON s.supplier_id = sup.supplier_id
+             WHERE s.status = 'Delivered' AND (s.receiving_status IS NULL OR s.receiving_status NOT IN ('Fully Received', 'Received'))
+             ORDER BY s.delivered_at DESC NULLS LAST
+             LIMIT 4
+           ) d_row) AS attention_deliveries,
+
+          -- Recent Purchase Orders (limit 5)
+          (SELECT json_agg(po_row) FROM (
+             SELECT po.purchase_order_id, po.order_date, po.expected_delivery, po.total_amount, po.status, sup.supplier_name
+             FROM "PurchaseOrders" po
+             LEFT JOIN "Suppliers" sup ON po.supplier_id = sup.supplier_id
+             ORDER BY po.order_date DESC NULLS LAST
+             LIMIT 5
+           ) po_row) AS recent_orders,
+
+          -- Critical Low Stock items table (limit 5)
+          (SELECT json_agg(cls_row) FROM (
+             SELECT p.product_id, p.product_name, p.sku, i.quantity_available, p.reorder_level
+             FROM "Products" p
+             JOIN "Inventory" i ON p.product_id = i.product_id
+             WHERE i.quantity_available <= COALESCE(p.reorder_level, 10)
+             ORDER BY (i.quantity_available - COALESCE(p.reorder_level, 10)) ASC
+             LIMIT 5
+           ) cls_row) AS critical_low_stock,
+
+          -- Recent stock requests (limit 5)
+          (SELECT json_agg(sr_row) FROM (
+             SELECT sr.stock_request_id, sr.request_number, sr.priority, sr.status, sr.required_date, sr.created_at,
+                    (SELECT p.product_name FROM "StockRequestItems" sri JOIN "Products" p ON sri.product_id = p.product_id WHERE sri.stock_request_id = sr.stock_request_id LIMIT 1) AS primary_product,
+                    (SELECT COALESCE(SUM(sri.requested_quantity), 0) FROM "StockRequestItems" sri WHERE sri.stock_request_id = sr.stock_request_id) AS total_qty,
+                    sup.supplier_name
+             FROM "StockRequests" sr
+             LEFT JOIN "Suppliers" sup ON sr.supplier_id = sup.supplier_id
+             ORDER BY sr.created_at DESC
+             LIMIT 5
+           ) sr_row) AS recent_stock_requests,
+
+          -- Recent transactions (limit 5)
+          (SELECT json_agg(st_row) FROM (
+             SELECT st.transaction_id, p.product_name, st.transaction_type, st.quantity, st.transaction_date
+             FROM "StockTransactions" st
+             JOIN "Products" p ON p.product_id = st.product_id
+             ORDER BY st.transaction_date DESC
+             LIMIT 5
+           ) st_row) AS recent_transactions,
+
+          -- Recent Operational Activity from OrderStatusHistory (limit 6)
+          (SELECT json_agg(act_row) FROM (
+             SELECT history_id, purchase_order_id, shipment_id, status, action, notes, changed_by, created_at
+             FROM "OrderStatusHistory"
+             ORDER BY created_at DESC
+             LIMIT 6
+           ) act_row) AS recent_activity;
+        '''
+
+        cursor.execute(q_metrics)
+        m_row = cursor.fetchone()
+
+        cursor.execute(q_lists)
+        l_row = cursor.fetchone()
+
+        # Parse metrics
+        po_stats = m_row[0] or {}
+        active_pos = int(po_stats.get('active_pos', 0))
+        pending_po_value = float(po_stats.get('pending_po_value', 0.0))
+        low_stock_count = int(m_row[1] or 0)
+        pending_quotations = int(m_row[2] or 0)
+        pending_deliveries = int(m_row[3] or 0)
+
+        raw_ship_counts = m_row[4] or {}
+        delayed_shipments = int(m_row[5] or 0)
 
         shipment_stats = {
-            "ready_for_shipment": raw_ship_counts.get("Ready for Shipment", 0),
-            "dispatched": raw_ship_counts.get("Dispatched", 0),
-            "in_transit": raw_ship_counts.get("In Transit", 0),
+            "ready_for_shipment": int(raw_ship_counts.get("Ready for Shipment", 0)),
+            "dispatched": int(raw_ship_counts.get("Dispatched", 0)),
+            "in_transit": int(raw_ship_counts.get("In Transit", 0)),
             "delayed": delayed_shipments,
-            "delivered": raw_ship_counts.get("Delivered", 0),
-            "total": sum(raw_ship_counts.values())
+            "delivered": int(raw_ship_counts.get("Delivered", 0)),
+            "total": sum(int(v) for v in raw_ship_counts.values())
         }
 
-        # 7. Actionable Items for "Needs Your Attention"
+        sr_counts = m_row[6] or {}
+        stock_requests_overview = {
+            "pending": int(sr_counts.get("Pending", 0)) + int(sr_counts.get("Open", 0)),
+            "quoted": int(sr_counts.get("Quoted", 0)),
+            "rejected": int(sr_counts.get("Rejected", 0)),
+            "total": sum(int(v) for v in sr_counts.values())
+        }
+
+        recent_stock_movement = int(m_row[7] or 0)
+
+        # Parse lists
         attention_items = []
 
-        # (a) Quotations awaiting Manager approval
-        cursor.execute('''
-            SELECT q.quotation_id, q.quotation_number, sup.supplier_name, q.total_amount, q.status, q.quotation_date
-            FROM "SupplierQuotations" q
-            LEFT JOIN "Suppliers" sup ON q.supplier_id = sup.supplier_id
-            WHERE q.status IN ('Submitted', 'Pending', 'Under Review')
-            ORDER BY q.quotation_date DESC NULLS LAST
-            LIMIT 4
-        ''')
-        for q in cursor.fetchall():
-            q_num = q[1] or f"QT-{q[0]}"
-            sup_name = q[2] or "Registered Supplier"
-            amt = float(q[3]) if q[3] is not None else 0.0
+        # (a) Quotations
+        for q in (l_row[0] or []):
+            q_id = q['quotation_id']
+            q_num = q['quotation_number'] or f"QT-{q_id}"
+            sup_name = q['supplier_name'] or "Registered Supplier"
+            amt = float(q['total_amount']) if q['total_amount'] is not None else 0.0
+            date_val = q['quotation_date']
             attention_items.append({
                 "type": "quotation",
-                "id": q[0],
+                "id": q_id,
                 "reference": q_num,
                 "title": f"Quotation {q_num} awaits approval",
                 "description": f"Supplier: {sup_name} • Value: ₹{amt:,.2f}",
-                "date": q[5].isoformat() if q[5] else None,
-                "status": q[4],
+                "date": date_val,
+                "status": q['status'],
                 "priority": "High",
                 "target_page": "quotations",
                 "action_label": "Review"
             })
 
-        # (b) Low-Stock critical products requiring replenishment
-        cursor.execute('''
-            SELECT p.product_id, p.product_name, p.sku, i.quantity_available, p.reorder_level
-            FROM "Products" p
-            JOIN "Inventory" i ON p.product_id = i.product_id
-            WHERE i.quantity_available <= COALESCE(p.reorder_level, 10)
-            ORDER BY (i.quantity_available - COALESCE(p.reorder_level, 10)) ASC
-            LIMIT 4
-        ''')
-        for p in cursor.fetchall():
-            avail = p[3]
-            reorder = p[4] or 10
+        # (b) Low-Stock
+        for p in (l_row[1] or []):
+            prod_id = p['product_id']
+            avail = p['quantity_available']
+            reorder = p['reorder_level'] or 10
             attention_items.append({
                 "type": "low_stock",
-                "id": p[0],
-                "reference": p[2] or f"PROD-{p[0]}",
-                "title": f"Low Stock: {p[1]}",
-                "description": f"SKU: {p[2]} • Available: {avail} (Reorder level: {reorder})",
+                "id": prod_id,
+                "reference": p['sku'] or f"PROD-{prod_id}",
+                "title": f"Low Stock: {p['product_name']}",
+                "description": f"SKU: {p['sku']} • Available: {avail} (Reorder level: {reorder})",
                 "date": None,
                 "status": "Low Stock",
                 "priority": "Urgent" if avail == 0 else "High",
@@ -810,160 +879,91 @@ def get_manager_dashboard():
                 "action_label": "Restock"
             })
 
-        # (c) Delivered shipments awaiting receiving / Stock-In
-        cursor.execute('''
-            SELECT s.shipment_id, s.shipment_number, s.purchase_order_id, sup.supplier_name, s.status, s.receiving_status, s.delivered_at
-            FROM "Shipments" s
-            LEFT JOIN "Suppliers" sup ON s.supplier_id = sup.supplier_id
-            WHERE s.status = 'Delivered' AND (s.receiving_status IS NULL OR s.receiving_status NOT IN ('Fully Received', 'Received'))
-            ORDER BY s.delivered_at DESC NULLS LAST
-            LIMIT 4
-        ''')
-        for sh in cursor.fetchall():
-            sh_num = sh[1] or f"SHP-{sh[0]}"
-            sup_name = sh[3] or "Supplier"
-            po_ref = f"PO #{sh[2]}" if sh[2] else "N/A"
+        # (c) Deliveries
+        for sh in (l_row[2] or []):
+            sh_id = sh['shipment_id']
+            sh_num = sh['shipment_number'] or f"SHP-{sh_id}"
+            sup_name = sh['supplier_name'] or "Supplier"
+            po_ref = f"PO #{sh['purchase_order_id']}" if sh['purchase_order_id'] else "N/A"
+            deliv_at = sh['delivered_at']
+            date_str = deliv_at[:10] if deliv_at else None
             attention_items.append({
                 "type": "delivery",
-                "id": sh[0],
+                "id": sh_id,
                 "reference": sh_num,
                 "title": f"Shipment {sh_num} delivered, pending Stock-In",
                 "description": f"{sup_name} • Order: {po_ref}",
-                "date": sh[6].strftime("%Y-%m-%d") if sh[6] else None,
+                "date": date_str,
                 "status": "Pending Stock-In",
                 "priority": "High",
                 "target_page": "shipments",
                 "action_label": "Receive"
             })
 
-        # 8. Recent Purchase Orders for Manager table
-        cursor.execute('''
-            SELECT po.purchase_order_id, po.order_date, po.expected_delivery, po.total_amount, po.status, sup.supplier_name
-            FROM "PurchaseOrders" po
-            LEFT JOIN "Suppliers" sup ON po.supplier_id = sup.supplier_id
-            ORDER BY po.order_date DESC NULLS LAST
-            LIMIT 5
-        ''')
+        # Recent orders
         recent_orders = []
-        for rpo in cursor.fetchall():
+        for rpo in (l_row[3] or []):
             recent_orders.append({
-                "purchase_order_id": rpo[0],
-                "order_date": rpo[1].isoformat() if rpo[1] else None,
-                "expected_delivery": rpo[2].isoformat() if rpo[2] else None,
-                "total_amount": float(rpo[3]) if rpo[3] is not None else 0.0,
-                "status": rpo[4],
-                "supplier_name": rpo[5] or "Unassigned"
+                "purchase_order_id": rpo['purchase_order_id'],
+                "order_date": rpo['order_date'],
+                "expected_delivery": rpo['expected_delivery'],
+                "total_amount": float(rpo['total_amount']) if rpo['total_amount'] is not None else 0.0,
+                "status": rpo['status'],
+                "supplier_name": rpo['supplier_name'] or "Unassigned"
             })
 
-        # 9. Critical Low Stock items table
-        cursor.execute('''
-            SELECT p.product_id, p.product_name, p.sku, i.quantity_available, p.reorder_level
-            FROM "Products" p
-            JOIN "Inventory" i ON p.product_id = i.product_id
-            WHERE i.quantity_available <= COALESCE(p.reorder_level, 10)
-            ORDER BY (i.quantity_available - COALESCE(p.reorder_level, 10)) ASC
-            LIMIT 5
-        ''')
+        # Critical low stock
         critical_low_stock = []
-        for cls_row in cursor.fetchall():
+        for cls_row in (l_row[4] or []):
+            pid = cls_row['product_id']
+            qty = cls_row['quantity_available']
             critical_low_stock.append({
-                "product_id": cls_row[0],
-                "product_name": cls_row[1],
-                "sku": cls_row[2] or f"PROD-{cls_row[0]}",
-                "quantity_available": cls_row[3],
-                "reorder_level": cls_row[4] or 10,
-                "status": "Out of Stock" if cls_row[3] == 0 else "Low Stock"
+                "product_id": pid,
+                "product_name": cls_row['product_name'],
+                "sku": cls_row['sku'] or f"PROD-{pid}",
+                "quantity_available": qty,
+                "reorder_level": cls_row['reorder_level'] or 10,
+                "status": "Out of Stock" if qty == 0 else "Low Stock"
             })
 
-        # 10. Stock Requests Overview & Recent Requests
-        cursor.execute('''
-            SELECT status, COUNT(*)
-            FROM "StockRequests"
-            GROUP BY status
-        ''')
-        sr_counts = dict(cursor.fetchall())
-        stock_requests_overview = {
-            "pending": sr_counts.get("Pending", 0) + sr_counts.get("Open", 0),
-            "quoted": sr_counts.get("Quoted", 0),
-            "rejected": sr_counts.get("Rejected", 0),
-            "total": sum(sr_counts.values())
-        }
-
-        cursor.execute('''
-            SELECT sr.stock_request_id, sr.request_number, sr.priority, sr.status, sr.required_date, sr.created_at,
-                   (SELECT p.product_name FROM "StockRequestItems" sri JOIN "Products" p ON sri.product_id = p.product_id WHERE sri.stock_request_id = sr.stock_request_id LIMIT 1) AS primary_product,
-                   (SELECT COALESCE(SUM(sri.requested_quantity), 0) FROM "StockRequestItems" sri WHERE sri.stock_request_id = sr.stock_request_id) AS total_qty,
-                   sup.supplier_name
-            FROM "StockRequests" sr
-            LEFT JOIN "Suppliers" sup ON sr.supplier_id = sup.supplier_id
-            ORDER BY sr.created_at DESC
-            LIMIT 5
-        ''')
+        # Recent stock requests
         recent_stock_requests = []
-        for srr in cursor.fetchall():
+        for srr in (l_row[5] or []):
             recent_stock_requests.append({
-                "stock_request_id": srr[0],
-                "request_number": srr[1],
-                "priority": srr[2] or "Medium",
-                "status": srr[3],
-                "required_date": srr[4].isoformat() if srr[4] else None,
-                "created_at": srr[5].isoformat() if srr[5] else None,
-                "primary_product": srr[6] or "Catalog Restock",
-                "total_quantity": int(srr[7]),
-                "supplier_name": srr[8] or "Open Market"
+                "stock_request_id": srr['stock_request_id'],
+                "request_number": srr['request_number'],
+                "priority": srr['priority'] or "Medium",
+                "status": srr['status'],
+                "required_date": srr['required_date'],
+                "created_at": srr['created_at'],
+                "primary_product": srr['primary_product'] or "Catalog Restock",
+                "total_quantity": int(srr['total_qty']),
+                "supplier_name": srr['supplier_name'] or "Open Market"
             })
 
-        # 11. 30-day stock movement
-        cursor.execute('''
-            SELECT COALESCE(SUM(quantity), 0)
-            FROM "StockTransactions"
-            WHERE transaction_date >= CURRENT_DATE - INTERVAL '30 days'
-        ''')
-        recent_stock_movement = cursor.fetchone()[0]
-
-        # 12. Recent stock transactions
-        cursor.execute('''
-            SELECT
-                st.transaction_id,
-                p.product_name,
-                st.transaction_type,
-                st.quantity,
-                st.transaction_date
-            FROM "StockTransactions" st
-            JOIN "Products" p
-                ON p.product_id = st.product_id
-            ORDER BY st.transaction_date DESC
-            LIMIT 5
-        ''')
-        transactions_rows = cursor.fetchall()
+        # Recent transactions
         recent_transactions = []
-        for row in transactions_rows:
+        for row in (l_row[6] or []):
             recent_transactions.append({
-                "transaction_id": row[0],
-                "product_name": row[1],
-                "transaction_type": row[2],
-                "quantity": row[3],
-                "transaction_date": row[4].isoformat() if row[4] else None
+                "transaction_id": row['transaction_id'],
+                "product_name": row['product_name'],
+                "transaction_type": row['transaction_type'],
+                "quantity": row['quantity'],
+                "transaction_date": row['transaction_date']
             })
 
-        # 13. Recent Operational Activity from OrderStatusHistory
-        cursor.execute('''
-            SELECT history_id, purchase_order_id, shipment_id, status, action, notes, changed_by, created_at
-            FROM "OrderStatusHistory"
-            ORDER BY created_at DESC
-            LIMIT 6
-        ''')
+        # Recent activity
         recent_activity = []
-        for act in cursor.fetchall():
+        for act in (l_row[7] or []):
             recent_activity.append({
-                "history_id": act[0],
-                "purchase_order_id": act[1],
-                "shipment_id": act[2],
-                "status": act[3],
-                "action": act[4] or "STATUS_CHANGE",
-                "notes": act[5] or "",
-                "changed_by": act[6] or "System",
-                "created_at": act[7].isoformat() if act[7] else None
+                "history_id": act['history_id'],
+                "purchase_order_id": act['purchase_order_id'],
+                "shipment_id": act['shipment_id'],
+                "status": act['status'],
+                "action": act['action'] or "STATUS_CHANGE",
+                "notes": act['notes'] or "",
+                "changed_by": act['changed_by'] or "System",
+                "created_at": act['created_at']
             })
 
         return {
@@ -993,6 +993,12 @@ def get_owner_dashboard():
     Get comprehensive executive-level dashboard metrics for the Owner role.
     Organization-wide visibility across all workflows: Inventory, Procurement,
     Quotations, Shipments, Users/Roles, System Health, and Audit activity.
+    Consolidated into two optimized round-trips:
+      1. Scalar metrics: Users/Roles breakdown, supplier counts, catalog valuation,
+         stock transaction volume, purchase order spend, pending quotations, shipment counts,
+         latest backup record, and system health status
+      2. Lists: Recent purchase orders, attention items (quotations, critical low stock,
+         pending POs), and recent audit log events
     Preserves all existing response keys: total_users, total_suppliers,
     total_products, total_inventory_value, recent_audits.
     """
@@ -1000,19 +1006,149 @@ def get_owner_dashboard():
     cursor = conn.cursor()
 
     try:
-        # 1. Users Breakdown (Total, Active, Inactive, and Grouped by Role)
-        cursor.execute('''
-            SELECT r.role_name, u.status, COUNT(*)
-            FROM "Users" u
-            JOIN "Roles" r ON u.role_id = r.role_id
-            GROUP BY r.role_name, u.status
-        ''')
-        user_rows = cursor.fetchall()
+        # Query 1: All scalar executive metrics and breakdowns
+        q_metrics = '''
+        WITH
+          users_summary AS (
+            SELECT json_agg(json_build_object('role_name', r.role_name, 'status', sub.status, 'count', sub.cnt)) AS data
+            FROM (
+              SELECT u.role_id, u.status, COUNT(*) AS cnt
+              FROM "Users" u
+              GROUP BY u.role_id, u.status
+            ) sub
+            JOIN "Roles" r ON sub.role_id = r.role_id
+          ),
+          suppliers_summary AS (
+            SELECT COUNT(*) AS total_suppliers FROM "Suppliers"
+          ),
+          inventory_summary AS (
+            SELECT 
+                COUNT(p.product_id) as total_products,
+                COALESCE(SUM(i.quantity_available), 0) as total_units,
+                COALESCE(SUM(p.selling_price * i.quantity_available), 0) as total_inventory_value,
+                COUNT(CASE WHEN i.quantity_available <= p.reorder_level THEN 1 END) as low_stock_count,
+                COUNT(CASE WHEN i.quantity_available = 0 THEN 1 END) as out_of_stock_count
+            FROM "Products" p
+            LEFT JOIN "Inventory" i ON p.product_id = i.product_id
+          ),
+          stock_tx_summary AS (
+            SELECT 
+                COALESCE(SUM(CASE WHEN transaction_type = 'STOCK_IN' THEN quantity ELSE 0 END), 0) as received_units,
+                COALESCE(SUM(CASE WHEN transaction_type = 'STOCK_OUT' THEN quantity ELSE 0 END), 0) as issued_units,
+                COUNT(*) as total_transactions
+            FROM "StockTransactions"
+          ),
+          po_summary AS (
+            SELECT json_agg(json_build_object('status', status, 'count', cnt, 'val', val)) AS data
+            FROM (
+              SELECT status, COUNT(*) AS cnt, COALESCE(SUM(total_amount), 0) AS val
+              FROM "PurchaseOrders"
+              GROUP BY status
+            ) po_sub
+          ),
+          quotations_summary AS (
+            SELECT COUNT(*) AS pending_quotations_count
+            FROM "SupplierQuotations"
+            WHERE status IN ('Submitted', 'Pending', 'Under Review')
+          ),
+          shipment_summary AS (
+            SELECT 
+                COUNT(CASE WHEN status = 'Ready for Shipment' THEN 1 END) as ready,
+                COUNT(CASE WHEN status IN ('Dispatched', 'In Transit') THEN 1 END) as in_transit,
+                COUNT(CASE WHEN status = 'Delivered' THEN 1 END) as delivered,
+                COUNT(*) as total
+            FROM "Shipments"
+          ),
+          backup_summary AS (
+            SELECT backup_id, backup_name, backup_type, backup_date, backup_size, status
+            FROM "BackupHistory"
+            ORDER BY backup_id DESC LIMIT 1
+          ),
+          status_summary AS (
+            SELECT status_id, module_name, status, progress, message, updated_at
+            FROM "SystemStatus"
+            ORDER BY status_id ASC LIMIT 1
+          )
+        SELECT 
+          (SELECT data FROM users_summary) AS users_breakdown,
+          (SELECT total_suppliers FROM suppliers_summary) AS total_suppliers,
+          (SELECT row_to_json(inventory_summary.*) FROM inventory_summary) AS inventory_health,
+          (SELECT row_to_json(stock_tx_summary.*) FROM stock_tx_summary) AS stock_tx_health,
+          (SELECT data FROM po_summary) AS po_breakdown,
+          (SELECT pending_quotations_count FROM quotations_summary) AS pending_quotations_count,
+          (SELECT row_to_json(shipment_summary.*) FROM shipment_summary) AS shipment_stats,
+          (SELECT row_to_json(backup_summary.*) FROM backup_summary) AS latest_backup,
+          (SELECT row_to_json(status_summary.*) FROM status_summary) AS system_status;
+        '''
+
+        # Query 2: All recent lists and attention items
+        q_lists = '''
+        SELECT
+          -- Recent purchase orders (limit 5)
+          (SELECT json_agg(po_row) FROM (
+             SELECT po.purchase_order_id, s.supplier_name, po.order_date, po.expected_delivery, po.total_amount, po.status 
+             FROM "PurchaseOrders" po 
+             LEFT JOIN "Suppliers" s ON po.supplier_id = s.supplier_id 
+             ORDER BY po.order_date DESC NULLS LAST, po.purchase_order_id DESC 
+             LIMIT 5
+           ) po_row) AS recent_orders,
+
+          -- Attention quotations (limit 4)
+          (SELECT json_agg(q_row) FROM (
+             SELECT sq.quotation_id, sq.quotation_number, s.supplier_name, p.product_name, sq.total_amount, sq.status, sq.quotation_date
+             FROM "SupplierQuotations" sq
+             LEFT JOIN "Suppliers" s ON sq.supplier_id = s.supplier_id
+             LEFT JOIN "Products" p ON sq.product_id = p.product_id
+             WHERE sq.status IN ('Submitted', 'Pending', 'Under Review')
+             ORDER BY sq.quotation_date DESC NULLS LAST, sq.quotation_id DESC
+             LIMIT 4
+           ) q_row) AS attention_quotations,
+
+          -- Attention low-stock (limit 3)
+          (SELECT json_agg(ls_row) FROM (
+             SELECT p.product_id, p.product_name, p.sku, i.quantity_available, p.reorder_level
+             FROM "Products" p
+             JOIN "Inventory" i ON p.product_id = i.product_id
+             WHERE i.quantity_available <= p.reorder_level
+             ORDER BY i.quantity_available ASC
+             LIMIT 3
+           ) ls_row) AS attention_low_stock,
+
+          -- Attention pending purchase orders (limit 3)
+          (SELECT json_agg(ppo_row) FROM (
+             SELECT po.purchase_order_id, s.supplier_name, po.total_amount, po.status, po.order_date
+             FROM "PurchaseOrders" po
+             LEFT JOIN "Suppliers" s ON po.supplier_id = s.supplier_id
+             WHERE po.status = 'Pending'
+             ORDER BY po.order_date DESC NULLS LAST, po.purchase_order_id DESC
+             LIMIT 3
+           ) ppo_row) AS attention_pending_pos,
+
+          -- Recent audit logs (limit 5)
+          (SELECT json_agg(aud_row) FROM (
+             SELECT al.log_id, al.action, COALESCE(u.username, 'System') AS username, al.action_time, al.table_name, al.record_id, al.ip_address
+             FROM "AuditLogs" al
+             LEFT JOIN "Users" u ON al.user_id = u.user_id
+             ORDER BY al.action_time DESC
+             LIMIT 5
+           ) aud_row) AS recent_audits;
+        '''
+
+        cursor.execute(q_metrics)
+        m_row = cursor.fetchone()
+
+        cursor.execute(q_lists)
+        l_row = cursor.fetchone()
+
+        # 1. Users Breakdown
         total_users = 0
         active_users_count = 0
         inactive_users_count = 0
         users_by_role = {}
-        for role_name, status, count in user_rows:
+        for item in (m_row[0] or []):
+            role_name = item['role_name']
+            status = item['status']
+            count = int(item['count'])
             total_users += count
             if status == "Active":
                 active_users_count += count
@@ -1026,180 +1162,106 @@ def get_owner_dashboard():
             else:
                 users_by_role[role_name]["inactive"] += count
 
-        # 2. Total registered suppliers
-        cursor.execute('SELECT COUNT(*) FROM "Suppliers"')
-        total_suppliers = cursor.fetchone()[0] or 0
+        # 2. Total Suppliers
+        total_suppliers = int(m_row[1] or 0)
 
         # 3. Product Catalog & Inventory Health
-        cursor.execute('''
-            SELECT 
-                COUNT(p.product_id) as total_products,
-                COALESCE(SUM(i.quantity_available), 0) as total_units,
-                COALESCE(SUM(p.selling_price * i.quantity_available), 0) as total_inventory_value,
-                COUNT(CASE WHEN i.quantity_available <= p.reorder_level THEN 1 END) as low_stock_count,
-                COUNT(CASE WHEN i.quantity_available = 0 THEN 1 END) as out_of_stock_count
-            FROM "Products" p
-            LEFT JOIN "Inventory" i ON p.product_id = i.product_id
-        ''')
-        inv_row = cursor.fetchone()
-        total_products = int(inv_row[0] or 0)
-        total_units = int(inv_row[1] or 0)
-        total_inventory_value = float(inv_row[2] or 0.0)
-        low_stock_count = int(inv_row[3] or 0)
-        out_of_stock_count = int(inv_row[4] or 0)
+        inv_data = m_row[2] or {}
+        total_products = int(inv_data.get('total_products', 0))
+        total_units = int(inv_data.get('total_units', 0))
+        total_inventory_value = float(inv_data.get('total_inventory_value', 0.0))
+        low_stock_count = int(inv_data.get('low_stock_count', 0))
+        out_of_stock_count = int(inv_data.get('out_of_stock_count', 0))
 
-        # 4. Stock Movement Throughput (Received vs Issued Volume)
-        cursor.execute('''
-            SELECT 
-                COALESCE(SUM(CASE WHEN transaction_type = 'STOCK_IN' THEN quantity ELSE 0 END), 0) as received_units,
-                COALESCE(SUM(CASE WHEN transaction_type = 'STOCK_OUT' THEN quantity ELSE 0 END), 0) as issued_units,
-                COUNT(*) as total_transactions
-            FROM "StockTransactions"
-        ''')
-        tx_row = cursor.fetchone()
-        received_units = int(tx_row[0] or 0)
-        issued_units = int(tx_row[1] or 0)
-        total_transactions = int(tx_row[2] or 0)
+        # 4. Stock Movement Throughput
+        tx_data = m_row[3] or {}
+        received_units = int(tx_data.get('received_units', 0))
+        issued_units = int(tx_data.get('issued_units', 0))
+        total_transactions = int(tx_data.get('total_transactions', 0))
 
-        # 5. Purchase Orders & Financial Spend Overview
-        cursor.execute('''
-            SELECT status, COUNT(*), COALESCE(SUM(total_amount), 0)
-            FROM "PurchaseOrders"
-            GROUP BY status
-        ''')
-        po_rows = cursor.fetchall()
+        # 5. Purchase Orders & Spend Breakdown
         active_pos_count = 0
         active_pos_value = 0.0
         po_status_breakdown = {}
         total_pos_count = 0
-        for status_val, count, val in po_rows:
+        for item in (m_row[4] or []):
+            status_val = item['status']
+            count = int(item['count'])
+            val = float(item['val'] or 0.0)
             total_pos_count += count
             po_status_breakdown[status_val] = {
                 "count": count,
-                "value": float(val or 0.0)
+                "value": val
             }
             if status_val in ('Pending', 'Accepted'):
                 active_pos_count += count
-                active_pos_value += float(val or 0.0)
+                active_pos_value += val
 
         # 6. Pending Quotations Overview
-        cursor.execute('''
-            SELECT COUNT(*) 
-            FROM "SupplierQuotations" 
-            WHERE status IN ('Submitted', 'Pending', 'Under Review')
-        ''')
-        pending_quotations_count = int(cursor.fetchone()[0] or 0)
+        pending_quotations_count = int(m_row[5] or 0)
 
-        # 7. Recent Purchase Orders (Latest 5)
-        cursor.execute('''
-            SELECT 
-                po.purchase_order_id, 
-                s.supplier_name, 
-                po.order_date, 
-                po.expected_delivery, 
-                po.total_amount, 
-                po.status 
-            FROM "PurchaseOrders" po 
-            LEFT JOIN "Suppliers" s ON po.supplier_id = s.supplier_id 
-            ORDER BY po.order_date DESC, po.purchase_order_id DESC 
-            LIMIT 5
-        ''')
-        recent_orders_rows = cursor.fetchall()
-        recent_orders = []
-        for r in recent_orders_rows:
-            recent_orders.append({
-                "purchase_order_id": r[0],
-                "supplier_name": r[1] or "Unknown Supplier",
-                "order_date": r[2].isoformat() if r[2] else None,
-                "expected_delivery": r[3].isoformat() if r[3] else None,
-                "total_amount": float(r[4] or 0.0),
-                "status": r[5]
-            })
-
-        # 8. Shipment & Logistics Statistics
-        cursor.execute('''
-            SELECT 
-                COUNT(CASE WHEN status = 'Ready for Shipment' THEN 1 END) as ready,
-                COUNT(CASE WHEN status IN ('Dispatched', 'In Transit') THEN 1 END) as in_transit,
-                COUNT(CASE WHEN status = 'Delivered' THEN 1 END) as delivered,
-                COUNT(*) as total
-            FROM "Shipments"
-        ''')
-        ship_row = cursor.fetchone()
+        # 7. Shipment & Logistics Statistics
+        ship_data = m_row[6] or {}
         shipment_stats = {
-            "ready_for_shipment": int(ship_row[0] or 0),
-            "in_transit": int(ship_row[1] or 0),
-            "delivered": int(ship_row[2] or 0),
-            "total_shipments": int(ship_row[3] or 0)
+            "ready_for_shipment": int(ship_data.get('ready', 0)),
+            "in_transit": int(ship_data.get('in_transit', 0)),
+            "delivered": int(ship_data.get('delivered', 0)),
+            "total_shipments": int(ship_data.get('total', 0))
         }
 
-        # 9. Latest Database Backup
-        cursor.execute('''
-            SELECT backup_id, backup_name, backup_type, backup_date, backup_size, status
-            FROM "BackupHistory"
-            ORDER BY backup_id DESC LIMIT 1
-        ''')
-        bk_row = cursor.fetchone()
+        # 8. Latest Database Backup
+        bk_row = m_row[7]
         latest_backup = None
         if bk_row:
             latest_backup = {
-                "backup_id": bk_row[0],
-                "backup_name": bk_row[1],
-                "backup_type": bk_row[2],
-                "backup_date": bk_row[3].isoformat() if bk_row[3] else None,
-                "backup_size": bk_row[4],
-                "status": bk_row[5]
+                "backup_id": bk_row['backup_id'],
+                "backup_name": bk_row['backup_name'],
+                "backup_type": bk_row['backup_type'],
+                "backup_date": bk_row['backup_date'],
+                "backup_size": bk_row['backup_size'],
+                "status": bk_row['status']
             }
 
-        # 10. System Health Summary
-        cursor.execute('''
-            SELECT status_id, module_name, status, progress, message, updated_at
-            FROM "SystemStatus"
-            ORDER BY status_id ASC LIMIT 1
-        ''')
-        sys_row = cursor.fetchone()
+        # 9. System Health Summary
+        sys_row = m_row[8]
         system_status = None
         if sys_row:
             system_status = {
-                "module_name": sys_row[1],
-                "status": sys_row[2],
-                "progress": sys_row[3],
-                "message": sys_row[4],
-                "updated_at": sys_row[5].isoformat() if sys_row[5] else None
+                "module_name": sys_row['module_name'],
+                "status": sys_row['status'],
+                "progress": sys_row['progress'],
+                "message": sys_row['message'],
+                "updated_at": sys_row['updated_at']
             }
 
-        # 11. Needs Your Attention Items (Real live pending decisions)
+        # 10. Recent Purchase Orders
+        recent_orders = []
+        for r in (l_row[0] or []):
+            recent_orders.append({
+                "purchase_order_id": r['purchase_order_id'],
+                "supplier_name": r['supplier_name'] or "Unknown Supplier",
+                "order_date": r['order_date'],
+                "expected_delivery": r['expected_delivery'],
+                "total_amount": float(r['total_amount'] or 0.0),
+                "status": r['status']
+            })
+
+        # 11. Needs Your Attention Items
         attention_items = []
 
-        # A. Pending Quotations Awaiting Approval
-        cursor.execute('''
-            SELECT 
-                sq.quotation_id, 
-                sq.quotation_number, 
-                s.supplier_name, 
-                p.product_name, 
-                sq.total_amount, 
-                sq.status, 
-                sq.quotation_date
-            FROM "SupplierQuotations" sq
-            LEFT JOIN "Suppliers" s ON sq.supplier_id = s.supplier_id
-            LEFT JOIN "Products" p ON sq.product_id = p.product_id
-            WHERE sq.status IN ('Submitted', 'Pending', 'Under Review')
-            ORDER BY sq.quotation_date DESC, sq.quotation_id DESC
-            LIMIT 4
-        ''')
-        for q_row in cursor.fetchall():
-            q_id = q_row[0]
-            q_num = q_row[1] or f"QTN-{q_id:04d}"
-            s_name = q_row[2] or "Supplier"
-            p_name = q_row[3] or "Product"
-            amt = float(q_row[4] or 0.0)
+        # A. Pending Quotations
+        for q_row in (l_row[1] or []):
+            q_id = q_row['quotation_id']
+            q_num = q_row['quotation_number'] or f"QTN-{q_id:04d}"
+            s_name = q_row['supplier_name'] or "Supplier"
+            p_name = q_row['product_name'] or "Product"
+            amt = float(q_row['total_amount'] or 0.0)
             attention_items.append({
                 "type": "quotation",
                 "id": q_id,
                 "title": f"Quotation {q_num} ({s_name})",
                 "subtitle": f"{p_name} — Total: ₹{amt:,.2f}",
-                "status": q_row[5],
+                "status": q_row['status'],
                 "badge": "Awaiting Approval",
                 "badge_color": "warning",
                 "action_label": "Review →",
@@ -1207,20 +1269,12 @@ def get_owner_dashboard():
             })
 
         # B. Critical Low Stock Products
-        cursor.execute('''
-            SELECT p.product_id, p.product_name, p.sku, i.quantity_available, p.reorder_level
-            FROM "Products" p
-            JOIN "Inventory" i ON p.product_id = p.product_id
-            WHERE i.quantity_available <= p.reorder_level
-            ORDER BY i.quantity_available ASC
-            LIMIT 3
-        ''')
-        for p_row in cursor.fetchall():
-            prod_id = p_row[0]
-            prod_name = p_row[1]
-            sku = p_row[2]
-            qty = p_row[3]
-            reorder = p_row[4]
+        for p_row in (l_row[2] or []):
+            prod_id = p_row['product_id']
+            prod_name = p_row['product_name']
+            sku = p_row['sku']
+            qty = p_row['quantity_available']
+            reorder = p_row['reorder_level']
             attention_items.append({
                 "type": "low_stock",
                 "id": prod_id,
@@ -1234,55 +1288,31 @@ def get_owner_dashboard():
             })
 
         # C. Pending Purchase Orders Awaiting Response
-        cursor.execute('''
-            SELECT po.purchase_order_id, s.supplier_name, po.total_amount, po.status, po.order_date
-            FROM "PurchaseOrders" po
-            LEFT JOIN "Suppliers" s ON po.supplier_id = s.supplier_id
-            WHERE po.status = 'Pending'
-            ORDER BY po.order_date DESC, po.purchase_order_id DESC
-            LIMIT 3
-        ''')
-        for po_item in cursor.fetchall():
-            po_id = po_item[0]
-            s_name = po_item[1] or "Supplier"
-            po_amt = float(po_item[2] or 0.0)
+        for po_item in (l_row[3] or []):
+            po_id = po_item['purchase_order_id']
+            s_name = po_item['supplier_name'] or "Supplier"
+            po_amt = float(po_item['total_amount'] or 0.0)
             attention_items.append({
                 "type": "purchase_order",
                 "id": po_id,
                 "title": f"Purchase Order #{po_id:04d} ({s_name})",
                 "subtitle": f"Value: ₹{po_amt:,.2f} — Waiting for supplier response",
-                "status": po_item[3],
+                "status": po_item['status'],
                 "badge": "Pending Response",
                 "badge_color": "info",
                 "action_label": "View →",
                 "action_route": "purchase-orders"
             })
 
-        # 12. Recent System Audit Logs (last 5, preserved)
-        cursor.execute('''
-            SELECT
-                al.log_id,
-                al.action,
-                COALESCE(u.username, 'System'),
-                al.action_time,
-                al.table_name,
-                al.record_id,
-                al.ip_address
-            FROM "AuditLogs" al
-            LEFT JOIN "Users" u
-                ON al.user_id = u.user_id
-            ORDER BY al.action_time DESC
-            LIMIT 5
-        ''')
-        audit_rows = cursor.fetchall()
+        # 12. Recent System Audit Logs
         recent_audits = []
-        for row in audit_rows:
-            action = row[1] or "Action"
-            username = row[2]
-            action_time = row[3]
-            table_name = row[4] or "System"
-            record_id = row[5]
-            ip_address = row[6]
+        for row in (l_row[4] or []):
+            action = row['action'] or "Action"
+            username = row['username']
+            action_time = row['action_time']
+            table_name = row['table_name'] or "System"
+            record_id = row['record_id']
+            ip_address = row['ip_address']
 
             readable_action = action.replace('_', ' ').title()
             if action.startswith('CREATE'):
@@ -1301,10 +1331,10 @@ def get_owner_dashboard():
                 details = f"Modified {table_name} (Record ID: {record_id})"
 
             recent_audits.append({
-                "log_id": row[0],
+                "log_id": row['log_id'],
                 "action": readable_action,
                 "username": username,
-                "timestamp": action_time.isoformat() if action_time else None,
+                "timestamp": action_time,
                 "details": details
             })
 
@@ -1346,4 +1376,4 @@ def get_owner_dashboard():
 
     finally:
         cursor.close()
-        conn.close()
+        conn.close()

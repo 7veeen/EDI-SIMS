@@ -362,7 +362,7 @@ def submit_invoice(user_id, role, data):
 
 
 def get_invoices(user_id, role, status=None, supplier_id_filter=None, po_id=None,
-                 date_from=None, date_to=None, search=None, page=1, limit=50):
+                 date_from=None, date_to=None, search=None, page=1, limit=50, page_size=None):
     """
     List supplier invoices with role-based visibility and supplier isolation.
     - Owner/Manager: Organization-wide access with optional filtering.
@@ -420,40 +420,40 @@ def get_invoices(user_id, role, status=None, supplier_id_filter=None, po_id=None
             LEFT JOIN public."Shipments" sh ON si.shipment_id = sh.shipment_id
             JOIN public."Users" u ON si.created_by = u.user_id
             LEFT JOIN public."SupplierPayments" sp ON si.invoice_id = sp.invoice_id
-            WHERE 1=1
         '''
+        base_where = ' WHERE 1=1'
         params = []
 
         if target_supplier_id is not None:
-            query += ' AND si.supplier_id = %s'
+            base_where += ' AND si.supplier_id = %s'
             params.append(target_supplier_id)
 
         if status:
             clean_status = str(status).strip()
-            query += ' AND si.status ILIKE %s'
+            base_where += ' AND si.status ILIKE %s'
             params.append(clean_status)
 
         if po_id:
             try:
-                query += ' AND si.purchase_order_id = %s'
+                base_where += ' AND si.purchase_order_id = %s'
                 params.append(int(po_id))
             except (ValueError, TypeError):
                 pass
 
         if date_from:
-            query += ' AND si.invoice_date >= %s'
+            base_where += ' AND si.invoice_date >= %s'
             params.append(str(date_from).split("T")[0])
 
         if date_to:
-            query += ' AND si.invoice_date <= %s'
+            base_where += ' AND si.invoice_date <= %s'
             params.append(str(date_to).split("T")[0])
 
         if search:
             search_param = f"%{str(search).strip()}%"
-            query += ' AND (si.invoice_number ILIKE %s OR s.supplier_name ILIKE %s OR po.purchase_order_id::text ILIKE %s)'
+            base_where += ' AND (si.invoice_number ILIKE %s OR s.supplier_name ILIKE %s OR po.purchase_order_id::text ILIKE %s)'
             params.extend([search_param, search_param, search_param])
 
-        query += '''
+        query += base_where + '''
             GROUP BY 
                 si.invoice_id, si.invoice_number, si.supplier_id, s.supplier_name,
                 si.purchase_order_id, po.purchase_order_id, po.total_amount,
@@ -461,18 +461,19 @@ def get_invoices(user_id, role, status=None, supplier_id_filter=None, po_id=None
                 si.subtotal, si.tax_amount, si.total_amount, si.status,
                 si.rejection_reason, si.notes, si.created_by, u.username,
                 si.created_at, si.updated_at
-            ORDER BY si.created_at DESC
+            ORDER BY si.created_at DESC, si.invoice_id DESC
         '''
 
         # Pagination calculations
+        effective_limit = page_size if page_size is not None else limit
         try:
-            page = max(1, int(page))
-            limit = max(1, min(200, int(limit)))
+            page_num = max(1, int(page or 1))
+            limit_num = max(1, min(200, int(effective_limit or 50)))
         except (ValueError, TypeError):
-            page = 1
-            limit = 50
+            page_num = 1
+            limit_num = 50
 
-        offset = (page - 1) * limit
+        offset_num = (page_num - 1) * limit_num
 
         cursor.execute(query, tuple(params))
         all_rows = cursor.fetchall()
@@ -500,7 +501,7 @@ def get_invoices(user_id, role, status=None, supplier_id_filter=None, po_id=None
             if inv_status in stat_counts:
                 stat_counts[inv_status] += 1
 
-        paged_rows = all_rows[offset : offset + limit]
+        paged_rows = all_rows[offset_num : offset_num + limit_num]
 
         invoices_list = []
         for r in paged_rows:
@@ -534,17 +535,39 @@ def get_invoices(user_id, role, status=None, supplier_id_filter=None, po_id=None
                 "remaining_balance": _format_decimal(rem_bal)
             })
 
+        total_pages = (total_count + limit_num - 1) // limit_num if (total_count > 0 and limit_num > 0) else 1
         stats = {
             "total_invoices": total_count,
             "total_amount": _format_decimal(stat_total_amount),
             "total_paid": _format_decimal(stat_total_paid),
             "total_outstanding": _format_decimal(stat_total_amount - stat_total_paid),
             "status_counts": stat_counts,
-            "page": page,
-            "limit": limit
+            "page": page_num,
+            "limit": limit_num,
+            "page_size": limit_num,
+            "total_count": total_count,
+            "total_pages": total_pages
+        }
+        pagination = {
+            "page": page_num,
+            "limit": limit_num,
+            "page_size": limit_num,
+            "total": total_count,
+            "total_count": total_count,
+            "total_pages": total_pages
         }
 
-        return {"invoices": invoices_list, "stats": stats, "total_count": total_count}, None, 200
+        return {
+            "invoices": invoices_list,
+            "stats": stats,
+            "total_count": total_count,
+            "total": total_count,
+            "page": page_num,
+            "limit": limit_num,
+            "page_size": limit_num,
+            "total_pages": total_pages,
+            "pagination": pagination
+        }, None, 200
 
     except Error as db_err:
         return None, f"Database error listing invoices: {str(db_err)}", 500
