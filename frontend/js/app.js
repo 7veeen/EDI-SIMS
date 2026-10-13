@@ -44,6 +44,8 @@ const App = {
         this.setupSidebar();
         this.setupEventListeners();
         this.notifications.init();
+        this.search.init();
+        this.profileDropdown.init();
         
         // Initial route
         const hash = window.location.hash.replace('#', '') || 'dashboard';
@@ -51,21 +53,46 @@ const App = {
     },
 
     initTheme() {
-        const savedTheme = localStorage.getItem('sims_theme') || localStorage.getItem('theme') || localStorage.getItem('supplierTheme');
-        const isDark = savedTheme === 'dark';
-        if (isDark) {
-            document.body.classList.add('dark');
-            document.body.classList.add('dark-theme');
+        let savedTheme = null;
+        try {
+            savedTheme = localStorage.getItem('sims_theme') || localStorage.getItem('theme') || localStorage.getItem('supplierTheme');
+        } catch (storageErr) {
+            // Storage access denied or unavailable -> fall back to OS preference
+            savedTheme = null;
+        }
+
+        let isDark = false;
+        if (savedTheme === 'dark') {
+            isDark = true;
+        } else if (savedTheme === 'light') {
+            isDark = false;
         } else {
-            document.body.classList.remove('dark');
-            document.body.classList.remove('dark-theme');
+            // Storage threw, missing, or invalid preference: safely query OS preference
+            try {
+                if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                    isDark = true;
+                }
+            } catch (mediaErr) {
+                isDark = false;
+            }
+        }
+
+        document.documentElement.classList.toggle('dark', isDark);
+        document.documentElement.classList.toggle('dark-theme', isDark);
+        if (document.body) {
+            document.body.classList.toggle('dark', isDark);
+            document.body.classList.toggle('dark-theme', isDark);
         }
         this.updateThemeIcon();
     },
 
     updateThemeIcon() {
-        const themeBtns = [document.getElementById('themeToggle'), document.getElementById('loginThemeToggle')];
-        const isDark = document.body.classList.contains('dark') || document.body.classList.contains('dark-theme');
+        const themeBtns = [
+            document.getElementById('themeToggle'),
+            document.getElementById('loginThemeToggle'),
+            document.getElementById('profileThemeToggle')
+        ];
+        const isDark = document.documentElement.classList.contains('dark') || (document.body && document.body.classList.contains('dark'));
         themeBtns.forEach(themeBtn => {
             if (!themeBtn) return;
             const i = themeBtn.querySelector('i');
@@ -73,13 +100,29 @@ const App = {
                 i.className = isDark ? 'bx bx-sun' : 'bx bx-moon';
             }
             themeBtn.title = isDark ? 'Switch to light mode' : 'Switch to dark mode';
+            themeBtn.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
         });
+        const themeText = document.getElementById('profile-theme-text');
+        if (themeText) {
+            themeText.textContent = isDark ? 'Light Mode' : 'Dark Mode';
+        }
     },
 
     toggleTheme() {
-        const isDark = document.body.classList.toggle('dark');
-        document.body.classList.toggle('dark-theme', isDark);
-        localStorage.setItem('sims_theme', isDark ? 'dark' : 'light');
+        const currentlyDark = document.documentElement.classList.contains('dark') || (document.body && document.body.classList.contains('dark'));
+        const isDark = !currentlyDark;
+
+        document.documentElement.classList.toggle('dark', isDark);
+        document.documentElement.classList.toggle('dark-theme', isDark);
+        if (document.body) {
+            document.body.classList.toggle('dark', isDark);
+            document.body.classList.toggle('dark-theme', isDark);
+        }
+
+        try {
+            localStorage.setItem('sims_theme', isDark ? 'dark' : 'light');
+        } catch (e) {}
+
         this.updateThemeIcon();
     },
 
@@ -92,6 +135,12 @@ const App = {
         document.getElementById('display-role').textContent = user.role;
         document.getElementById('topbar-display-name').textContent = user.username;
         document.getElementById('topbar-display-role').textContent = user.role;
+
+        // Update profile dropdown header
+        const dropName = document.getElementById('dropdown-user-name');
+        const dropRole = document.getElementById('dropdown-user-role');
+        if (dropName) dropName.textContent = user.username;
+        if (dropRole) dropRole.textContent = user.role;
 
         const navContainer = document.getElementById('sidebar-nav');
         navContainer.innerHTML = '<div class="nav-section-title">WORKSPACE</div>';
@@ -163,6 +212,22 @@ const App = {
                 document.getElementById('sidebar').classList.toggle('active');
             });
         }
+
+        // Global Keyboard Shortcut: Ctrl+K or Cmd+K
+        window.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+                // Do not steal focus if an active modal overlay is open
+                if (document.querySelector('.modal-overlay.active')) return;
+
+                // Do not intercept if user is composing text in a textarea or editable element
+                const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+                const isEditable = document.activeElement && (document.activeElement.isContentEditable || activeTag === 'textarea');
+                if (isEditable) return;
+
+                e.preventDefault();
+                App.search.focus();
+            }
+        });
 
         document.getElementById('logout-btn').addEventListener('click', () => {
             Auth.logout();
@@ -294,6 +359,14 @@ const App = {
             const dropdown = document.getElementById('notificationDropdown');
             const bellBtn = document.getElementById('notificationButton');
             if (!dropdown) return;
+
+            // Close other topbar popups
+            if (App.profileDropdown && App.profileDropdown.isOpen) {
+                App.profileDropdown.close();
+            }
+            if (App.search && App.search.isOpen) {
+                App.search.close();
+            }
 
             this.isOpen = true;
             dropdown.style.display = 'flex';
@@ -633,6 +706,477 @@ const App = {
         };
 
         setTimeout(executeTargetAction, 100);
+    },
+
+    getRouteForReference(normType) {
+        const map = {
+            'SHIPMENT': 'shipments',
+            'PURCHASEORDER': 'purchase-orders',
+            'PRODUCT': 'products',
+            'QUOTATION': 'quotations',
+            'STOCKREQUEST': 'stock-requests',
+            'STOCKTRANSACTION': 'stock-transactions',
+            'INVOICE': 'payments',
+            'PAYMENT': 'payments'
+        };
+        return map[normType] || null;
+    },
+
+    // Global Search Controller
+    search: {
+        isOpen: false,
+        debounceTimer: null,
+        selectedIndex: -1,
+        currentResults: [],
+
+        init() {
+            const input = document.getElementById('globalSearch');
+            const clearBtn = document.getElementById('globalSearchClear');
+            if (!input || input.dataset.listenerAttached) return;
+            input.dataset.listenerAttached = 'true';
+
+            input.addEventListener('input', () => {
+                const q = input.value.trim();
+                if (clearBtn) clearBtn.style.display = q ? 'inline-flex' : 'none';
+                clearTimeout(this.debounceTimer);
+                this.debounceTimer = setTimeout(() => {
+                    this.performSearch(q);
+                }, 160);
+            });
+
+            input.addEventListener('focus', () => {
+                const q = input.value.trim();
+                if (q) this.performSearch(q);
+            });
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    this.moveSelection(1);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    this.moveSelection(-1);
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.selectCurrent();
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    this.close();
+                    input.blur();
+                }
+            });
+
+            if (clearBtn) {
+                clearBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    input.value = '';
+                    clearBtn.style.display = 'none';
+                    this.close();
+                    input.focus();
+                });
+            }
+
+            // Dismiss on outside click
+            document.addEventListener('click', (e) => {
+                const container = document.getElementById('globalSearchContainer');
+                if (this.isOpen && container && !container.contains(e.target)) {
+                    this.close();
+                }
+            });
+        },
+
+        focus() {
+            const input = document.getElementById('globalSearch');
+            if (input) {
+                input.focus();
+                input.select();
+                const q = input.value.trim();
+                if (q) this.performSearch(q);
+            }
+        },
+
+        close() {
+            const resultsContainer = document.getElementById('globalSearchResults');
+            const input = document.getElementById('globalSearch');
+            if (resultsContainer) resultsContainer.style.display = 'none';
+            if (input) input.setAttribute('aria-expanded', 'false');
+            this.isOpen = false;
+            this.selectedIndex = -1;
+            this.currentResults = [];
+        },
+
+        performSearch(query) {
+            const resultsContainer = document.getElementById('globalSearchResults');
+            const input = document.getElementById('globalSearch');
+            if (!resultsContainer || !input) return;
+
+            const cleanQuery = (query || '').trim().toLowerCase();
+            if (!cleanQuery) {
+                this.close();
+                return;
+            }
+
+            const user = Auth.getUser();
+            if (!user) return;
+
+            const results = [];
+
+            // 1. Role-Filtered Route Search
+            const matchingRoutes = App.routes.filter(r => {
+                if (!r.roles.includes(user.role) || r.hidden) return false;
+                return r.label.toLowerCase().includes(cleanQuery) || r.path.toLowerCase().includes(cleanQuery);
+            });
+
+            matchingRoutes.forEach(r => {
+                results.push({
+                    type: 'route',
+                    title: r.label,
+                    desc: `Navigate to ${r.label}`,
+                    icon: r.icon || 'bx-right-arrow-alt',
+                    action: () => {
+                        window.location.hash = r.path;
+                    }
+                });
+            });
+
+            // 2. Entity Reference Handling (Prefix Patterns)
+            const entityMatch = cleanQuery.match(/^([a-z]+)[\s\-_#]*([0-9]+)$/i);
+            if (entityMatch) {
+                const prefix = entityMatch[1].toUpperCase();
+                const recordId = parseInt(entityMatch[2], 10);
+                const normType = App.normalizeReferenceType(prefix);
+
+                if (normType && !isNaN(recordId)) {
+                    const targetPath = App.getRouteForReference(normType);
+                    const routeDef = App.routes.find(r => r.path === targetPath);
+
+                    if (routeDef && routeDef.roles.includes(user.role)) {
+                        // Present result only as navigation to the relevant module (clearly distinguished from verified records)
+                        results.unshift({
+                            type: 'reference-nav',
+                            normType: normType,
+                            recordId: recordId,
+                            title: `Navigate to ${routeDef.label} (Ref: ${prefix}-${recordId})`,
+                            desc: `Go to ${routeDef.label} module (unverified reference #${recordId})`,
+                            icon: routeDef.icon || 'bx-right-arrow-alt',
+                            action: () => {
+                                window.location.hash = targetPath;
+                            }
+                        });
+
+                        // Attempt authorization-aware verification if a suitable lookup exists
+                        this.tryVerifyEntityRecord(normType, recordId, cleanQuery);
+                    }
+                }
+            }
+
+            this.currentResults = results;
+            this.selectedIndex = results.length > 0 ? 0 : -1;
+            this.renderResults(results, cleanQuery);
+        },
+
+        async tryVerifyEntityRecord(normType, recordId, query) {
+            const user = Auth.getUser();
+            if (!user) return;
+
+            let lookupPromise = null;
+            if (normType === 'PURCHASEORDER') {
+                lookupPromise = Api.get(`/purchase-orders/${recordId}`);
+            } else if (normType === 'INVOICE') {
+                lookupPromise = Api.get(`/invoices/${recordId}`);
+            } else if (normType === 'SHIPMENT') {
+                lookupPromise = Api.get(`/shipments/${recordId}`);
+            }
+
+            if (!lookupPromise) {
+                // No suitable single-record lookup exists for this entity type (e.g. Stock Requests, Quotations)
+                // Result remains module navigation only, clearly distinguished from verified records
+                return;
+            }
+
+            try {
+                const data = await lookupPromise;
+                const input = document.getElementById('globalSearch');
+                const activeQuery = input ? input.value.trim().toLowerCase() : '';
+                if (activeQuery !== query) return;
+
+                let verifiedInfo = null;
+                if (normType === 'PURCHASEORDER' && data && data.purchase_order) {
+                    const po = data.purchase_order;
+                    verifiedInfo = {
+                        label: `Purchase Order #${recordId}`,
+                        status: po.status || 'Active',
+                        details: `Status: ${po.status || 'Active'} • Total: ₹${Number(po.total_amount || 0).toFixed(2)}`
+                    };
+                } else if (normType === 'INVOICE' && data && (data.invoice || data.id)) {
+                    const inv = data.invoice || data;
+                    verifiedInfo = {
+                        label: `Invoice #${recordId}`,
+                        status: inv.status || 'Active',
+                        details: `Status: ${inv.status || 'Active'} • Amount: ₹${Number(inv.total_amount || 0).toFixed(2)}`
+                    };
+                } else if (normType === 'SHIPMENT' && data && data.shipment) {
+                    const shp = data.shipment;
+                    verifiedInfo = {
+                        label: `Shipment #${recordId}`,
+                        status: shp.status || 'Active',
+                        details: `Status: ${shp.status || 'Active'} • Tracking: ${shp.tracking_number || 'N/A'}`
+                    };
+                }
+
+                if (verifiedInfo) {
+                    // Replace unverified reference-nav with verified record
+                    this.currentResults = this.currentResults.filter(r => !(r.type === 'reference-nav' && r.normType === normType && r.recordId === recordId));
+                    this.currentResults.unshift({
+                        type: 'verified-record',
+                        title: `Verified ${verifiedInfo.label}`,
+                        desc: `${verifiedInfo.details} — Open verified details`,
+                        icon: 'bx-check-shield',
+                        action: async () => {
+                            await App.navigateToReference(normType, recordId);
+                        }
+                    });
+                    this.selectedIndex = 0;
+                    this.renderResults(this.currentResults, query);
+                }
+            } catch (err) {
+                // Record does not exist (404), access denied (403), or lookup failed.
+                // Do NOT fabricate record details or claim record existence.
+                // The item remains unverified module navigation only.
+            }
+        },
+
+        formatEntityLabel(normType) {
+            const map = {
+                'PURCHASEORDER': 'Purchase Order',
+                'SHIPMENT': 'Shipment',
+                'INVOICE': 'Invoice',
+                'PAYMENT': 'Payment Voucher',
+                'QUOTATION': 'Quotation',
+                'STOCKREQUEST': 'Stock Request',
+                'STOCKTRANSACTION': 'Stock Transaction',
+                'PRODUCT': 'Product'
+            };
+            return map[normType] || normType;
+        },
+
+        renderResults(results, query) {
+            const container = document.getElementById('globalSearchResults');
+            const input = document.getElementById('globalSearch');
+            if (!container || !input) return;
+
+            this.isOpen = true;
+            container.style.display = 'flex';
+            input.setAttribute('aria-expanded', 'true');
+
+            if (results.length === 0) {
+                container.innerHTML = `
+                    <div class="search-empty-state">
+                        <i class='bx bx-search-alt' style="font-size: 24px; opacity: 0.5; display: block; margin-bottom: 6px;"></i>
+                        <div>No results found for "${Utils.escapeHtml(query)}"</div>
+                        <div style="font-size: 11px; margin-top: 4px; color: var(--text-light);">Try searching for modules (e.g. "inventory", "reports") or records (e.g. "PO-12")</div>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            const verifiedResults = results.filter(r => r.type === 'verified-record');
+            const refNavResults = results.filter(r => r.type === 'reference-nav');
+            const routeResults = results.filter(r => r.type === 'route');
+
+            if (verifiedResults.length > 0) {
+                html += `<div class="search-result-group-title">Verified Records</div>`;
+                verifiedResults.forEach(r => {
+                    const globalIdx = results.indexOf(r);
+                    html += this.renderResultItemHtml(r, globalIdx);
+                });
+            }
+
+            if (refNavResults.length > 0) {
+                html += `<div class="search-result-group-title">Module Navigation (Reference Pattern)</div>`;
+                refNavResults.forEach(r => {
+                    const globalIdx = results.indexOf(r);
+                    html += this.renderResultItemHtml(r, globalIdx);
+                });
+            }
+
+            if (routeResults.length > 0) {
+                html += `<div class="search-result-group-title">Modules &amp; Pages</div>`;
+                routeResults.forEach(r => {
+                    const globalIdx = results.indexOf(r);
+                    html += this.renderResultItemHtml(r, globalIdx);
+                });
+            }
+
+            container.innerHTML = html;
+
+            container.querySelectorAll('.search-result-item').forEach(itemEl => {
+                const idx = parseInt(itemEl.dataset.index, 10);
+                itemEl.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.executeResult(idx);
+                });
+            });
+
+            this.updateActiveItemVisual();
+        },
+
+        renderResultItemHtml(r, idx) {
+            const isSelected = idx === this.selectedIndex;
+            return `
+                <div class="search-result-item ${isSelected ? 'active' : ''}" data-index="${idx}" role="option" aria-selected="${isSelected}">
+                    <i class='bx ${r.icon}'></i>
+                    <div class="item-details">
+                        <span class="item-title">${Utils.escapeHtml(r.title)}</span>
+                        <span class="item-desc">${Utils.escapeHtml(r.desc)}</span>
+                    </div>
+                    <i class='bx bx-chevron-right' style="font-size: 16px; color: var(--text-light);"></i>
+                </div>
+            `;
+        },
+
+        moveSelection(direction) {
+            if (!this.isOpen || this.currentResults.length === 0) return;
+            this.selectedIndex += direction;
+            if (this.selectedIndex < 0) {
+                this.selectedIndex = this.currentResults.length - 1;
+            } else if (this.selectedIndex >= this.currentResults.length) {
+                this.selectedIndex = 0;
+            }
+            this.updateActiveItemVisual();
+        },
+
+        updateActiveItemVisual() {
+            const container = document.getElementById('globalSearchResults');
+            if (!container) return;
+            const items = container.querySelectorAll('.search-result-item');
+            items.forEach((item, idx) => {
+                const isSel = idx === this.selectedIndex;
+                item.classList.toggle('active', isSel);
+                item.setAttribute('aria-selected', isSel ? 'true' : 'false');
+                if (isSel) {
+                    item.scrollIntoView({ block: 'nearest' });
+                }
+            });
+        },
+
+        selectCurrent() {
+            if (this.selectedIndex >= 0 && this.selectedIndex < this.currentResults.length) {
+                this.executeResult(this.selectedIndex);
+            }
+        },
+
+        executeResult(idx) {
+            const res = this.currentResults[idx];
+            if (res && typeof res.action === 'function') {
+                this.close();
+                res.action();
+            }
+        }
+    },
+
+    // User Profile Dropdown Controller
+    profileDropdown: {
+        isOpen: false,
+
+        init() {
+            const btn = document.getElementById('topProfileBtn');
+            if (!btn || btn.dataset.listenerAttached) return;
+            btn.dataset.listenerAttached = 'true';
+
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.toggle();
+            });
+
+            // Change password button click
+            const changePassBtn = document.getElementById('change-password-btn');
+            if (changePassBtn) {
+                changePassBtn.addEventListener('click', () => {
+                    this.close();
+                });
+            }
+
+            // Profile theme toggle
+            const profileThemeBtn = document.getElementById('profileThemeToggle');
+            if (profileThemeBtn) {
+                profileThemeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    App.toggleTheme();
+                });
+            }
+
+            // Logout button click
+            const logoutBtn = document.getElementById('profile-logout-btn');
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.close();
+                    Auth.logout();
+                });
+            }
+
+            // Close on outside click
+            document.addEventListener('click', (e) => {
+                const wrapper = document.getElementById('topProfileWrapper');
+                if (this.isOpen && wrapper && !wrapper.contains(e.target)) {
+                    this.close();
+                }
+            });
+
+            // Close on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && this.isOpen) {
+                    this.close();
+                    btn.focus();
+                }
+            });
+        },
+
+        toggle() {
+            if (this.isOpen) {
+                this.close();
+            } else {
+                this.open();
+            }
+        },
+
+        open() {
+            const dropdown = document.getElementById('profileDropdown');
+            const btn = document.getElementById('topProfileBtn');
+            if (!dropdown || !btn) return;
+
+            // Mutual exclusion: close other popups
+            if (App.notifications && App.notifications.isOpen) {
+                App.notifications.closeDropdown();
+            }
+            if (App.search && App.search.isOpen) {
+                App.search.close();
+            }
+
+            const user = Auth.getUser();
+            if (user) {
+                const nameEl = document.getElementById('dropdown-user-name');
+                const roleEl = document.getElementById('dropdown-user-role');
+                if (nameEl) nameEl.textContent = user.username || 'User';
+                if (roleEl) roleEl.textContent = user.role || 'Role';
+            }
+
+            this.isOpen = true;
+            dropdown.style.display = 'flex';
+            btn.setAttribute('aria-expanded', 'true');
+        },
+
+        close() {
+            const dropdown = document.getElementById('profileDropdown');
+            const btn = document.getElementById('topProfileBtn');
+            if (!dropdown) return;
+
+            this.isOpen = false;
+            dropdown.style.display = 'none';
+            if (btn) btn.setAttribute('aria-expanded', 'false');
+        }
     }
 };
 

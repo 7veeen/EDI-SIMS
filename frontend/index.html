@@ -4,7 +4,43 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SIMS - Smart Inventory Management System</title>
-    <link rel="stylesheet" href="index.css?v=7">
+    <!-- Early Pre-Render Theme Initialization (FOUC Prevention) -->
+    <script>
+        (function() {
+            var saved = null;
+            try {
+                saved = localStorage.getItem('sims_theme') || localStorage.getItem('theme') || localStorage.getItem('supplierTheme');
+            } catch (storageErr) {
+                // Storage access denied or unavailable -> fall back to OS preference
+                saved = null;
+            }
+
+            var isDark = false;
+            if (saved === 'dark') {
+                isDark = true;
+            } else if (saved === 'light') {
+                isDark = false;
+            } else {
+                // Storage threw, missing, or invalid preference: safely query OS preference
+                try {
+                    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                        isDark = true;
+                    }
+                } catch (mediaErr) {
+                    isDark = false;
+                }
+            }
+
+            try {
+                if (isDark) {
+                    document.documentElement.classList.add('dark', 'dark-theme');
+                } else {
+                    document.documentElement.classList.remove('dark', 'dark-theme');
+                }
+            } catch (domErr) {}
+        })();
+    </script>
+    <link rel="stylesheet" href="index.css?v=8">
     <link rel="stylesheet" href="css/supplier-invoices.css?v=1">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -218,22 +254,26 @@
         <main class="main">
             <!-- TOPBAR -->
             <header class="topbar">
-                <button class="mobile-menu" id="mobileMenu">
+                <button class="mobile-menu" id="mobileMenu" aria-label="Toggle mobile menu" title="Toggle mobile menu">
                     <i class='bx bx-menu'></i>
                 </button>
 
-                <button class="sidebar-toggle" id="sidebarToggle">
+                <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar collapse" title="Toggle sidebar">
                     <i class='bx bx-menu-alt-left'></i>
                 </button>
 
-                <div class="global-search">
+                <div class="global-search" id="globalSearchContainer">
                     <i class='bx bx-search'></i>
-                    <input type="text" id="globalSearch" placeholder="Search anything...">
-                    <kbd>Ctrl K</kbd>
+                    <input type="text" id="globalSearch" placeholder="Search anything..." autocomplete="off" aria-label="Search SIMS modules and records" aria-expanded="false" aria-controls="globalSearchResults">
+                    <button type="button" class="search-clear-btn" id="globalSearchClear" title="Clear search" aria-label="Clear search" style="display: none;">
+                        <i class='bx bx-x'></i>
+                    </button>
+                    <kbd id="globalSearchKbd">Ctrl K</kbd>
+                    <div class="global-search-results" id="globalSearchResults" style="display: none;" role="listbox" aria-label="Search results"></div>
                 </div>
 
                 <div class="top-actions">
-                    <button class="top-action" id="themeToggle" title="Toggle dark mode">
+                    <button class="top-action" id="themeToggle" title="Toggle dark mode" aria-label="Toggle dark mode">
                         <i class='bx bx-moon'></i>
                     </button>
 
@@ -247,13 +287,41 @@
                         </div>
                     </div>
 
-                    <div class="top-profile">
-                        <div class="top-avatar"><i class='bx bx-user'></i></div>
-                        <div class="top-profile-text">
-                            <strong id="topbar-display-name">User</strong>
-                            <span id="topbar-display-role">Role</span>
+                    <div class="top-profile-wrapper" id="topProfileWrapper">
+                        <button type="button" class="top-profile-btn" id="topProfileBtn" aria-label="User account menu" aria-haspopup="true" aria-expanded="false" aria-controls="profileDropdown">
+                            <div class="top-avatar"><i class='bx bx-user'></i></div>
+                            <div class="top-profile-text">
+                                <strong id="topbar-display-name">User</strong>
+                                <span id="topbar-display-role">Role</span>
+                            </div>
+                            <i class='bx bx-chevron-down' id="topProfileChevron"></i>
+                        </button>
+
+                        <div class="profile-dropdown" id="profileDropdown" style="display: none;" role="menu" aria-label="User profile options">
+                            <div class="profile-dropdown-header">
+                                <div class="profile-dropdown-avatar"><i class='bx bx-user'></i></div>
+                                <div class="profile-dropdown-info">
+                                    <strong id="dropdown-user-name">User</strong>
+                                    <span class="role-badge" id="dropdown-user-role">Role</span>
+                                </div>
+                            </div>
+                            <div class="profile-dropdown-body">
+                                <button type="button" class="profile-dropdown-item" id="change-password-btn" role="menuitem">
+                                    <i class='bx bx-key'></i>
+                                    <span>Change Password</span>
+                                </button>
+                                <button type="button" class="profile-dropdown-item" id="profileThemeToggle" role="menuitem" title="Toggle theme" aria-label="Toggle theme">
+                                    <i class='bx bx-moon'></i>
+                                    <span id="profile-theme-text">Dark Mode</span>
+                                </button>
+                            </div>
+                            <div class="profile-dropdown-footer">
+                                <button type="button" class="profile-dropdown-item logout-item" id="profile-logout-btn" role="menuitem">
+                                    <i class='bx bx-log-out'></i>
+                                    <span>Sign out</span>
+                                </button>
+                            </div>
                         </div>
-                        <i class='bx bx-chevron-down'></i>
                     </div>
                 </div>
             </header>
@@ -275,7 +343,7 @@
     <script src="js/components/modal.js?v=23"></script>
     
     <!-- Core App Logic -->
-    <script src="js/app.js?v=24"></script>
+    <script src="js/app.js?v=25"></script>
 
     <!-- Page Scripts -->
     <script src="js/pages/login.js?v=8"></script>
