@@ -517,13 +517,13 @@ An exhaustive, read-only security preflight was performed to evaluate database-a
 ### 10.1 Database Access Model: Strict Backend-Only Architecture
 Codebase and configuration inspection confirmed the following architectural facts:
 1. **Frontend Network Layer:**
-   - Inspection of [api.js](file:///d:/7even%20repica%202/frontend/js/api/api.js) confirms that all client-side network communication is strictly routed through the Flask API gateway (`http://127.0.0.1:5000/api`).
+   - Inspection of [api.js](file) confirms that all client-side network communication is strictly routed through the Flask API gateway ().
    - The frontend contains **zero** Supabase client library integrations (`@supabase/supabase-js` is not installed or referenced).
    - Zero direct PostgREST or Supabase GraphQL calls exist anywhere in the frontend or admin clients.
 2. **Backend Database Connection:**
-   - In [extensions.py](file:///d:/7even%20repica%202/backend/app/extensions.py), the Flask application establishes raw PostgreSQL connections via `psycopg2.connect(DATABASE_URL)`.
+   - In [extensions.py](), the Flask application establishes raw PostgreSQL connections via `psycopg2.connect(DATABASE_URL)`.
    - The connection user is `postgres` (`rolsuper = True`, `rolcanlogin = True`, `rolbypassrls = True`).
-   - The database server is hosted on Supabase (`db.hltosdkwugwcpofekjgp.supabase.co:5432` / Supabase transaction pooler).
+   - The database server is hosted on Supabase ( Supabase transaction pooler).
 3. **Authentication Boundary:**
    - SIMS user accounts (`public."Users"`) and roles (`public."Roles"`) are purely application-level database records.
    - Authentication is handled exclusively by Flask using `flask_jwt_extended` with a private HMAC secret (`JWT_SECRET_KEY`).
@@ -562,35 +562,24 @@ Because SIMS uses custom Flask JWTs rather than Supabase Auth tokens, Supabase's
 Therefore, the database itself must enforce a **default-deny boundary** on PostgREST client roles.
 
 ### 10.4 Smallest Safe Security Change Recommendation & Compatibility Proof
-To completely seal the Supabase Data API exposure vector without impacting the existing application or database architecture, we recommend the following security hardening change:
+To completely seal the Supabase Data API exposure vector without impacting the existing application or database architecture, we recommend the following two-part security hardening change:
 
 ```sql
 -- Part 1: Enable Row Level Security (Default-Deny for all non-superuser roles)
 ALTER TABLE public."SupplierInvoices" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public."SupplierPayments" ENABLE ROW LEVEL SECURITY;
 
--- Part 2: Explicitly revoke table privileges from PostgREST client roles & PUBLIC
-REVOKE ALL ON TABLE public."SupplierInvoices" FROM anon, authenticated, PUBLIC;
-REVOKE ALL ON TABLE public."SupplierPayments" FROM anon, authenticated, PUBLIC;
+-- Part 2: Explicitly revoke table privileges from PostgREST client roles
+REVOKE ALL ON TABLE public."SupplierInvoices" FROM anon, authenticated;
+REVOKE ALL ON TABLE public."SupplierPayments" FROM anon, authenticated;
 ```
 
-#### Detailed Effective Privilege & Access Matrix:
-An inspection of PostgreSQL role inheritance (`pg_auth_members`), system attributes (`rolbypassrls`, `rolsuper`), and privileges verifies the effective access for each role after applying Migration 002:
-
-| Role | Direct Table Privileges | Inherited Privileges (`member_of`) | RLS Enforced? (`rolbypassrls`) | Effective Access to Invoices & Payments |
-| :--- | :--- | :--- | :--- | :--- |
-| **`anon`** | **NONE** (Explicitly revoked by `REVOKE ALL`) | `[]` (None; `PUBLIC` also holds 0 privileges) | **YES** (`bypassrls = False`)<br>Default-deny (0 policies) | **BLOCKED (Zero Access)**<br>PostgREST queries return `401/403/404`. Cannot read, insert, update, or delete. |
-| **`authenticated`** | **NONE** (Explicitly revoked by `REVOKE ALL`) | `[]` (None; `PUBLIC` also holds 0 privileges) | **YES** (`bypassrls = False`)<br>Default-deny (0 policies) | **BLOCKED (Zero Access)**<br>PostgREST queries return `401/403/404`. Cannot read, insert, update, or delete. |
-| **`PUBLIC`** | **NONE** (Explicitly revoked by `REVOKE ALL`) | N/A (Pseudo-role for all users) | **YES** | **BLOCKED (Zero Access)** |
-| **`service_role`** | `arwdDxtm` (SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER from `pg_default_acl`) | `[]` (None) | **NO** (`bypassrls = True`) | **FULL (Admin Only)**<br>Accessible only via private `service_role` secret (verified unexposed). |
-| **`postgres`** (Flask Backend) | **TABLE OWNER** + `arwdDxtm` (Full privileges) | `['supabase_privileged_role', 'pg_read_all_data', ...]` | **NO** (`bypassrls = True`) | **FULL (100% Preserved)**<br>Flask backend maintains uninterrupted read/write access via `psycopg2`. |
-
 #### Compatibility Analysis with Existing Backend Connection:
-1. **Superuser / Bypass RLS:** The Flask backend connects via `DATABASE_URL` as user `postgres`. In PostgreSQL, `postgres` possesses `rolbypassrls = True`. By PostgreSQL design, roles with `BYPASSRLS` automatically bypass all table RLS checks.
-2. **Table Ownership:** User `postgres` is the owner of both tables. Revoking permissions from `anon`, `authenticated`, and `PUBLIC` has zero effect on the table owner.
+1. **Superuser Bypass:** The Flask backend connects via `DATABASE_URL` as user `postgres`. In PostgreSQL, `postgres` possesses `rolsuper = True` and `rolbypassrls = True`. By PostgreSQL design, roles with `BYPASSRLS` automatically bypass all table RLS checks.
+2. **Table Ownership:** User `postgres` is the owner of both tables. Revoking permissions from `anon` and `authenticated` has zero effect on the table owner.
 3. **Zero Backend Regression:** Every query executed by the Flask backend in Phase 2 (`SELECT`, `INSERT`, `UPDATE`, `FOR UPDATE`) will continue to operate with 100% normal capability and zero performance overhead.
-4. **Dual-Layer Defense in Depth:** External HTTP requests attempting to query `https://<project-ref>.supabase.co/rest/v1/SupplierInvoices` or `SupplierPayments` via PostgREST will be rejected at the table grant check and blocked by RLS default-deny.
-5. **Zero Impact on Existing Tables:** This change applies strictly to `"SupplierInvoices"` and `"SupplierPayments"`. It does not alter or disrupt any of the existing 19 SIMS tables.
+4. **Immediate PostgREST Lockdown:** External HTTP requests attempting to query `https://<project-ref>.supabase.co/rest/v1/SupplierInvoices` or `SupplierPayments` via PostgREST will receive HTTP `404 Not Found` or `401/403 Forbidden`.
+5. **No Interference with Existing Tables:** This change applies strictly to `"SupplierInvoices"` and `"SupplierPayments"`. It does not alter or disrupt any of the existing 19 SIMS tables.
 
 ### 10.5 Secondary Index Redundancy Review
 A thorough architectural review of the 11 secondary indexes defined in `001_create_supplier_payments_and_invoices.sql` was conducted:
@@ -620,20 +609,7 @@ In accordance with Task 5, the proposed security hardening SQL has been prepared
 - **File:** [002_secure_supplier_payments_and_invoices_rls.sql](file:///d:/7even%20repica%202/database/migrations/002_secure_supplier_payments_and_invoices_rls.sql)
 - **Status:** **PROPOSED / PENDING APPROVAL** (Not applied to live database).
 
-### 10.7 Credential Isolation & Scope Limitations
-
-#### 1. Verification of `service_role` Credential Isolation:
-- An exhaustive scan across all frontend directories (`frontend/`, `frontend-admin/`, `frontend-mpa-backup/`), JavaScript bundles, and backend code confirmed that the Supabase `service_role` credential is **completely absent** from client-side files.
-- No Supabase API keys (`anon` or `service_role`) are embedded in client code, client local storage, or public repositories.
-- Client-facing users have zero access to the `service_role` secret.
-
-#### 2. Scope Boundary of Migration 002:
-> [!IMPORTANT]
-> **Scope Limitation Notice:**  
-> Migration 002 applies **exclusively to the new financial tables** (`SupplierInvoices` and `SupplierPayments`). It explicitly does NOT modify, lock down, or enable RLS on the 19 pre-existing SIMS tables (`Users`, `Suppliers`, `PurchaseOrders`, `Shipments`, etc.).  
-> The existing tables currently remain in their baseline state (`relrowsecurity = False`), which is an existing infrastructure characteristic that predates this feature. Securing existing tables requires a separate, dedicated system-wide security assessment and regression testing suite to ensure existing features are not impacted.
-
-### 10.8 Unresolved Security Risks & Phase 2 Backend Guardrails
+### 10.7 Unresolved Security Risks & Phase 2 Backend Guardrails
 The following security risks cannot be resolved at the schema layer and require strict enforcement in Phase 2 backend service logic:
 
 1. **PostgREST Exposure on Existing Tables:**

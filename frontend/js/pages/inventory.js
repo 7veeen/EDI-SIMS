@@ -299,8 +299,6 @@ App.pages['inventory'] = {
             }
             if (paginationContainer) paginationContainer.innerHTML = '';
         }
-    },>`;
-        }
     },
 
     // Stock-Out Modal (Step 6 Outgoing Stock)
