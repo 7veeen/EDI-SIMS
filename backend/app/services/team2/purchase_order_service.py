@@ -294,17 +294,43 @@ def get_purchase_order_by_id(purchase_order_id, user_id=None, role=None):
         cursor.execute(items_query, (purchase_order_id,))
         item_rows = cursor.fetchall()
 
+        # Check approved quotation quantities if available
+        cursor.execute("""
+            SELECT product_id, quantity FROM "SupplierQuotations"
+            WHERE purchase_order_id = %s AND status IN ('Approved', 'Accepted')
+        """, (purchase_order_id,))
+        quote_map = {row[0]: int(row[1]) for row in cursor.fetchall()}
+
+        # Fetch previously allocated quantities across non-cancelled shipments
+        cursor.execute("""
+            SELECT si.product_id, COALESCE(SUM(si.quantity), 0)
+            FROM "ShipmentItems" si
+            JOIN "Shipments" s ON si.shipment_id = s.shipment_id
+            WHERE s.purchase_order_id = %s AND s.status != 'Cancelled'
+            GROUP BY si.product_id
+        """, (purchase_order_id,))
+        alloc_map = {row[0]: int(row[1]) for row in cursor.fetchall()}
+
         items = []
         for ir in item_rows:
+            pid = ir[2]
+            poi_qty = ir[5]
+            approved_qty = quote_map.get(pid, poi_qty)
+            alloc_qty = alloc_map.get(pid, 0)
+            rem_qty = max(0, approved_qty - alloc_qty)
+
             items.append({
                 "purchase_order_item_id": ir[0],
                 "purchase_order_id": ir[1],
-                "product_id": ir[2],
+                "product_id": pid,
                 "product_name": ir[3],
                 "sku": ir[4],
-                "quantity": ir[5],
+                "quantity": approved_qty,
+                "poi_quantity": poi_qty,
                 "unit_price": float(ir[6]),
-                "subtotal": float(ir[7])
+                "subtotal": float(ir[7]),
+                "allocated_quantity": alloc_qty,
+                "remaining_quantity": rem_qty
             })
 
         # Fetch Order Status History

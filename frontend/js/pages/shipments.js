@@ -94,7 +94,7 @@ App.pages['shipments'] = {
             </div>
 
             <!-- Table Card & Filters -->
-            <div class="card table-responsive" style="border-radius: 12px; background: var(--card-bg, #ffffff); border: 1px solid var(--border); overflow: hidden;">
+            <div class="card" style="border-radius: 12px; background: var(--card-bg, #ffffff); border: 1px solid var(--border); overflow: hidden; margin-top: 10px; padding: 0;">
                 <div style="padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px;">
                     <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 280px;">
                         <div style="position: relative; flex: 1; max-width: 360px;">
@@ -117,28 +117,30 @@ App.pages['shipments'] = {
                     </div>
                 </div>
 
-                <table class="data-table" style="width: 100%; border-collapse: collapse; text-align: left;">
-                    <thead>
-                        <tr style="background: var(--bg-surface, #f9fafb); border-bottom: 1px solid var(--border); color: var(--text-secondary); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">
-                            <th style="padding: 12px 16px;">SHIPMENT #</th>
-                            <th style="padding: 12px 16px;">PURCHASE ORDER</th>
-                            ${!isSupplier ? '<th style="padding: 12px 16px;">SUPPLIER</th>' : ''}
-                            <th style="padding: 12px 16px;">CARRIER &amp; TRACKING</th>
-                            ${!isSupplier ? '<th style="padding: 12px 16px;">ASSIGNED TO</th>' : ''}
-                            <th style="padding: 12px 16px;">RECEIVING STATUS</th>
-                            <th style="padding: 12px 16px;">STATUS</th>
-                            <th style="padding: 12px 16px; text-align: center;">ACTIONS</th>
-                        </tr>
-                    </thead>
-                    <tbody id="shipments-tbody">
-                        <tr>
-                            <td colspan="${isSupplier ? '7' : '9'}" style="text-align: center; padding: 40px; color: var(--text-secondary);">
-                                <i class='bx bx-loader-alt bx-spin' style="font-size: 24px; margin-bottom: 8px;"></i>
-                                <div>Loading shipments from Supabase...</div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div class="table-responsive shipments-table-container">
+                    <table class="data-table" id="shipments-table" style="width: 100%; min-width: 980px; border-collapse: collapse; text-align: left;">
+                        <thead>
+                            <tr style="background: var(--bg-surface, #f9fafb); border-bottom: 1px solid var(--border); color: var(--text-secondary); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">
+                                <th style="padding: 12px 16px; min-width: 140px;">SHIPMENT #</th>
+                                <th style="padding: 12px 16px; min-width: 110px;">PURCHASE ORDER</th>
+                                ${!isSupplier ? '<th style="padding: 12px 16px; min-width: 160px;">SUPPLIER</th>' : ''}
+                                <th style="padding: 12px 16px; min-width: 160px;">CARRIER &amp; TRACKING</th>
+                                ${!isSupplier ? '<th style="padding: 12px 16px; min-width: 140px;">ASSIGNED TO</th>' : ''}
+                                <th style="padding: 12px 16px; min-width: 140px;">RECEIVING STATUS</th>
+                                <th style="padding: 12px 16px; min-width: 100px;">STATUS</th>
+                                <th class="col-actions cell-actions-center" style="padding: 12px 16px; min-width: 140px; text-align: center;">ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="shipments-tbody">
+                            <tr>
+                                <td colspan="${isSupplier ? '7' : '9'}" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                                    <i class='bx bx-loader-alt bx-spin' style="font-size: 24px; margin-bottom: 8px;"></i>
+                                    <div>Loading shipments from Supabase...</div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
             <div id="shipments-pagination-container"></div>
         `;
@@ -339,8 +341,8 @@ App.pages['shipments'] = {
                             <div style="display: flex; align-items: center; gap: 6px;">
                                 <span style="font-weight: 600; font-size: 12px; color: var(--text);">${Utils.escapeHtml(s.assigned_employee_name)}</span>
                                 ${recStatus !== 'Fully Received' ? `
-                                    <button class="btn btn-icon-small" title="Reassign Employee" onclick="App.pages['shipments'].openAssignEmployeeModal(${s.shipment_id})"
-                                            style="background: white; border: 1px solid var(--border); border-radius: 4px; padding: 2px 4px; font-size: 12px; color: #4f46e5; cursor: pointer;">
+                                    <button class="btn-icon btn-action-assign" title="Reassign Employee" aria-label="Reassign employee for shipment ${s.shipment_id}" onclick="App.pages['shipments'].openAssignEmployeeModal(${s.shipment_id})"
+                                            style="width: 26px; height: 26px; font-size: 13px; cursor: pointer;">
                                         <i class='bx bx-edit-alt'></i>
                                     </button>
                                 ` : ''}
@@ -380,7 +382,7 @@ App.pages['shipments'] = {
                         <div style="font-weight: 600; font-size: 13px; color: var(--text); display: flex; align-items: center; gap: 6px;">
                             <i class='bx bx-send' style="color: #2563eb;"></i> ${Utils.escapeHtml(s.carrier)}
                         </div>
-                        <div style="font-size: 11px; color: var(--text-secondary); font-family: monospace; margin-top: 2px;">
+                        <div style="font-size: 11px; color: var(--text-secondary); font-family: monospace; margin-top: 2px; word-break: break-all;">
                             ${s.tracking_number ? `TRK: ${Utils.escapeHtml(s.tracking_number)}` : 'No tracking'}
                         </div>
                     </td>
@@ -395,38 +397,33 @@ App.pages['shipments'] = {
                     <td style="padding: 14px 16px;">
                         ${statusBadge}
                     </td>
-                    <td style="padding: 14px 16px; text-align: center;">
-                        <div style="display: inline-flex; gap: 6px; align-items: center; justify-content: center; flex-wrap: wrap;">
-                            <button class="btn btn-icon-small" title="View Shipment Details" onclick="App.pages['shipments'].openShipmentDetailsModal(${s.shipment_id})"
-                                    style="background: white; border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; cursor: pointer; color: var(--text-secondary);">
-                                <i class='bx bx-show' style="font-size: 16px;"></i>
+                    <td class="col-actions cell-actions-center" style="padding: 12px 16px; text-align: center;">
+                        <div class="action-buttons" style="justify-content: center;">
+                            <button class="btn-icon btn-action-view" title="View Shipment Details" aria-label="View shipment details for ${Utils.escapeHtml(s.shipment_number)}" onclick="App.pages['shipments'].openShipmentDetailsModal(${s.shipment_id})">
+                                <i class='bx bx-show'></i>
                             </button>
 
                             ${canStockIn ? `
-                                <button class="btn btn-sm" title="Receive Stock / Stock-In" onclick="App.pages['shipments'].openReceiveStockModal(${s.shipment_id})"
-                                        style="background: #059669; color: white; border: none; border-radius: 6px; padding: 6px 10px; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
-                                    <i class='bx bx-download'></i> Receive Stock
+                                <button class="btn-icon btn-action-stockin text-success" title="Receive Stock / Stock-In" aria-label="Receive stock for shipment ${Utils.escapeHtml(s.shipment_number)}" onclick="App.pages['shipments'].openReceiveStockModal(${s.shipment_id})">
+                                    <i class='bx bx-download'></i>
                                 </button>
                             ` : ''}
 
                             ${isManagerOrOwner && !s.assigned_employee_id && recStatus !== 'Fully Received' ? `
-                                <button class="btn btn-icon-small" title="Assign Employee" onclick="App.pages['shipments'].openAssignEmployeeModal(${s.shipment_id})"
-                                        style="background: white; border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; cursor: pointer; color: #4f46e5;">
-                                    <i class='bx bx-user-plus' style="font-size: 16px;"></i>
+                                <button class="btn-icon btn-action-assign" title="Assign Employee" aria-label="Assign employee to shipment ${Utils.escapeHtml(s.shipment_number)}" onclick="App.pages['shipments'].openAssignEmployeeModal(${s.shipment_id})">
+                                    <i class='bx bx-user-plus'></i>
                                 </button>
                             ` : ''}
 
                             ${!isTerminal && (isSupplier || isManagerOrOwner) ? `
-                                <button class="btn btn-icon-small" title="Update Status" onclick="App.pages['shipments'].openUpdateStatusModal(${s.shipment_id})"
-                                        style="background: white; border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; cursor: pointer; color: #2563eb;">
-                                    <i class='bx bx-refresh' style="font-size: 16px;"></i>
+                                <button class="btn-icon btn-action-status" title="Update Status" aria-label="Update status for shipment ${Utils.escapeHtml(s.shipment_number)}" onclick="App.pages['shipments'].openUpdateStatusModal(${s.shipment_id})">
+                                    <i class='bx bx-refresh'></i>
                                 </button>
                             ` : ''}
 
                             ${!isTerminal && isSupplier ? `
-                                <button class="btn btn-icon-small" title="Edit Shipment Details" onclick="App.pages['shipments'].openEditShipmentModal(${s.shipment_id})"
-                                        style="background: white; border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; cursor: pointer; color: #4b5563;">
-                                    <i class='bx bx-edit' style="font-size: 16px;"></i>
+                                <button class="btn-icon btn-action-edit" title="Edit Shipment Details" aria-label="Edit shipment details for ${Utils.escapeHtml(s.shipment_number)}" onclick="App.pages['shipments'].openEditShipmentModal(${s.shipment_id})">
+                                    <i class='bx bx-edit'></i>
                                 </button>
                             ` : ''}
                         </div>
@@ -495,8 +492,8 @@ App.pages['shipments'] = {
                         </select>
                     </div>
 
-                    <div id="modal-ship-po-preview" style="display: none; padding: 12px; border-radius: 8px; background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.2);">
-                        <!-- PO Preview details injected here -->
+                    <div id="modal-ship-po-preview" style="display: none; padding: 14px; border-radius: 8px; background: var(--bg-surface, #f9fafb); border: 1px solid var(--border);">
+                        <!-- Interactive PO product allocations injected here -->
                     </div>
 
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
@@ -573,77 +570,310 @@ App.pages['shipments'] = {
             Modal.show({
                 title: 'Create & Dispatch Shipment 📦',
                 content,
+                size: 'lg',
                 saveText: 'Create Shipment',
-                onSave: async (closeModal) => {
-                    const poId = document.getElementById('modal-ship-po-select').value;
+                onSave: async (modalEl) => {
+                    const poSelect = document.getElementById('modal-ship-po-select');
+                    const poId = poSelect ? poSelect.value : '';
                     if (!poId) {
-                        alert('Please select a Purchase Order.');
-                        return;
+                        throw new Error('Please select an accepted Purchase Order.');
+                    }
+
+                    const previewBox = document.getElementById('modal-ship-po-preview');
+                    if (!previewBox) {
+                        throw new Error('Shipment allocation builder not initialized.');
+                    }
+
+                    const checkedBoxes = Array.from(previewBox.querySelectorAll('.alloc-item-checkbox:checked'));
+                    if (checkedBoxes.length === 0) {
+                        const allRows = previewBox.querySelectorAll('tr.alloc-row, tr.alloc-row-disabled');
+                        if (allRows.length > 0 && previewBox.querySelectorAll('.alloc-item-checkbox').length === 0) {
+                            throw new Error('All products for this Purchase Order have already been fully allocated to existing shipments.');
+                        }
+                        throw new Error('Please select at least one product to allocate to this shipment consignment.');
+                    }
+
+                    const items = [];
+                    const seenPids = new Set();
+
+                    for (const cb of checkedBoxes) {
+                        const pidStr = cb.getAttribute('data-product-id');
+                        const pid = parseInt(pidStr, 10);
+                        if (isNaN(pid) || pid <= 0) {
+                            throw new Error('Invalid product selected.');
+                        }
+
+                        if (seenPids.has(pid)) {
+                            throw new Error(`Duplicate product ID ${pid} selected in allocation.`);
+                        }
+                        seenPids.add(pid);
+
+                        const qtyInput = previewBox.querySelector(`.alloc-qty-input[data-product-id="${pid}"]`);
+                        const prodName = qtyInput ? (qtyInput.getAttribute('data-product-name') || `Product #${pid}`) : `Product #${pid}`;
+                        const maxRem = parseInt(cb.getAttribute('data-max') || '0', 10);
+
+                        if (!qtyInput) {
+                            throw new Error(`Quantity input missing for ${prodName}.`);
+                        }
+
+                        const rawQty = qtyInput.value ? qtyInput.value.trim() : '';
+                        if (!rawQty || !/^\d+$/.test(rawQty)) {
+                            throw new Error(`Allocation quantity for "${prodName}" must be a valid positive integer.`);
+                        }
+
+                        const qty = parseInt(rawQty, 10);
+                        if (qty <= 0) {
+                            throw new Error(`Allocation quantity for "${prodName}" must be greater than zero.`);
+                        }
+
+                        if (maxRem > 0 && qty > maxRem) {
+                            throw new Error(`Allocation quantity for "${prodName}" (${qty}) cannot exceed remaining allocatable quantity (${maxRem}).`);
+                        }
+
+                        items.push({
+                            product_id: pid,
+                            quantity: qty
+                        });
                     }
 
                     const carrier = document.getElementById('modal-ship-carrier').value;
                     const trackingNumber = document.getElementById('modal-ship-tracking').value;
                     const method = document.getElementById('modal-ship-method').value;
                     const status = document.getElementById('modal-ship-status').value;
-                    const pkgCount = parseInt(document.getElementById('modal-ship-pkg-count').value) || 1;
+                    const pkgCount = parseInt(document.getElementById('modal-ship-pkg-count').value, 10) || 1;
                     const weightVal = document.getElementById('modal-ship-weight').value;
                     const origin = document.getElementById('modal-ship-origin').value;
                     const dest = document.getElementById('modal-ship-dest').value;
                     const expectedDelivery = document.getElementById('modal-ship-expected-delivery').value;
                     const notes = document.getElementById('modal-ship-notes').value;
 
-                    try {
-                        await Api.post('/shipments/', {
-                            purchase_order_id: parseInt(poId),
-                            carrier: carrier || 'Standard Logistics',
-                            tracking_number: trackingNumber || null,
-                            shipping_method: method,
-                            status: status,
-                            package_count: pkgCount,
-                            total_weight: weightVal ? parseFloat(weightVal) : null,
-                            origin_address: origin,
-                            destination_address: dest,
-                            expected_delivery: expectedDelivery || null,
-                            shipping_notes: notes || ''
-                        });
-                        closeModal();
-                        alert('Shipment created and dispatched successfully!');
-                        App.pages['shipments'].loadShipments();
-                    } catch (err) {
-                        alert(`Error creating shipment: ${err.message}`);
-                    }
+                    await Api.post('/shipments/', {
+                        purchase_order_id: parseInt(poId, 10),
+                        carrier: carrier || 'Standard Logistics',
+                        tracking_number: trackingNumber || null,
+                        shipping_method: method,
+                        status: status,
+                        package_count: pkgCount,
+                        total_weight: weightVal ? parseFloat(weightVal) : null,
+                        origin_address: origin,
+                        destination_address: dest,
+                        expected_delivery: expectedDelivery || null,
+                        shipping_notes: notes || '',
+                        items: items
+                    });
+
+                    Utils.showToast('Shipment created and dispatched successfully with product allocations!', 'success');
+                    App.pages['shipments'].loadShipments();
                 }
             });
 
-            // PO selection preview listener
+            // PO selection listener with live allocation builder
             const poSelect = document.getElementById('modal-ship-po-select');
             const previewBox = document.getElementById('modal-ship-po-preview');
+            let currentPoRequestId = 0;
+
+            const updateAllocationSummary = () => {
+                if (!previewBox) return;
+                const checkedBoxes = Array.from(previewBox.querySelectorAll('.alloc-item-checkbox:checked'));
+                let totalUnits = 0;
+                checkedBoxes.forEach(cb => {
+                    const pid = cb.getAttribute('data-product-id');
+                    const inp = previewBox.querySelector(`.alloc-qty-input[data-product-id="${pid}"]`);
+                    if (inp && inp.value && !isNaN(parseInt(inp.value, 10))) {
+                        totalUnits += parseInt(inp.value, 10);
+                    }
+                });
+
+                const countEl = previewBox.querySelector('#alloc-selected-count');
+                const unitsEl = previewBox.querySelector('#alloc-total-units');
+                const totalEligible = previewBox.querySelectorAll('.alloc-item-checkbox').length;
+
+                if (countEl) countEl.textContent = `${checkedBoxes.length} of ${totalEligible} product${totalEligible === 1 ? '' : 's'} selected`;
+                if (unitsEl) unitsEl.textContent = `Total Consignment Units: ${totalUnits}`;
+            };
+
             poSelect.addEventListener('change', async (e) => {
                 const poId = e.target.value;
+                const thisReq = ++currentPoRequestId;
+
                 if (!poId) {
                     previewBox.style.display = 'none';
+                    previewBox.innerHTML = '';
                     return;
                 }
+
                 try {
                     previewBox.style.display = 'block';
-                    previewBox.innerHTML = '<div>Loading PO details...</div>';
-                    const poData = await Api.get(`/purchase-orders/${poId}`);
-                    const order = poData.purchase_order;
-
                     previewBox.innerHTML = `
-                        <div style="font-weight: 700; font-size: 13px; color: #1e40af; margin-bottom: 4px;">Purchase Order #${order.purchase_order_id} Contents</div>
-                        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">Order Date: ${order.order_date || 'N/A'} • Total Budget: ₹${(order.total_amount || 0).toLocaleString('en-IN')}</div>
-                        <div style="display: flex; flex-direction: column; gap: 4px;">
-                            ${order.items.map(item => `
-                                <div style="font-size: 12px; color: var(--text); display: flex; justify-content: space-between;">
-                                    <span>• ${item.product_name} (${item.sku || 'N/A'})</span>
-                                    <strong>${item.quantity} units</strong>
-                                </div>
-                            `).join('')}
+                        <div style="text-align: center; padding: 24px; color: var(--text-secondary); font-size: 13px;">
+                            <i class='bx bx-loader-alt bx-spin' style="font-size: 22px; margin-bottom: 6px; display: block; color: #2563eb;"></i>
+                            Loading purchase order line items and allocation limits...
                         </div>
                     `;
+
+                    const poData = await Api.get(`/purchase-orders/${poId}`);
+                    if (thisReq !== currentPoRequestId) return; // Stale request discarded
+
+                    const order = poData.purchase_order;
+                    const items = (order && Array.isArray(order.items)) ? order.items : [];
+
+                    if (items.length === 0) {
+                        previewBox.innerHTML = `
+                            <div style="padding: 14px; text-align: center; color: var(--text-secondary);">
+                                <i class='bx bx-info-circle' style="font-size: 20px; color: #d97706;"></i>
+                                <div style="margin-top: 4px; font-size: 13px;">No items found in Purchase Order #${order.purchase_order_id}.</div>
+                            </div>
+                        `;
+                        return;
+                    }
+
+                    const escape = (str) => Utils.escapeHtml ? Utils.escapeHtml(str || '') : (str || '');
+
+                    let rowsHtml = '';
+                    let eligibleCount = 0;
+
+                    items.forEach(item => {
+                        const poQty = parseInt(item.quantity, 10) || 0;
+                        const allocQty = item.allocated_quantity !== undefined ? parseInt(item.allocated_quantity, 10) : 0;
+                        const remQty = item.remaining_quantity !== undefined ? parseInt(item.remaining_quantity, 10) : Math.max(0, poQty - allocQty);
+                        const isFullyAllocated = remQty <= 0;
+
+                        if (!isFullyAllocated) eligibleCount++;
+
+                        rowsHtml += `
+                            <tr style="border-bottom: 1px solid var(--border); ${isFullyAllocated ? 'background: rgba(0,0,0,0.02); opacity: 0.65;' : ''}" class="${isFullyAllocated ? 'alloc-row-disabled' : 'alloc-row'}">
+                                <td style="padding: 8px 10px; text-align: center;">
+                                    ${isFullyAllocated 
+                                        ? `<input type="checkbox" disabled title="Fully allocated to other dispatches" style="cursor: not-allowed;">`
+                                        : `<input type="checkbox" class="alloc-item-checkbox" data-product-id="${item.product_id}" data-max="${remQty}" checked style="cursor: pointer;">`
+                                    }
+                                </td>
+                                <td style="padding: 8px 10px;">
+                                    <div style="font-weight: 600; color: var(--text); font-size: 13px;">${escape(item.product_name)}</div>
+                                    <div style="font-size: 11px; font-family: monospace; color: var(--text-secondary);">${escape(item.sku || 'N/A')}</div>
+                                </td>
+                                <td style="padding: 8px 10px; text-align: right; font-weight: 500;">${poQty}</td>
+                                <td style="padding: 8px 10px; text-align: right; color: var(--text-secondary);">${allocQty}</td>
+                                <td style="padding: 8px 10px; text-align: right; font-weight: 700; color: ${isFullyAllocated ? '#64748b' : '#059669'};">${remQty}</td>
+                                <td style="padding: 8px 10px; text-align: right;">
+                                    ${isFullyAllocated 
+                                        ? `<span style="display: inline-block; padding: 2px 8px; border-radius: 4px; background: rgba(100, 116, 139, 0.12); color: #64748b; font-size: 11px; font-weight: 600;">Fully Allocated</span>`
+                                        : `<input type="number" class="alloc-qty-input" data-product-id="${item.product_id}" data-max="${remQty}" data-product-name="${escape(item.product_name)}"
+                                                  min="1" max="${remQty}" step="1" value="${remQty}"
+                                                  style="width: 100px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); font-size: 13px; font-weight: 600; text-align: right; background: var(--bg-surface, #ffffff); color: var(--text);">`
+                                    }
+                                </td>
+                            </tr>
+                        `;
+                    });
+
+                    previewBox.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                            <div>
+                                <div style="font-weight: 700; font-size: 14px; color: #1e40af;">PO #${order.purchase_order_id} Product Allocations</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">Order Date: ${order.order_date || 'N/A'} • Total Budget: ₹${(order.total_amount || 0).toLocaleString('en-IN')}</div>
+                            </div>
+                            <div style="font-size: 11px; padding: 4px 8px; border-radius: 6px; background: rgba(59, 130, 246, 0.1); color: #2563eb; font-weight: 600;">
+                                <i class='bx bx-check-shield'></i> Split Allocation Builder
+                            </div>
+                        </div>
+
+                        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">
+                            Select the eligible products and quantities to allocate to this consignment.
+                        </div>
+
+                        <div style="border-radius: 8px; border: 1px solid var(--border); overflow: hidden; background: var(--card-bg, #ffffff);">
+                            <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
+                                <thead>
+                                    <tr style="background: var(--bg-surface, #f8fafc); border-bottom: 1px solid var(--border); color: var(--text-secondary); font-size: 11px; text-transform: uppercase;">
+                                        <th style="padding: 8px 10px; width: 36px; text-align: center;">
+                                            <input type="checkbox" id="alloc-select-all" title="Select / Deselect All Products" ${eligibleCount > 0 ? 'checked' : 'disabled'} style="cursor: pointer;">
+                                        </th>
+                                        <th style="padding: 8px 10px;">Product &amp; SKU</th>
+                                        <th style="padding: 8px 10px; text-align: right;">PO Qty</th>
+                                        <th style="padding: 8px 10px; text-align: right;">Allocated</th>
+                                        <th style="padding: 8px 10px; text-align: right;">Remaining</th>
+                                        <th style="padding: 8px 10px; text-align: right; width: 130px;">Ship Quantity *</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${rowsHtml}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 12px; font-weight: 600; color: var(--text-secondary);">
+                            <span id="alloc-selected-count">${eligibleCount} of ${items.length} products selected</span>
+                            <span id="alloc-total-units" style="color: #059669;">Total Consignment Units: 0</span>
+                        </div>
+                    `;
+
+                    // Wire up checkbox toggles and quantity input handlers
+                    const selectAllBox = previewBox.querySelector('#alloc-select-all');
+                    const checkboxes = Array.from(previewBox.querySelectorAll('.alloc-item-checkbox'));
+                    const qtyInputs = Array.from(previewBox.querySelectorAll('.alloc-qty-input'));
+
+                    const syncRowState = (cb) => {
+                        const pid = cb.getAttribute('data-product-id');
+                        const maxRem = parseInt(cb.getAttribute('data-max') || '0', 10);
+                        const inp = previewBox.querySelector(`.alloc-qty-input[data-product-id="${pid}"]`);
+                        if (!inp) return;
+
+                        if (cb.checked) {
+                            inp.disabled = false;
+                            inp.style.opacity = '1';
+                            if (!inp.value || parseInt(inp.value, 10) <= 0) {
+                                inp.value = maxRem;
+                            }
+                        } else {
+                            inp.disabled = true;
+                            inp.style.opacity = '0.5';
+                        }
+                    };
+
+                    checkboxes.forEach(cb => {
+                        cb.addEventListener('change', () => {
+                            syncRowState(cb);
+                            if (selectAllBox) {
+                                selectAllBox.checked = checkboxes.every(c => c.checked);
+                                selectAllBox.indeterminate = checkboxes.some(c => c.checked) && !selectAllBox.checked;
+                            }
+                            updateAllocationSummary();
+                        });
+                    });
+
+                    if (selectAllBox) {
+                        selectAllBox.addEventListener('change', (ev) => {
+                            const isChecked = ev.target.checked;
+                            checkboxes.forEach(cb => {
+                                cb.checked = isChecked;
+                                syncRowState(cb);
+                            });
+                            updateAllocationSummary();
+                        });
+                    }
+
+                    qtyInputs.forEach(inp => {
+                        inp.addEventListener('input', () => {
+                            const maxRem = parseInt(inp.getAttribute('data-max') || '0', 10);
+                            const val = parseInt(inp.value, 10);
+                            if (maxRem > 0 && val > maxRem) {
+                                inp.value = maxRem;
+                                Utils.showToast(`Quantity capped at maximum remaining allocatable units (${maxRem}).`, 'warning');
+                            }
+                            updateAllocationSummary();
+                        });
+                    });
+
+                    updateAllocationSummary();
+
                 } catch (err) {
-                    previewBox.innerHTML = `<div style="color: var(--red);">Error loading PO: ${err.message}</div>`;
+                    if (thisReq !== currentPoRequestId) return;
+                    previewBox.innerHTML = `
+                        <div style="padding: 12px; border-radius: 6px; background: rgba(239, 68, 68, 0.08); color: var(--red); font-size: 13px;">
+                            <i class='bx bx-error-circle'></i> Error loading purchase order line items: ${escape(err.message || 'Server error')}
+                        </div>
+                    `;
                 }
             });
 

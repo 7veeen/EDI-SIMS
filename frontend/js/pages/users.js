@@ -9,6 +9,7 @@ App.pages['users'] = {
     sortBy: 'user_id',
     sortOrder: 'asc',
     debounceTimer: null,
+    pendingUserActionIds: new Set(),
 
     render() {
         const container = document.createElement('div');
@@ -31,22 +32,24 @@ App.pages['users'] = {
                 </div>
             </div>
             
-            <div class="card table-responsive" style="margin-top: 20px; overflow: hidden;">
-                <table class="table" id="users-table">
-                    <thead>
-                        <tr>
-                            <th class="sortable" data-sort="user_id">ID <i class='bx bx-sort'></i></th>
-                            <th class="sortable" data-sort="username">USERNAME <i class='bx bx-sort'></i></th>
-                            <th class="sortable" data-sort="email">EMAIL <i class='bx bx-sort'></i></th>
-                            <th class="sortable" data-sort="role">ROLE <i class='bx bx-sort'></i></th>
-                            <th class="sortable" data-sort="status">STATUS <i class='bx bx-sort'></i></th>
-                            <th style="text-align: right;">ACTIONS</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr><td colspan="6" style="text-align: center; padding: 28px; color: var(--text-secondary);">Loading users...</td></tr>
-                    </tbody>
-                </table>
+            <div class="card" style="margin-top: 20px; padding: 0; overflow: hidden;">
+                <div class="table-responsive users-table-container">
+                    <table class="table" id="users-table">
+                        <thead>
+                            <tr>
+                                <th class="sortable" data-sort="user_id" style="min-width: 70px;">ID <i class='bx bx-sort'></i></th>
+                                <th class="sortable" data-sort="username" style="min-width: 140px;">USERNAME <i class='bx bx-sort'></i></th>
+                                <th class="sortable" data-sort="email" style="min-width: 180px;">EMAIL <i class='bx bx-sort'></i></th>
+                                <th class="sortable" data-sort="role" style="min-width: 110px;">ROLE <i class='bx bx-sort'></i></th>
+                                <th class="sortable" data-sort="status" style="min-width: 100px;">STATUS <i class='bx bx-sort'></i></th>
+                                <th class="col-actions cell-actions-right">ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td colspan="6" style="text-align: center; padding: 28px; color: var(--text-secondary);">Loading users...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
                 <div class="table-pagination" id="users-pagination">
                     <div class="pagination-info" id="users-pagination-info">Showing 0 of 0 users</div>
                     <div class="pagination-controls" id="users-pagination-controls"></div>
@@ -172,32 +175,34 @@ App.pages['users'] = {
                 return `
                     <tr>
                         <td><strong>#${u.user_id}</strong></td>
-                        <td>${Utils.escapeHtml(u.username)} ${isSelf ? '<span style="font-size: 11px; color: var(--primary); font-weight: 600;">(You)</span>' : ''}</td>
-                        <td>${Utils.escapeHtml(u.email)}</td>
+                        <td><strong style="color: var(--text);">${Utils.escapeHtml(u.username)}</strong> ${isSelf ? '<span style="font-size: 11px; color: var(--primary); font-weight: 600; margin-left: 4px;">(You)</span>' : ''}</td>
+                        <td style="word-break: break-all; overflow-wrap: anywhere;">${Utils.escapeHtml(u.email)}</td>
                         <td><span class="badge" style="background: ${roleBadgeColor}; color: white; font-weight: 600;">${u.role}</span></td>
                         <td>
                             <span class="status-badge ${u.status === 'Active' ? 'status-active' : 'status-inactive'}">
                                 ${u.status}
                             </span>
                         </td>
-                        <td style="text-align: right;">
-                            <div class="table-actions" style="justify-content: flex-end;">
+                        <td class="col-actions cell-actions-right">
+                            <div class="action-buttons" style="justify-content: flex-end;">
                                 ${canEdit ? `
-                                    <button class="btn-icon" 
+                                    <button class="btn-icon btn-action-edit" 
                                         onclick="App.pages['users'].showEditModal(${u.user_id})" 
-                                        title="Edit User">
+                                        title="Edit User"
+                                        aria-label="Edit user ${Utils.escapeHtml(u.username)}">
                                         <i class='bx bx-edit-alt'></i>
                                     </button>
                                 ` : ''}
                                 ${canToggle ? `
-                                    <button class="btn-icon ${u.status === 'Active' ? 'text-danger' : 'text-success'}" 
+                                    <button class="btn-icon ${u.status === 'Active' ? 'btn-action-deactivate text-danger' : 'btn-action-activate text-success'}" 
                                         onclick="App.pages['users'].toggleStatus(${u.user_id}, '${u.status}', '${Utils.escapeHtml(u.username)}', '${u.role}')" 
-                                        title="${u.status === 'Active' ? 'Deactivate User' : 'Activate User'}">
+                                        title="${u.status === 'Active' ? 'Deactivate User' : 'Activate User'}"
+                                        aria-label="${u.status === 'Active' ? 'Deactivate user' : 'Activate user'} ${Utils.escapeHtml(u.username)}">
                                         <i class='bx ${u.status === 'Active' ? 'bx-block' : 'bx-check-circle'}'></i>
                                     </button>
                                 ` : (isSelf ? `
-                                    <span class="protected-badge"><i class='bx bx-lock-alt'></i> Protected</span>
-                                ` : '')}
+                                    <span class="protected-badge" title="You cannot modify or deactivate your own active session account"><i class='bx bx-shield-quarter'></i> Protected</span>
+                                ` : (!canEdit ? `<span style="color: var(--text-light); font-size: 13px;">—</span>` : ''))}
                             </div>
                         </td>
                     </tr>
@@ -261,18 +266,23 @@ App.pages['users'] = {
     },
 
     async toggleStatus(id, currentStatus, username, role) {
+        if (this.pendingUserActionIds.has(id)) return;
+
         const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
         const actionWord = newStatus === 'Inactive' ? 'deactivate' : 'activate';
         const confirmMsg = `Are you sure you want to ${actionWord} user "${username || id}"?`;
 
         if (!confirm(confirmMsg)) return;
 
+        this.pendingUserActionIds.add(id);
         try {
             await Api.put(`/users/${id}/status`, { status: newStatus });
             Utils.showToast(`User "${username}" status updated to ${newStatus}`, "success");
             this.loadUsers();
         } catch (error) {
             Utils.showToast(error.message || "Failed to update user status", "error");
+        } finally {
+            this.pendingUserActionIds.delete(id);
         }
     },
 
@@ -432,7 +442,7 @@ App.pages['users'] = {
                     </div>
                     <div id="cu_error" class="error-text hidden" style="color: var(--red); font-size: 13px; text-align: center;"></div>
                     <div class="modal-footer" style="padding-top: 1.5rem; margin-top: 0.5rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 1rem;">
-                        <button type="button" class="btn cancel-btn" style="background: white; border: 1px solid var(--border); padding: 10px 20px;">Cancel</button>
+                        <button type="button" class="btn cancel-btn" style="background: var(--bg-surface); color: var(--text); border: 1px solid var(--border); padding: 10px 20px;">Cancel</button>
                         <button type="submit" class="btn primary" style="padding: 10px 20px;">Create User</button>
                     </div>
                 </form>

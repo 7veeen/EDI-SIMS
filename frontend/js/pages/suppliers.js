@@ -79,45 +79,49 @@ App.pages['suppliers'] = {
             </div>
 
             <!-- Controls: Search & Filter -->
-            <div class="card" style="padding: 16px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 14px; align-items: center; justify-content: space-between;">
-                <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; flex: 1;">
-                    <div class="global-search" style="margin: 0; flex: 1; min-width: 240px; max-width: 400px; background: var(--white); border: 1px solid var(--border);">
-                        <i class='bx bx-search'></i>
-                        <input type="text" id="supplier-search" placeholder="Search by name, contact, email or phone..." style="background: transparent;">
+            <div class="card" style="padding: 16px; margin-bottom: 20px;">
+                <div class="supplier-toolbar">
+                    <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; flex: 1;">
+                        <div class="global-search" style="margin: 0; flex: 1; min-width: 240px; max-width: 420px; background: var(--white); border: 1px solid var(--border);">
+                            <i class='bx bx-search'></i>
+                            <input type="text" id="supplier-search" placeholder="Search by name, contact, email or phone..." style="background: transparent;">
+                        </div>
+                        <div style="min-width: 170px;">
+                            <select id="supplier-status-filter" class="input" style="height: 42px; margin: 0;">
+                                <option value="">All Statuses</option>
+                                <option value="Active">Active Only</option>
+                                <option value="Inactive">Inactive Only</option>
+                            </select>
+                        </div>
                     </div>
-                    <div style="min-width: 170px;">
-                        <select id="supplier-status-filter" class="input" style="height: 42px; margin: 0;">
-                            <option value="">All Statuses</option>
-                            <option value="Active">Active Only</option>
-                            <option value="Inactive">Inactive Only</option>
-                        </select>
+                    <div id="supplier-count-indicator" style="font-size: 13px; color: var(--text-secondary); white-space: nowrap;">
+                        Loading suppliers...
                     </div>
-                </div>
-                <div id="supplier-count-indicator" style="font-size: 13px; color: var(--text-secondary);">
-                    Loading suppliers...
                 </div>
             </div>
 
-            <!-- Table -->
-            <div class="card table-responsive" style="margin-top: 10px;">
-                <table class="table" id="suppliers-table">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>SUPPLIER / COMPANY</th>
-                            <th>CONTACT PERSON</th>
-                            <th>WORK PHONE</th>
-                            <th>EMAIL ADDRESS</th>
-                            <th>PORTAL USER</th>
-                            <th>ORDERS</th>
-                            <th>STATUS</th>
-                            <th style="text-align: right;">ACTIONS</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr><td colspan="9" style="text-align: center; padding: 32px; color: var(--text-secondary);">Loading supplier directory...</td></tr>
-                    </tbody>
-                </table>
+            <!-- Table Container -->
+            <div class="card" style="margin-top: 10px; padding: 0; overflow: hidden;">
+                <div class="table-responsive supplier-table-container">
+                    <table class="table" id="suppliers-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 70px; min-width: 70px;">ID</th>
+                                <th style="min-width: 200px;">SUPPLIER / COMPANY</th>
+                                <th style="min-width: 160px;">CONTACT PERSON</th>
+                                <th style="min-width: 130px; white-space: nowrap;">WORK PHONE</th>
+                                <th style="min-width: 200px;">EMAIL ADDRESS</th>
+                                <th style="min-width: 140px;">PORTAL USER</th>
+                                <th style="min-width: 100px; text-align: center;">ORDERS</th>
+                                <th style="min-width: 100px; text-align: center;">STATUS</th>
+                                <th class="col-actions">ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td colspan="9" style="text-align: center; padding: 32px; color: var(--text-secondary);">Loading supplier directory...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         `;
 
@@ -229,9 +233,9 @@ App.pages['suppliers'] = {
                             </div>
                         </td>
                         <td><strong>${Utils.escapeHtml(s.contact_person || '—')}</strong></td>
-                        <td style="font-size: 13px;">${Utils.escapeHtml(s.phone || '—')}</td>
+                        <td style="font-size: 13px; white-space: nowrap;">${Utils.escapeHtml(s.phone || '—')}</td>
                         <td style="font-size: 13px;">
-                            ${s.email ? `<a href="mailto:${Utils.escapeHtml(s.email)}" style="color: var(--primary); text-decoration: none;"><i class='bx bx-envelope'></i> ${Utils.escapeHtml(s.email)}</a>` : '—'}
+                            ${s.email ? `<a href="mailto:${Utils.escapeHtml(s.email)}" class="supplier-email-link"><i class='bx bx-envelope'></i> ${Utils.escapeHtml(s.email)}</a>` : '—'}
                         </td>
                         <td>
                             ${s.username ? `
@@ -240,26 +244,26 @@ App.pages['suppliers'] = {
                                 </span>
                             ` : `<span style="color: var(--text-secondary); font-size: 12px;">Not Linked</span>`}
                         </td>
-                        <td>
+                        <td style="text-align: center;">
                             <span class="badge" style="background: #f1f5f9; color: #475569; font-weight: 600;">
                                 ${s.total_orders || 0} POs
                             </span>
                         </td>
-                        <td>
+                        <td style="text-align: center;">
                             <span class="status-badge ${statusBadge}">
                                 ${s.status}
                             </span>
                         </td>
-                        <td style="text-align: right;">
-                            <div class="action-buttons" style="justify-content: flex-end;">
-                                <button class="btn-icon text-primary" onclick="App.pages['suppliers'].viewSupplierDetails(${s.supplier_id})" title="View Details">
+                        <td class="col-actions">
+                            <div class="action-buttons">
+                                <button class="btn-icon btn-action-view text-primary" onclick="App.pages['suppliers'].viewSupplierDetails(${s.supplier_id})" title="View Details" aria-label="View supplier details">
                                     <i class='bx bx-show'></i>
                                 </button>
                                 ${canEdit ? `
-                                    <button class="btn-icon text-primary" onclick="App.pages['suppliers'].showSupplierModal(${s.supplier_id})" title="Edit Supplier">
+                                    <button class="btn-icon btn-action-edit" onclick="App.pages['suppliers'].showSupplierModal(${s.supplier_id})" title="Edit Supplier" aria-label="Edit supplier">
                                         <i class='bx bx-edit'></i>
                                     </button>
-                                    <button class="btn-icon text-danger" onclick="App.pages['suppliers'].deleteSupplier(${s.supplier_id})" title="Delete / Deactivate">
+                                    <button class="btn-icon btn-action-delete text-danger" onclick="App.pages['suppliers'].deleteSupplier(${s.supplier_id})" title="Delete / Deactivate" aria-label="Delete supplier">
                                         <i class='bx bx-trash'></i>
                                     </button>
                                 ` : ''}
@@ -282,51 +286,55 @@ App.pages['suppliers'] = {
             if (!s) throw new Error("Supplier details unavailable");
 
             const ordersHtml = (s.recent_orders && s.recent_orders.length > 0) ? `
-                <table class="table" style="margin-top: 8px; font-size: 13px;">
-                    <thead>
-                        <tr>
-                            <th>PO #</th>
-                            <th>Date</th>
-                            <th>Amount</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${s.recent_orders.map(o => `
+                <div class="table-responsive" style="margin-top: 8px;">
+                    <table class="table" style="font-size: 13px; min-width: 480px;">
+                        <thead>
                             <tr>
-                                <td>#${o.purchase_order_id}</td>
-                                <td>${o.order_date || 'N/A'}</td>
-                                <td><strong>₹${o.total_amount.toFixed(2)}</strong></td>
-                                <td><span class="status-badge ${o.status === 'Received' ? 'status-active' : 'status-pending'}">${o.status}</span></td>
+                                <th>PO #</th>
+                                <th>Date</th>
+                                <th>Amount</th>
+                                <th>Status</th>
                             </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            ${s.recent_orders.map(o => `
+                                <tr>
+                                    <td>#${o.purchase_order_id}</td>
+                                    <td>${o.order_date || 'N/A'}</td>
+                                    <td><strong>₹${o.total_amount.toFixed(2)}</strong></td>
+                                    <td><span class="status-badge ${o.status === 'Received' ? 'status-active' : 'status-pending'}">${o.status}</span></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
             ` : `<p style="color: var(--text-secondary); font-size: 13px; margin: 8px 0;">No purchase orders recorded yet.</p>`;
 
             const quotesHtml = (s.recent_quotations && s.recent_quotations.length > 0) ? `
-                <table class="table" style="margin-top: 8px; font-size: 13px;">
-                    <thead>
-                        <tr>
-                            <th>Quote #</th>
-                            <th>Product</th>
-                            <th>Price</th>
-                            <th>Qty</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${s.recent_quotations.map(q => `
+                <div class="table-responsive" style="margin-top: 8px;">
+                    <table class="table" style="font-size: 13px; min-width: 480px;">
+                        <thead>
                             <tr>
-                                <td>#${q.quotation_id}</td>
-                                <td>${Utils.escapeHtml(q.product_name)}</td>
-                                <td>₹${q.quoted_price.toFixed(2)}</td>
-                                <td>${q.quantity}</td>
-                                <td><span class="status-badge ${q.status === 'Accepted' ? 'status-active' : 'status-pending'}">${q.status}</span></td>
+                                <th>Quote #</th>
+                                <th>Product</th>
+                                <th>Price</th>
+                                <th>Qty</th>
+                                <th>Status</th>
                             </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            ${s.recent_quotations.map(q => `
+                                <tr>
+                                    <td>#${q.quotation_id}</td>
+                                    <td>${Utils.escapeHtml(q.product_name)}</td>
+                                    <td>₹${q.quoted_price.toFixed(2)}</td>
+                                    <td>${q.quantity}</td>
+                                    <td><span class="status-badge ${q.status === 'Accepted' ? 'status-active' : 'status-pending'}">${q.status}</span></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
             ` : `<p style="color: var(--text-secondary); font-size: 13px; margin: 8px 0;">No quotations submitted yet.</p>`;
 
             const contentHtml = `
@@ -342,7 +350,7 @@ App.pages['suppliers'] = {
                     </div>
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; padding: 14px; background: #f8fafc; border-radius: 8px; border: 1px solid var(--border); font-size: 13px;">
+                <div class="supplier-detail-grid">
                     <div>
                         <span style="color: var(--text-secondary);">Contact Representative:</span><br>
                         <strong>${Utils.escapeHtml(s.contact_person || 'Not specified')}</strong>
@@ -423,7 +431,7 @@ App.pages['suppliers'] = {
                 <label>Contact Representative</label>
                 <input type="text" id="modal-supplier-contact" class="input" value="${supplier ? Utils.escapeHtml(supplier.contact_person) : ''}" placeholder="e.g. Rahul Sharma">
             </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="supplier-form-grid">
                 <div class="form-group">
                     <label>Work Phone</label>
                     <input type="text" id="modal-supplier-phone" class="input" value="${supplier ? Utils.escapeHtml(supplier.phone) : ''}" placeholder="+91 98765 43210">

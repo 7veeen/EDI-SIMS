@@ -23,7 +23,7 @@ App.pages['notifications'] = {
                     <button class="btn btn-outline" id="btn-refresh-notifications" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;">
                         <i class='bx bx-refresh' id="refresh-icon"></i> Refresh
                     </button>
-                    <button class="btn btn-primary" id="btn-mark-all-read" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; background: #2563eb; color: white; border: none;">
+                    <button class="btn btn-primary" id="btn-mark-all-read" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer;">
                         <i class='bx bx-check-double'></i> Mark All as Read
                     </button>
                 </div>
@@ -64,28 +64,30 @@ App.pages['notifications'] = {
             </div>
             
             <!-- Notifications Table Card -->
-            <div class="card table-responsive" style="border-radius: var(--radius); border: 1px solid var(--border); background: var(--white); overflow: hidden;">
-                <table class="table" id="notifications-table" style="width: 100%; border-collapse: collapse;">
-                    <thead>
-                        <tr style="background: var(--bg-surface, #f9fafb); border-bottom: 1px solid var(--border); color: var(--text-secondary); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">
-                            <th style="padding: 12px 16px; text-align: left;">TYPE</th>
-                            <th style="padding: 12px 16px; text-align: left;">TITLE</th>
-                            <th style="padding: 12px 16px; text-align: left;">MESSAGE</th>
-                            <th style="padding: 12px 16px; text-align: center;">PRIORITY</th>
-                            <th style="padding: 12px 16px; text-align: left;">DATE</th>
-                            <th style="padding: 12px 16px; text-align: center;">STATUS</th>
-                            <th style="padding: 12px 16px; text-align: center;">ACTIONS</th>
-                        </tr>
-                    </thead>
-                    <tbody id="notifications-tbody">
-                        <tr>
-                            <td colspan="7" style="text-align: center; padding: 40px 20px; color: var(--text-secondary);">
-                                <i class='bx bx-loader-alt bx-spin' style="font-size: 24px; display: block; margin-bottom: 8px;"></i>
-                                Loading your notifications...
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div class="card" style="border-radius: var(--radius); border: 1px solid var(--border); background: var(--card-bg, #ffffff); overflow: hidden; margin-top: 10px; padding: 0;">
+                <div class="table-responsive notifications-table-container">
+                    <table class="table" id="notifications-table" style="width: 100%; min-width: 860px; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: var(--bg-surface, #f9fafb); border-bottom: 1px solid var(--border); color: var(--text-secondary); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">
+                                <th style="padding: 12px 16px; min-width: 120px; text-align: left;">TYPE</th>
+                                <th style="padding: 12px 16px; min-width: 180px; text-align: left;">TITLE</th>
+                                <th style="padding: 12px 16px; min-width: 240px; text-align: left;">MESSAGE</th>
+                                <th style="padding: 12px 16px; min-width: 100px; text-align: center;">PRIORITY</th>
+                                <th style="padding: 12px 16px; min-width: 140px; text-align: left;">DATE</th>
+                                <th style="padding: 12px 16px; min-width: 90px; text-align: center;">STATUS</th>
+                                <th class="col-actions cell-actions-center" style="padding: 12px 16px; min-width: 110px; text-align: center;">ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="notifications-tbody">
+                            <tr>
+                                <td colspan="7" style="text-align: center; padding: 40px 20px; color: var(--text-secondary);">
+                                    <i class='bx bx-loader-alt bx-spin' style="font-size: 24px; display: block; margin-bottom: 8px;"></i>
+                                    Loading your notifications...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         `;
         return container;
@@ -371,28 +373,28 @@ App.pages['notifications'] = {
                             ${isUnread ? 'Unread' : 'Read'}
                         </span>
                     </td>
-                    <td style="padding: 12px 16px; text-align: center;">
-                        <div style="display: inline-flex; gap: 6px; align-items: center; justify-content: center; flex-wrap: wrap;">
+                    <td class="col-actions cell-actions-center" style="padding: 12px 16px; text-align: center;">
+                        <div class="action-buttons" style="justify-content: center;">
                             ${isUnread ? `
-                                <button class="btn btn-sm" id="btn-read-${n.notification_id}" 
+                                <button class="btn-icon btn-action-read" id="btn-read-${n.notification_id}" 
                                         onclick="App.pages['notifications'].markAsRead(${n.notification_id}, this)" 
-                                        style="padding: 4px 10px; font-size: 12px; border-radius: 6px; background: rgba(37, 99, 235, 0.08); color: #2563eb; border: 1px solid rgba(37, 99, 235, 0.2); cursor: pointer; font-weight: 600; white-space: nowrap;"
-                                        title="Mark as read">
-                                    <i class='bx bx-check'></i> Mark Read
+                                        title="Mark as Read"
+                                        aria-label="Mark notification '${Utils.escapeHtml(n.title)}' as read">
+                                    <i class='bx bx-check'></i>
                                 </button>
                             ` : ''}
 
                             ${hasReference ? `
-                                <button class="btn btn-sm btn-outline" 
+                                <button class="btn-icon btn-action-view" 
                                         onclick="App.navigateToReference('${Utils.escapeHtml(n.reference_type)}', '${Utils.escapeHtml(n.reference_id)}', ${n.notification_id})" 
-                                        style="padding: 4px 8px; font-size: 12px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;"
-                                        title="Navigate to ${Utils.escapeHtml(n.reference_type)} #${Utils.escapeHtml(n.reference_id)}">
-                                    <i class='bx bx-right-arrow-alt'></i> View
+                                        title="View ${Utils.escapeHtml(n.reference_type)} #${Utils.escapeHtml(n.reference_id)}"
+                                        aria-label="View referenced ${Utils.escapeHtml(n.reference_type)} #${Utils.escapeHtml(n.reference_id)}">
+                                    <i class='bx bx-link-external'></i>
                                 </button>
                             ` : ''}
 
                             ${!isUnread && !hasReference ? `
-                                <span style="color: var(--text-light); font-size: 13px;">—</span>
+                                <span style="color: var(--text-light); font-size: 14px;">—</span>
                             ` : ''}
                         </div>
                     </td>

@@ -92,10 +92,10 @@ App.pages['quotations'] = {
             </div>
 
             <!-- Table Card & Filters -->
-            <div class="card table-responsive" style="border-radius: 12px; background: var(--card-bg, #ffffff); border: 1px solid var(--border); overflow: hidden;">
+            <div class="card" style="border-radius: 12px; background: var(--card-bg, #ffffff); border: 1px solid var(--border); overflow: hidden; margin-bottom: 2rem;">
                 <div style="padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px;">
-                    <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 280px;">
-                        <div style="position: relative; flex: 1; max-width: 360px;">
+                    <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 280px; flex-wrap: wrap;">
+                        <div style="position: relative; flex: 1; min-width: 200px; max-width: 360px;">
                             <i class='bx bx-search' style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-secondary); font-size: 18px;"></i>
                             <input type="text" id="quote-search-input" placeholder="Search quotation #, PO, supplier, or product..." 
                                    style="width: 100%; padding: 8px 12px 8px 38px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-surface, #ffffff); color: var(--text); font-size: 13px;">
@@ -114,30 +114,32 @@ App.pages['quotations'] = {
                     </div>
                 </div>
 
-                <table class="data-table" style="width: 100%; border-collapse: collapse; text-align: left;">
-                    <thead>
-                        <tr style="background: var(--bg-surface, #f9fafb); border-bottom: 1px solid var(--border); color: var(--text-secondary); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">
-                            <th style="padding: 12px 16px;">QUOTATION</th>
-                            <th style="padding: 12px 16px;">PURCHASE ORDER</th>
-                            ${!isSupplier ? '<th style="padding: 12px 16px;">SUPPLIER</th>' : ''}
-                            <th style="padding: 12px 16px;">PRODUCT OFFERED</th>
-                            <th style="padding: 12px 16px; text-align: right;">OFFERED QTY</th>
-                            <th style="padding: 12px 16px; text-align: right;">UNIT PRICE</th>
-                            <th style="padding: 12px 16px; text-align: right;">TOTAL</th>
-                            <th style="padding: 12px 16px;">VALID UNTIL</th>
-                            <th style="padding: 12px 16px;">STATUS</th>
-                            <th style="padding: 12px 16px; text-align: center;">ACTIONS</th>
-                        </tr>
-                    </thead>
-                    <tbody id="quotations-tbody">
-                        <tr>
-                            <td colspan="${isSupplier ? '9' : '10'}" style="text-align: center; padding: 40px; color: var(--text-secondary);">
-                                <i class='bx bx-loader-alt bx-spin' style="font-size: 24px; margin-bottom: 8px;"></i>
-                                <div>Loading quotations from Supabase...</div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div class="table-responsive" style="overflow-x: auto; width: 100%; -webkit-overflow-scrolling: touch;">
+                    <table class="data-table" style="min-width: 1020px; width: 100%; border-collapse: collapse; text-align: left;">
+                        <thead>
+                            <tr style="background: var(--bg-surface, #f9fafb); border-bottom: 1px solid var(--border); color: var(--text-secondary); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">
+                                <th style="padding: 12px 16px;">QUOTATION</th>
+                                <th style="padding: 12px 16px;">PURCHASE ORDER</th>
+                                ${!isSupplier ? '<th style="padding: 12px 16px;">SUPPLIER</th>' : ''}
+                                <th style="padding: 12px 16px;">PRODUCT OFFERED</th>
+                                <th style="padding: 12px 16px; text-align: right;">OFFERED QTY</th>
+                                <th style="padding: 12px 16px; text-align: right;">UNIT PRICE</th>
+                                <th style="padding: 12px 16px; text-align: right;">TOTAL</th>
+                                <th style="padding: 12px 16px;">VALID UNTIL</th>
+                                <th style="padding: 12px 16px;">STATUS</th>
+                                <th style="padding: 12px 16px; text-align: center;">ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="quotations-tbody">
+                            <tr>
+                                <td colspan="${isSupplier ? '9' : '10'}" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                                    <i class='bx bx-loader-alt bx-spin' style="font-size: 24px; margin-bottom: 8px;"></i>
+                                    <div>Loading quotations from Supabase...</div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         `;
 
@@ -294,32 +296,32 @@ App.pages['quotations'] = {
                     <td style="padding: 14px 16px;">
                         ${statusBadge}
                     </td>
-                    <td style="padding: 14px 16px; text-align: center;">
-                        <div style="display: inline-flex; gap: 6px; align-items: center;">
+                    <td style="padding: 14px 16px; text-align: center; white-space: nowrap;">
+                        <div style="display: inline-flex; gap: 6px; align-items: center; justify-content: center; flex-wrap: nowrap;">
                             <button class="btn btn-icon-small" title="View Quotation Details" onclick="App.pages['quotations'].openQuotationDetailsModal(${q.quotation_id})"
-                                    style="background: white; border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; cursor: pointer; color: var(--text-secondary);">
-                                <i class='bx bx-show' style="font-size: 16px;"></i>
+                                    style="background: var(--card-bg, #ffffff); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; cursor: pointer; color: var(--text-secondary); display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500;">
+                                <i class='bx bx-show' style="font-size: 16px;"></i> Details
                             </button>
 
                             ${isSupplier && isDraft ? `
                                 <button class="btn btn-icon-small" title="Edit Draft" onclick="App.pages['quotations'].openEditDraftModal(${q.quotation_id})"
-                                        style="background: white; border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; cursor: pointer; color: #2563eb;">
-                                    <i class='bx bx-edit' style="font-size: 16px;"></i>
+                                        style="background: var(--card-bg, #ffffff); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; cursor: pointer; color: #2563eb; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500;">
+                                    <i class='bx bx-edit' style="font-size: 16px;"></i> Edit
                                 </button>
                                 <button class="btn btn-icon-small" title="Submit Quotation" onclick="App.pages['quotations'].submitDraft(${q.quotation_id})"
-                                        style="background: #2563eb; color: white; border: none; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;">
+                                        style="background: #2563eb; color: white; border: none; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
                                     <i class='bx bx-send'></i> Submit
                                 </button>
                             ` : ''}
 
                             ${isManagerOrOwner && isSubmitted ? `
                                 <button class="btn btn-icon-small" title="Approve Offer" onclick="App.pages['quotations'].approveQuotation(${q.quotation_id})"
-                                        style="background: #059669; color: white; border: none; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;">
+                                        style="background: #059669; color: white; border: none; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
                                     <i class='bx bx-check'></i> Approve
                                 </button>
                                 <button class="btn btn-icon-small" title="Reject Offer" onclick="App.pages['quotations'].rejectQuotation(${q.quotation_id})"
-                                        style="background: white; border: 1px solid #ef4444; color: #ef4444; border-radius: 6px; padding: 6px 8px; cursor: pointer;">
-                                    <i class='bx bx-x' style="font-size: 16px;"></i>
+                                        style="background: var(--card-bg, #ffffff); border: 1px solid #ef4444; color: #ef4444; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+                                    <i class='bx bx-x'></i> Reject
                                 </button>
                             ` : ''}
                         </div>
@@ -427,6 +429,7 @@ App.pages['quotations'] = {
             Modal.create({
                 id: 'modal-create-quotation',
                 title: 'Create Supplier Quotation 📝',
+                size: 'lg',
                 content,
                 footer,
                 onOpen: (overlay, closeModal) => {
@@ -453,9 +456,9 @@ App.pages['quotations'] = {
                             selectedPODetails = poData.purchase_order;
 
                             itemsContainer.innerHTML = selectedPODetails.items.map((item, idx) => `
-                                <div class="quote-item-row" data-product-id="${item.product_id}" style="padding: 10px; border-radius: 6px; background: white; border: 1px solid var(--border); display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 10px; align-items: center;">
+                                <div class="quote-item-row" data-product-id="${item.product_id}" style="padding: 10px; border-radius: 6px; background: var(--card-bg, #ffffff); border: 1px solid var(--border); display: grid; grid-template-columns: minmax(0, 2fr) minmax(80px, 1fr) minmax(90px, 1fr) minmax(90px, 1fr); gap: 10px; align-items: center;">
                                     <div>
-                                        <div style="font-weight: 600; font-size: 13px;">${item.product_name}</div>
+                                        <div style="font-weight: 600; font-size: 13px; overflow-wrap: anywhere; word-break: break-word;">${item.product_name}</div>
                                         <div style="font-size: 11px; color: var(--text-secondary);">Target: ${item.quantity} units @ ₹${item.unit_price}</div>
                                     </div>
                                     <div>
@@ -681,10 +684,10 @@ App.pages['quotations'] = {
             const content = `
                 <div style="display: flex; flex-direction: column; gap: 16px;">
                     <!-- Header Summary -->
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 16px; border-radius: 8px; background: var(--bg-surface, #f9fafb); border: 1px solid var(--border);">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 16px; border-radius: 8px; background: var(--bg-surface, #f9fafb); border: 1px solid var(--border); flex-wrap: wrap; gap: 12px;">
                         <div>
                             <div style="font-size: 12px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Quotation Number</div>
-                            <h2 style="font-size: 20px; font-weight: 700; margin: 4px 0; color: var(--text);">${q.quotation_number}</h2>
+                            <h2 style="font-size: 20px; font-weight: 700; margin: 4px 0; color: var(--text); overflow-wrap: anywhere; word-break: break-word;">${q.quotation_number}</h2>
                             <div style="font-size: 12px; color: var(--text-secondary);">Dated: ${q.quotation_date || 'N/A'} • Valid Until: ${q.valid_until || 'No expiry'}</div>
                         </div>
                         <div style="text-align: right;">
@@ -694,28 +697,28 @@ App.pages['quotations'] = {
                     </div>
 
                     <!-- PO & Supplier Details -->
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
                         <div style="padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
                             <div style="font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 6px;">Purchase Order Reference</div>
-                            <div style="font-weight: 600; font-size: 14px; color: #2563eb;">PO #${q.purchase_order_id || 'N/A'}</div>
+                            <div style="font-weight: 600; font-size: 14px; color: #2563eb; overflow-wrap: anywhere; word-break: break-word;">PO #${q.purchase_order_id || 'N/A'}</div>
                             <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Original PO Date: ${q.po_order_date || 'N/A'}</div>
                             <div style="font-size: 12px; color: var(--text-secondary);">Original PO Budget: ₹${(q.po_total || 0).toLocaleString('en-IN')}</div>
                         </div>
 
                         <div style="padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
                             <div style="font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 6px;">Supplier Details</div>
-                            <div style="font-weight: 600; font-size: 14px; color: var(--text);">${q.supplier_name}</div>
-                            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Contact: ${q.contact_person || 'N/A'}</div>
-                            <div style="font-size: 12px; color: var(--text-secondary);">${q.supplier_email || ''} • ${q.supplier_phone || ''}</div>
+                            <div style="font-weight: 600; font-size: 14px; color: var(--text); overflow-wrap: anywhere; word-break: break-word;">${q.supplier_name}</div>
+                            <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px; overflow-wrap: anywhere; word-break: break-word;">Contact: ${q.contact_person || 'N/A'}</div>
+                            <div style="font-size: 12px; color: var(--text-secondary); overflow-wrap: anywhere; word-break: break-word;">${q.supplier_email || ''} • ${q.supplier_phone || ''}</div>
                         </div>
                     </div>
 
                     <!-- Product & Offer Comparison Table -->
-                    <div style="border-radius: 8px; border: 1px solid var(--border); overflow: hidden;">
+                    <div class="table-responsive" style="border-radius: 8px; border: 1px solid var(--border); overflow-x: auto; width: 100%; -webkit-overflow-scrolling: touch;">
                         <div style="padding: 10px 14px; background: var(--bg-surface, #f9fafb); border-bottom: 1px solid var(--border); font-weight: 600; font-size: 12px; text-transform: uppercase; color: var(--text-secondary);">
                             Offer Breakdown vs Baseline Requirements
                         </div>
-                        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                        <table style="min-width: 620px; width: 100%; border-collapse: collapse; font-size: 13px;">
                             <thead>
                                 <tr style="background: rgba(0,0,0,0.01); border-bottom: 1px solid var(--border); color: var(--text-secondary); font-size: 11px;">
                                     <th style="padding: 8px 12px; text-align: left;">Product</th>
@@ -729,7 +732,7 @@ App.pages['quotations'] = {
                             <tbody>
                                 <tr>
                                     <td style="padding: 10px 12px; font-weight: 600;">
-                                        ${q.product_name}
+                                        <div style="overflow-wrap: anywhere; word-break: break-word;">${q.product_name}</div>
                                         <div style="font-size: 11px; color: var(--text-secondary); font-family: monospace;">SKU: ${q.product_sku || 'N/A'}</div>
                                     </td>
                                     <td style="padding: 10px 12px; text-align: right; color: var(--text-secondary);">
@@ -756,31 +759,31 @@ App.pages['quotations'] = {
                     ${q.notes ? `
                         <div style="padding: 10px 14px; border-radius: 8px; background: var(--bg-surface, #f9fafb); border: 1px solid var(--border);">
                             <div style="font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Proposal Remarks</div>
-                            <div style="font-size: 13px; margin-top: 4px; color: var(--text);">${q.notes}</div>
+                            <div style="font-size: 13px; margin-top: 4px; color: var(--text); overflow-wrap: anywhere; word-break: break-word; white-space: pre-wrap;">${q.notes}</div>
                         </div>
                     ` : ''}
 
                     ${q.approved_by_username ? `
                         <div style="padding: 10px 14px; border-radius: 8px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2);">
                             <div style="font-size: 11px; font-weight: 600; color: #059669; text-transform: uppercase;">Approval Audit</div>
-                            <div style="font-size: 13px; margin-top: 4px; color: var(--text);">Approved by <strong>${q.approved_by_username}</strong> on ${q.approved_at || 'Recorded'}</div>
+                            <div style="font-size: 13px; margin-top: 4px; color: var(--text); overflow-wrap: anywhere; word-break: break-word;">Approved by <strong>${q.approved_by_username}</strong> on ${q.approved_at || 'Recorded'}</div>
                         </div>
                     ` : ''}
 
                     ${q.rejection_reason ? `
                         <div style="padding: 10px 14px; border-radius: 8px; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2);">
                             <div style="font-size: 11px; font-weight: 600; color: #ef4444; text-transform: uppercase;">Rejection Audit</div>
-                            <div style="font-size: 13px; margin-top: 4px; color: var(--text);">${q.rejection_reason}</div>
+                            <div style="font-size: 13px; margin-top: 4px; color: var(--text); overflow-wrap: anywhere; word-break: break-word;">${q.rejection_reason}</div>
                         </div>
                     ` : ''}
                 </div>
             `;
 
             const footer = `
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 10px;">
                     <button type="button" class="btn btn-outline" id="modal-details-close-btn">Close</button>
                     ${isManagerOrOwner && isSubmitted ? `
-                        <div style="display: flex; gap: 10px;">
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                             <button type="button" class="btn" id="modal-details-reject-btn" style="background: white; border: 1px solid #ef4444; color: #ef4444;">
                                 <i class='bx bx-x'></i> Reject Offer
                             </button>
@@ -795,6 +798,7 @@ App.pages['quotations'] = {
             Modal.create({
                 id: 'modal-quotation-details',
                 title: 'Quotation Details 🔍',
+                size: 'lg',
                 content,
                 footer,
                 onOpen: (overlay, closeModal) => {
@@ -880,6 +884,7 @@ App.pages['quotations'] = {
             Modal.create({
                 id: 'modal-compare-quotations',
                 title: 'Compare Supplier Bids ⚖️',
+                size: 'lg',
                 content,
                 footer: `<div style="display: flex; justify-content: flex-end; width: 100%;"><button class="btn btn-outline close-compare-btn">Close</button></div>`,
                 onOpen: (overlay, closeModal) => {

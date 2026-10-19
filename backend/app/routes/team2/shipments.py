@@ -198,6 +198,8 @@ def change_shipment_status(shipment_id):
             return jsonify({"error": error}), 404
         if "Invalid status transition" in error or "Invalid status" in error:
             return jsonify({"error": error}), 400
+        if "Conflict" in error:
+            return jsonify({"error": error}), 409
         if "Database error" in error:
             return jsonify({"error": error}), 500
         return jsonify({"error": error}), 400

@@ -2,7 +2,7 @@
 
 const Modal = {
     create(options) {
-        const { id, title, content, footer, onOpen, onClose } = options;
+        const { id, title, content, footer, onOpen, onClose, size } = options;
         
         const modalsContainer = document.getElementById('modals-container');
         
@@ -10,11 +10,12 @@ const Modal = {
         overlay.className = 'modal-overlay';
         overlay.id = id;
         
+        const sizeClass = size ? ` modal-${size}` : '';
         overlay.innerHTML = `
-            <div class="glass-panel modal-content" onclick="event.stopPropagation()">
+            <div class="glass-panel modal-content${sizeClass}" onclick="event.stopPropagation()" role="dialog" aria-modal="true">
                 <div class="modal-header">
                     <h3>${title}</h3>
-                    <button class="btn-icon close-modal"><i class='bx bx-x'></i></button>
+                    <button class="btn-icon close-modal" title="Close dialog" aria-label="Close dialog"><i class='bx bx-x'></i></button>
                 </div>
                 <div class="modal-body">
                     ${content}
@@ -26,13 +27,24 @@ const Modal = {
         modalsContainer.appendChild(overlay);
         
         const closeBtn = overlay.querySelector('.close-modal');
+        let isClosed = false;
         const closeModal = () => {
+            if (isClosed) return;
+            isClosed = true;
+            document.removeEventListener('keydown', handleKeyDown);
             overlay.classList.remove('active');
             setTimeout(() => {
                 overlay.remove();
                 if (onClose) onClose();
             }, 300);
         };
+
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        };
+        document.addEventListener('keydown', handleKeyDown);
         
         closeBtn.addEventListener('click', closeModal);
         overlay.addEventListener('click', closeModal); // Click outside to close
@@ -46,7 +58,7 @@ const Modal = {
     },
 
     show(options) {
-        const { title, content, onSave, saveText = 'Save', onClose } = options;
+        const { title, content, onSave, saveText = 'Save', onClose, size } = options;
         const footer = `
             <div style="display: flex; justify-content: flex-end; gap: 10px; width: 100%;">
                 <button type="button" class="btn btn-outline cancel-modal-btn">Cancel</button>
@@ -58,6 +70,7 @@ const Modal = {
             title,
             content,
             footer,
+            size,
             onOpen: (modalEl, closeModal) => {
                 const cancelBtn = modalEl.querySelector('.cancel-modal-btn');
                 if (cancelBtn) cancelBtn.addEventListener('click', closeModal);

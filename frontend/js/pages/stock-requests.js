@@ -136,8 +136,8 @@ App.pages['stock-requests'] = {
             </div>
 
             <!-- Table Card -->
-            <div class="card table-responsive" style="border-radius: 12px; background: var(--card-bg, #ffffff); border: 1px solid var(--border); overflow: hidden;">
-                <div style="padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+            <div class="card" style="border-radius: 12px; background: var(--card-bg, #ffffff); border: 1px solid var(--border); overflow: hidden; margin-bottom: 2rem;">
+                <div style="padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
                     <span id="sr-table-counter" style="font-size: 13px; font-weight: 600; color: var(--text);">
                         0 Requests <span style="color: var(--text-light); font-weight: normal; margin-left: 8px;">Loading real-time records...</span>
                     </span>
@@ -145,20 +145,21 @@ App.pages['stock-requests'] = {
                         <i class='bx bx-check-shield' style="color: var(--success, #10b981);"></i> JWT Supplier-Isolated
                     </span>
                 </div>
-                <table class="data-table" style="width: 100%; border-collapse: collapse;">
-                    <thead>
-                        <tr style="background: var(--bg-main, #f9fafb); text-align: left; font-size: 12px; color: var(--text-light); text-transform: uppercase;">
-                            <th style="padding: 12px 16px;">REQUEST ID</th>
-                            <th style="padding: 12px 16px;">PRODUCT & ITEMS</th>
-                            ${isManagerOrOwner ? '<th style="padding: 12px 16px;">SUPPLIER</th>' : '<th style="padding: 12px 16px;">REQUESTED BY</th>'}
-                            <th style="padding: 12px 16px;">QUANTITY</th>
-                            <th style="padding: 12px 16px;">REQUIRED DATE</th>
-                            <th style="padding: 12px 16px;">PRIORITY</th>
-                            <th style="padding: 12px 16px;">STATUS</th>
-                            <th style="padding: 12px 16px; text-align: right;">ACTION</th>
-                        </tr>
-                    </thead>
-                    <tbody id="stock-requests-tbody">
+                <div class="table-responsive" style="overflow-x: auto; width: 100%; -webkit-overflow-scrolling: touch;">
+                    <table class="data-table" style="min-width: 900px; width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: var(--bg-main, #f9fafb); text-align: left; font-size: 12px; color: var(--text-light); text-transform: uppercase;">
+                                <th style="padding: 12px 16px;">REQUEST ID</th>
+                                <th style="padding: 12px 16px;">PRODUCT & ITEMS</th>
+                                ${isManagerOrOwner ? '<th style="padding: 12px 16px;">SUPPLIER</th>' : '<th style="padding: 12px 16px;">REQUESTED BY</th>'}
+                                <th style="padding: 12px 16px;">QUANTITY</th>
+                                <th style="padding: 12px 16px;">REQUIRED DATE</th>
+                                <th style="padding: 12px 16px;">PRIORITY</th>
+                                <th style="padding: 12px 16px;">STATUS</th>
+                                <th style="padding: 12px 16px; text-align: right;">ACTION</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stock-requests-tbody">
                         <tr>
                             <td colspan="8" style="text-align: center; padding: 40px; color: var(--text-light);">
                                 <i class='bx bx-loader-alt bx-spin' style="font-size: 28px; display: block; margin-bottom: 8px;"></i>
@@ -521,8 +522,8 @@ App.pages['stock-requests'] = {
                         ${statusLabel}
                     </span>
                 </td>
-                <td style="padding: 14px 16px; text-align: right;">
-                    <div style="display: inline-flex; gap: 6px; align-items: center; justify-content: flex-end;">
+                <td style="padding: 14px 16px; text-align: right; white-space: nowrap;">
+                    <div style="display: inline-flex; gap: 6px; align-items: center; justify-content: flex-end; flex-wrap: nowrap;">
                         <button class="btn btn-sm btn-view-sr" data-id="${req.stock_request_id}" style="background: var(--card-bg, #ffffff); border: 1px solid var(--border); color: var(--text); padding: 5px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" title="View Details">
                             <i class='bx bx-show'></i> Details
                         </button>
@@ -594,7 +595,7 @@ App.pages['stock-requests'] = {
 
             const quoteBox = sr.quotation ? `
                 <div style="margin-top: 1.2rem; padding: 14px; border-radius: 8px; background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.25);">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
                         <span style="font-weight: 700; color: #7c3aed; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;">
                             <i class='bx bx-receipt'></i> Linked Quotation #${sr.quotation.quotation_number}
                         </span>
@@ -602,7 +603,7 @@ App.pages['stock-requests'] = {
                             ${sr.quotation.status}
                         </span>
                     </div>
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 12px;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; font-size: 12px;">
                         <div>
                             <span style="color: var(--text-light); display: block;">Quoted Price</span>
                             <span style="font-weight: 700; color: var(--text);">₹${(sr.quotation.quoted_price || 0).toFixed(2)}/unit</span>
@@ -624,17 +625,17 @@ App.pages['stock-requests'] = {
                     <div style="font-size: 12px; font-weight: 600; color: var(--text-light); margin-bottom: 4px; text-transform: uppercase;">
                         Supplier Response (${sr.responded_at ? new Date(sr.responded_at).toLocaleString() : 'Recorded'}):
                     </div>
-                    <div style="font-size: 13px; color: var(--text); font-style: italic;">"${sr.supplier_response_notes}"</div>
+                    <div style="font-size: 13px; color: var(--text); font-style: italic; overflow-wrap: anywhere; word-break: break-word;">"${sr.supplier_response_notes}"</div>
                 </div>
             ` : '';
 
             const content = `
                 <div style="display: flex; flex-direction: column; gap: 1rem;">
                     <!-- Top meta grid -->
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; padding: 14px; border-radius: 8px; background: var(--bg-main, #f9fafb); border: 1px solid var(--border);">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; padding: 14px; border-radius: 8px; background: var(--bg-main, #f9fafb); border: 1px solid var(--border);">
                         <div>
                             <span style="font-size: 11px; color: var(--text-light); display: block; text-transform: uppercase;">Request Reference</span>
-                            <span style="font-size: 15px; font-weight: 700; color: var(--text);">${sr.request_number}</span>
+                            <span style="font-size: 15px; font-weight: 700; color: var(--text); overflow-wrap: anywhere; word-break: break-word;">${sr.request_number}</span>
                         </div>
                         <div>
                             <span style="font-size: 11px; color: var(--text-light); display: block; text-transform: uppercase;">Status</span>
@@ -651,15 +652,15 @@ App.pages['stock-requests'] = {
                     </div>
 
                     <!-- Supplier & Requester info -->
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
                         <div style="padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
                             <span style="font-size: 11px; color: var(--text-light); text-transform: uppercase; font-weight: 600;">Supplier Information</span>
-                            <div style="font-weight: 700; color: var(--text); margin-top: 4px;">${sr.supplier_name}</div>
-                            <div style="font-size: 12px; color: var(--text-light);">${sr.supplier_email || 'No email'} • ${sr.supplier_phone || ''}</div>
+                            <div style="font-weight: 700; color: var(--text); margin-top: 4px; overflow-wrap: anywhere; word-break: break-word;">${sr.supplier_name}</div>
+                            <div style="font-size: 12px; color: var(--text-light); overflow-wrap: anywhere; word-break: break-word;">${sr.supplier_email || 'No email'} • ${sr.supplier_phone || ''}</div>
                         </div>
                         <div style="padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
                             <span style="font-size: 11px; color: var(--text-light); text-transform: uppercase; font-weight: 600;">Requested By</span>
-                            <div style="font-weight: 700; color: var(--text); margin-top: 4px;">${sr.requested_by_name}</div>
+                            <div style="font-weight: 700; color: var(--text); margin-top: 4px; overflow-wrap: anywhere; word-break: break-word;">${sr.requested_by_name}</div>
                             <div style="font-size: 12px; color: var(--text-light);">Created: ${new Date(sr.created_at).toLocaleString()}</div>
                         </div>
                     </div>
@@ -667,29 +668,31 @@ App.pages['stock-requests'] = {
                     ${sr.notes ? `
                         <div style="padding: 12px; border-radius: 8px; background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.2);">
                             <span style="font-size: 11px; font-weight: 700; color: #2563eb; text-transform: uppercase;">Manager Notes & Specification</span>
-                            <p style="margin: 4px 0 0 0; font-size: 13px; color: var(--text);">${sr.notes}</p>
+                            <p style="margin: 4px 0 0 0; font-size: 13px; color: var(--text); overflow-wrap: anywhere; word-break: break-word; white-space: pre-wrap;">${sr.notes}</p>
                         </div>
                     ` : ''}
 
                     <!-- Products Table -->
                     <div>
-                        <div style="font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 8px; display: flex; justify-content: space-between;">
+                        <div style="font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
                             <span>Requested Products (${sr.items_count || 1})</span>
                             <span style="color: var(--primary);">Total: ${sr.total_quantity || 0} units</span>
                         </div>
-                        <table style="width: 100%; border-collapse: collapse; border: 1px solid var(--border); border-radius: 6px; overflow: hidden;">
-                            <thead style="background: var(--bg-main, #f9fafb); font-size: 11px; text-transform: uppercase; color: var(--text-light);">
-                                <tr>
-                                    <th style="padding: 8px 12px; text-align: left;">#</th>
-                                    <th style="padding: 8px 12px; text-align: left;">Product</th>
-                                    <th style="padding: 8px 12px; text-align: center;">Requested Qty</th>
-                                    <th style="padding: 8px 12px; text-align: right;">Ref Price</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${itemsRows}
-                            </tbody>
-                        </table>
+                        <div class="table-responsive" style="overflow-x: auto; width: 100%; -webkit-overflow-scrolling: touch; border: 1px solid var(--border); border-radius: 8px;">
+                            <table style="min-width: 480px; width: 100%; border-collapse: collapse;">
+                                <thead style="background: var(--bg-main, #f9fafb); font-size: 11px; text-transform: uppercase; color: var(--text-light);">
+                                    <tr>
+                                        <th style="padding: 8px 12px; text-align: left;">#</th>
+                                        <th style="padding: 8px 12px; text-align: left;">Product</th>
+                                        <th style="padding: 8px 12px; text-align: center;">Requested Qty</th>
+                                        <th style="padding: 8px 12px; text-align: right;">Ref Price</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${itemsRows}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
 
                     ${responseBox}
@@ -700,6 +703,7 @@ App.pages['stock-requests'] = {
             Modal.create({
                 id: 'modal-sr-details',
                 title: `Stock Request: ${sr.request_number}`,
+                size: 'lg',
                 content: content,
                 footer: `
                     <div style="display: flex; justify-content: flex-end; gap: 10px; width: 100%;">
@@ -720,11 +724,12 @@ App.pages['stock-requests'] = {
         Modal.create({
             id: 'modal-respond-stock-req',
             title: 'Respond to Stock Request',
+            size: 'md',
             content: `
                 <form id="sr-respond-form" style="display: flex; flex-direction: column; gap: 14px;">
                     <div>
                         <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 6px; color: var(--text);">Your Response Decision <span style="color: #ef4444;">*</span></label>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px;">
                             <label style="display: flex; align-items: center; gap: 8px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; background: var(--bg-main, #f9fafb);">
                                 <input type="radio" name="sr_action" value="Accept" checked style="accent-color: #059669;">
                                 <div>
@@ -749,24 +754,24 @@ App.pages['stock-requests'] = {
                         <p style="font-size: 12px; color: var(--text-light); margin: 0 0 10px 0;">
                             Providing a unit price will automatically generate a formal Supplier Quotation connected to this stock request for manager approval.
                         </p>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px;">
                             <div>
                                 <label style="font-size: 12px; font-weight: 600; color: var(--text); display: block; margin-bottom: 4px;">Quoted Price per Unit (₹)</label>
-                                <input type="number" id="sr_quoted_price" step="0.01" min="0.01" placeholder="e.g. 450.00" style="width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px;">
+                                <input type="number" id="sr_quoted_price" step="0.01" min="0.01" placeholder="e.g. 450.00" style="width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: var(--card-bg, #ffffff); color: var(--text);">
                             </div>
                             <div>
                                 <label style="font-size: 12px; font-weight: 600; color: var(--text); display: block; margin-bottom: 4px;">Quote Valid Until</label>
-                                <input type="date" id="sr_valid_until" style="width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px;">
+                                <input type="date" id="sr_valid_until" style="width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: var(--card-bg, #ffffff); color: var(--text);">
                             </div>
                         </div>
                     </div>
 
                     <div>
                         <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 6px; color: var(--text);">Response Notes / Delivery Timeline</label>
-                        <textarea id="sr_response_notes" rows="3" placeholder="Provide fulfillment notes, expected shipment availability, or reason if rejecting..." style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; color: var(--text); background: var(--card-bg, #ffffff);"></textarea>
+                        <textarea id="sr_response_notes" rows="3" placeholder="Provide fulfillment notes, expected shipment availability, or reason if rejecting..." style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; color: var(--text); background: var(--card-bg, #ffffff); overflow-wrap: anywhere; word-break: break-word;"></textarea>
                     </div>
 
-                    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);">
+                    <div class="modal-sticky-footer" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border);">
                         <button type="button" class="btn btn-outline cancel-respond-btn" style="padding: 8px 16px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer;">Cancel</button>
                         <button type="submit" id="btn-submit-respond" class="btn btn-primary" style="background: var(--primary, #2563eb); color: white; border: none; padding: 8px 20px; border-radius: 6px; font-weight: 600; cursor: pointer;">
                             Submit Response
@@ -885,18 +890,19 @@ App.pages['stock-requests'] = {
             Modal.create({
                 id: 'modal-create-stock-req',
                 title: 'Create New Stock Request',
+                size: 'lg',
                 content: `
-                    <form id="form-create-stock-req" style="display: flex; flex-direction: column; gap: 14px;">
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <form id="form-create-stock-req" style="display: flex; flex-direction: column; gap: 14px; min-height: 100%;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
                             <div>
                                 <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px; color: var(--text);">Select Supplier <span style="color: #ef4444;">*</span></label>
-                                <select id="csr-supplier-id" required style="width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px;">
+                                <select id="csr-supplier-id" required style="width: 100%; min-width: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: var(--card-bg, #ffffff); color: var(--text);">
                                     ${supplierOptions}
                                 </select>
                             </div>
                             <div>
                                 <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px; color: var(--text);">Priority <span style="color: #ef4444;">*</span></label>
-                                <select id="csr-priority" style="width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px;">
+                                <select id="csr-priority" style="width: 100%; min-width: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: var(--card-bg, #ffffff); color: var(--text);">
                                     <option value="Medium">Medium</option>
                                     <option value="High">High</option>
                                     <option value="Urgent">Urgent</option>
@@ -907,25 +913,25 @@ App.pages['stock-requests'] = {
 
                         <div>
                             <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px; color: var(--text);">Required Delivery Date</label>
-                            <input type="date" id="csr-required-date" style="width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px;">
+                            <input type="date" id="csr-required-date" style="width: 100%; min-width: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: var(--card-bg, #ffffff); color: var(--text);">
                         </div>
 
                         <!-- Products line items builder -->
                         <div style="border: 1px solid var(--border); border-radius: 8px; padding: 12px; background: var(--bg-main, #f9fafb);">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
                                 <label style="font-size: 13px; font-weight: 700; color: var(--text);">Requested Products & Quantities <span style="color: #ef4444;">*</span></label>
-                                <button type="button" id="btn-add-csr-item" style="background: white; border: 1px solid var(--border); padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                                <button type="button" id="btn-add-csr-item" style="background: var(--card-bg, #ffffff); border: 1px solid var(--border); padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; color: var(--text);">
                                     <i class='bx bx-plus'></i> Add Item
                                 </button>
                             </div>
                             <div id="csr-items-container" style="display: flex; flex-direction: column; gap: 8px;">
                                 <!-- Item Row 1 -->
-                                <div class="csr-item-row" style="display: grid; grid-template-columns: 2fr 1fr 30px; gap: 8px; align-items: center;">
-                                    <select class="csr-prod-select" required style="padding: 7px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px;">
+                                <div class="csr-item-row" style="display: grid; grid-template-columns: minmax(0, 2fr) minmax(70px, 1fr) 32px; gap: 8px; align-items: center;">
+                                    <select class="csr-prod-select" required style="width: 100%; min-width: 0; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: var(--card-bg, #ffffff); color: var(--text);">
                                         ${productOptions}
                                     </select>
-                                    <input type="number" class="csr-qty-input" required min="1" value="25" placeholder="Qty" style="padding: 7px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px;">
-                                    <button type="button" class="btn-remove-csr-item" style="border: none; background: transparent; color: #ef4444; font-size: 18px; cursor: pointer;" title="Remove item">
+                                    <input type="number" class="csr-qty-input" required min="1" value="25" placeholder="Qty" style="width: 100%; min-width: 0; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: var(--card-bg, #ffffff); color: var(--text);">
+                                    <button type="button" class="btn-remove-csr-item" style="border: none; background: transparent; color: #ef4444; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Remove item">
                                         <i class='bx bx-trash'></i>
                                     </button>
                                 </div>
@@ -934,12 +940,12 @@ App.pages['stock-requests'] = {
 
                         <div>
                             <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px; color: var(--text);">Notes & Restock Instructions</label>
-                            <textarea id="csr-notes" rows="2" placeholder="e.g. Urgent restock required for upcoming seasonal demand..." style="width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px;"></textarea>
+                            <textarea id="csr-notes" rows="2" placeholder="e.g. Urgent restock required for upcoming seasonal demand..." style="width: 100%; min-width: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: var(--card-bg, #ffffff); color: var(--text); overflow-wrap: anywhere; word-break: break-word;"></textarea>
                         </div>
 
-                        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);">
+                        <div class="modal-sticky-footer" style="display: flex; justify-content: flex-end; gap: 10px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border);">
                             <button type="button" class="btn btn-outline cancel-csr-btn" style="padding: 8px 16px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer;">Cancel</button>
-                            <button type="submit" id="btn-submit-csr" class="btn btn-primary" style="background: var(--primary, #2563eb); color: white; border: none; padding: 8px 20px; border-radius: 6px; font-weight: 600; cursor: pointer;">
+                            <button type="submit" id="btn-submit-csr" class="btn btn-primary" style="background: var(--primary, #078f72); color: white; border: none; padding: 8px 20px; border-radius: 6px; font-weight: 600; cursor: pointer;">
                                 Issue Stock Request
                             </button>
                         </div>
@@ -964,13 +970,13 @@ App.pages['stock-requests'] = {
                     addItemBtn.addEventListener('click', () => {
                         const row = document.createElement('div');
                         row.className = 'csr-item-row';
-                        row.style.cssText = 'display: grid; grid-template-columns: 2fr 1fr 30px; gap: 8px; align-items: center;';
+                        row.style.cssText = 'display: grid; grid-template-columns: minmax(0, 2fr) minmax(70px, 1fr) 32px; gap: 8px; align-items: center;';
                         row.innerHTML = `
-                            <select class="csr-prod-select" required style="padding: 7px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px;">
+                            <select class="csr-prod-select" required style="width: 100%; min-width: 0; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: var(--card-bg, #ffffff); color: var(--text);">
                                 ${productOptions}
                             </select>
-                            <input type="number" class="csr-qty-input" required min="1" value="20" placeholder="Qty" style="padding: 7px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px;">
-                            <button type="button" class="btn-remove-csr-item" style="border: none; background: transparent; color: #ef4444; font-size: 18px; cursor: pointer;" title="Remove item">
+                            <input type="number" class="csr-qty-input" required min="1" value="20" placeholder="Qty" style="width: 100%; min-width: 0; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: var(--card-bg, #ffffff); color: var(--text);">
+                            <button type="button" class="btn-remove-csr-item" style="border: none; background: transparent; color: #ef4444; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Remove item">
                                 <i class='bx bx-trash'></i>
                             </button>
                         `;

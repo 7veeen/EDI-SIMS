@@ -375,19 +375,35 @@ def get_shipment_by_id(shipment_id, user_id=None, role=None):
             if not assigned_emp_id or assigned_emp_id != int(user_id):
                 return None, "Access denied. You can only view shipments assigned to you."
 
-        # Fetch PO items with expected and received quantity computation
+        # Fetch shipment items (from ShipmentItems if present, else fallback to PO items)
         cursor.execute("""
-            SELECT poi.product_id, p.product_name, p.sku, poi.quantity, poi.unit_price, poi.subtotal
-            FROM "PurchaseOrderItems" poi
-            JOIN "Products" p ON poi.product_id = p.product_id
-            WHERE poi.purchase_order_id = %s
-            ORDER BY poi.purchase_order_item_id ASC
-        """, (po_id,))
-        po_items_raw = cursor.fetchall()
+            SELECT si.product_id, p.product_name, p.sku, si.quantity, poi.unit_price, poi.subtotal
+            FROM "ShipmentItems" si
+            JOIN "Products" p ON si.product_id = p.product_id
+            LEFT JOIN "PurchaseOrderItems" poi ON poi.purchase_order_id = %s AND poi.product_id = si.product_id
+            WHERE si.shipment_id = %s
+            ORDER BY si.shipment_item_id ASC
+        """, (po_id, shipment_id))
+        si_raw = cursor.fetchall()
+
+        if si_raw and len(si_raw) > 0:
+            po_items_raw = si_raw
+            is_shipment_items = True
+        else:
+            cursor.execute("""
+                SELECT poi.product_id, p.product_name, p.sku, poi.quantity, poi.unit_price, poi.subtotal
+                FROM "PurchaseOrderItems" poi
+                JOIN "Products" p ON poi.product_id = p.product_id
+                WHERE poi.purchase_order_id = %s
+                ORDER BY poi.purchase_order_item_id ASC
+            """, (po_id,))
+            po_items_raw = cursor.fetchall()
+            is_shipment_items = False
 
         po_items = []
         total_exp = 0
         total_rec = 0
+        all_items_fully_received = True
 
         for ir in po_items_raw:
             pid = ir[0]
@@ -397,14 +413,17 @@ def get_shipment_by_id(shipment_id, user_id=None, role=None):
             uprice = float(ir[4]) if ir[4] is not None else 0.0
             subtot = float(ir[5]) if ir[5] is not None else 0.0
 
-            # Check approved quotation for exact approved quantity
-            cursor.execute("""
-                SELECT quantity FROM "SupplierQuotations"
-                WHERE purchase_order_id = %s AND product_id = %s AND status IN ('Approved', 'Accepted')
-                LIMIT 1
-            """, (po_id, pid))
-            q_row = cursor.fetchone()
-            expected_qty = q_row[0] if q_row else poi_qty
+            if is_shipment_items:
+                expected_qty = poi_qty
+            else:
+                # Check approved quotation for exact approved quantity
+                cursor.execute("""
+                    SELECT quantity FROM "SupplierQuotations"
+                    WHERE purchase_order_id = %s AND product_id = %s AND status IN ('Approved', 'Accepted')
+                    LIMIT 1
+                """, (po_id, pid))
+                q_row = cursor.fetchone()
+                expected_qty = q_row[0] if q_row else poi_qty
 
             # Check received quantity for this shipment and product
             cursor.execute("""
@@ -420,8 +439,10 @@ def get_shipment_by_id(shipment_id, user_id=None, role=None):
 
             if received_qty == 0:
                 item_rec_status = "Pending Receipt"
+                all_items_fully_received = False
             elif received_qty < expected_qty:
                 item_rec_status = "Partially Received"
+                all_items_fully_received = False
             else:
                 item_rec_status = "Fully Received"
 
@@ -442,7 +463,7 @@ def get_shipment_by_id(shipment_id, user_id=None, role=None):
         if shp_status.lower() == "delivered":
             if total_rec == 0:
                 overall_rec_status = "Pending Receipt"
-            elif total_exp > 0 and total_rec >= total_exp:
+            elif total_exp > 0 and all_items_fully_received:
                 overall_rec_status = "Fully Received"
             else:
                 overall_rec_status = "Partially Received"
@@ -487,11 +508,11 @@ def get_shipment_by_id(shipment_id, user_id=None, role=None):
             "shipping_notes": row[14] or "",
             "origin_address": row[15] or "",
             "destination_address": row[16] or "",
-            "expected_delivery": row[17].isoformat() if row[17] else None,
-            "shipped_at": row[18].isoformat() if row[18] else None,
-            "delivered_at": row[19].isoformat() if row[19] else None,
-            "created_at": row[20].isoformat() if row[20] else None,
-            "updated_at": row[21].isoformat() if row[21] else None,
+            "expected_delivery": row[17].isoformat() if hasattr(row[17], 'isoformat') else (str(row[17]) if row[17] else None),
+            "shipped_at": row[18].isoformat() if hasattr(row[18], 'isoformat') else (str(row[18]) if row[18] else None),
+            "delivered_at": row[19].isoformat() if hasattr(row[19], 'isoformat') else (str(row[19]) if row[19] else None),
+            "created_at": row[20].isoformat() if hasattr(row[20], 'isoformat') else (str(row[20]) if row[20] else None),
+            "updated_at": row[21].isoformat() if hasattr(row[21], 'isoformat') else (str(row[21]) if row[21] else None),
             "assigned_employee_id": assigned_emp_id,
             "assigned_employee_name": assigned_emp_name,
             "receiving_status": overall_rec_status,
@@ -500,10 +521,10 @@ def get_shipment_by_id(shipment_id, user_id=None, role=None):
             "total_remaining_quantity": total_rem,
             "purchase_order": {
                 "purchase_order_id": po_id,
-                "order_date": row[22].isoformat() if row[22] else None,
+                "order_date": row[22].isoformat() if hasattr(row[22], 'isoformat') else (str(row[22]) if row[22] else None),
                 "total_amount": float(row[23]) if row[23] is not None else 0.0,
                 "status": row[24] or "",
-                "expected_delivery": row[25].isoformat() if row[25] else None,
+                "expected_delivery": row[25].isoformat() if hasattr(row[25], 'isoformat') else (str(row[25]) if row[25] else None),
                 "items": po_items
             },
             "status_history": history
@@ -580,11 +601,22 @@ def assign_employee(shipment_id, employee_id, user_id=None, role=None, username=
         rec_sum = cursor.fetchone()[0]
 
         cursor.execute("""
-            SELECT COALESCE(SUM(poi.quantity), 0)
-            FROM "PurchaseOrderItems" poi
-            WHERE poi.purchase_order_id = %s
-        """, (po_id,))
-        exp_sum = cursor.fetchone()[0]
+            SELECT COALESCE(SUM(quantity), 0)
+            FROM "ShipmentItems"
+            WHERE shipment_id = %s
+        """, (shipment_id,))
+        si_sum_row = cursor.fetchone()
+        si_sum = si_sum_row[0] if si_sum_row else 0
+
+        if si_sum > 0:
+            exp_sum = si_sum
+        else:
+            cursor.execute("""
+                SELECT COALESCE(SUM(poi.quantity), 0)
+                FROM "PurchaseOrderItems" poi
+                WHERE poi.purchase_order_id = %s
+            """, (po_id,))
+            exp_sum = cursor.fetchone()[0]
 
         if current_rec_status == 'Fully Received' or (exp_sum > 0 and rec_sum >= exp_sum):
             conn.rollback()
@@ -806,6 +838,7 @@ def create_shipment(data, user_id, role, username):
             SELECT purchase_order_id, supplier_id, status, supplier_response
             FROM "PurchaseOrders"
             WHERE purchase_order_id = %s
+            FOR UPDATE
         """, (po_id,))
         po_row = cursor.fetchone()
 
@@ -843,7 +876,71 @@ def create_shipment(data, user_id, role, username):
                 conn.rollback()
                 return None, "Cannot create shipment: Approved quotation belongs to a different supplier"
 
-        # 4. Generate unique shipment number
+        # 4. Validate items if provided
+        items_payload = data.get("items")
+        validated_items = []
+        if items_payload is not None:
+            if not isinstance(items_payload, list) or len(items_payload) == 0:
+                conn.rollback()
+                return None, "items must be a non-empty list of product allocations"
+
+            seen_pids = set()
+            for item in items_payload:
+                if not isinstance(item, dict):
+                    conn.rollback()
+                    return None, "Each item in items must be an object with product_id and quantity"
+                try:
+                    pid = int(item.get("product_id"))
+                    qty = int(item.get("quantity"))
+                except (ValueError, TypeError):
+                    conn.rollback()
+                    return None, "Each item must have integer product_id and quantity"
+
+                if qty <= 0:
+                    conn.rollback()
+                    return None, f"Allocation quantity for product ID {pid} must be greater than zero"
+
+                if pid in seen_pids:
+                    conn.rollback()
+                    return None, f"Duplicate product ID {pid} in shipment allocation items"
+                seen_pids.add(pid)
+
+                # Verify product is part of PO
+                cursor.execute("""
+                    SELECT quantity FROM "PurchaseOrderItems"
+                    WHERE purchase_order_id = %s AND product_id = %s
+                """, (po_id, pid))
+                poi_r = cursor.fetchone()
+                if not poi_r:
+                    conn.rollback()
+                    return None, f"Product ID {pid} does not belong to this purchase order"
+                poi_max_qty = poi_r[0]
+
+                cursor.execute("""
+                    SELECT quantity FROM "SupplierQuotations"
+                    WHERE purchase_order_id = %s AND product_id = %s AND status IN ('Approved', 'Accepted')
+                    LIMIT 1
+                """, (po_id, pid))
+                sq_r = cursor.fetchone()
+                max_po_qty = sq_r[0] if sq_r else poi_max_qty
+
+                # Check previously allocated quantities across non-cancelled shipments
+                cursor.execute("""
+                    SELECT COALESCE(SUM(si.quantity), 0)
+                    FROM "ShipmentItems" si
+                    JOIN "Shipments" s ON si.shipment_id = s.shipment_id
+                    WHERE s.purchase_order_id = %s AND si.product_id = %s AND s.status != 'Cancelled'
+                """, (po_id, pid))
+                prev_alloc_r = cursor.fetchone()
+                prev_alloc = prev_alloc_r[0] if prev_alloc_r else 0
+
+                if prev_alloc + qty > max_po_qty:
+                    conn.rollback()
+                    return None, f"Allocation for product ID {pid} ({prev_alloc + qty}) exceeds total purchase order quantity ({max_po_qty})"
+
+                validated_items.append((pid, qty))
+
+        # 5. Generate unique shipment number
         cursor.execute('SELECT COALESCE(MAX(shipment_id), 0) + 1 FROM "Shipments"')
         next_sid = cursor.fetchone()[0]
         rand_suffix = random.randint(100, 999)
@@ -855,7 +952,7 @@ def create_shipment(data, user_id, role, username):
 
         shipped_at = datetime.now() if raw_status in ("Dispatched", "In Transit") else None
 
-        # 5. Insert Shipment
+        # 6. Insert Shipment
         cursor.execute("""
             INSERT INTO "Shipments" (
                 shipment_number,
@@ -894,6 +991,40 @@ def create_shipment(data, user_id, role, username):
             shipped_at
         ))
         new_shipment_id = cursor.fetchone()[0]
+
+        # Insert allocated items into ShipmentItems
+        for pid, qty in validated_items:
+            cursor.execute("""
+                INSERT INTO "ShipmentItems" (shipment_id, product_id, quantity, created_at)
+                VALUES (%s, %s, %s, NOW())
+            """, (new_shipment_id, pid, qty))
+
+        # If PO was previously marked Delivered, creating an active shipment puts it back into active fulfillment ('Accepted')
+        if po_status == 'Delivered':
+            cursor.execute("""
+                UPDATE "PurchaseOrders"
+                SET status = %s
+                WHERE purchase_order_id = %s
+            """, ('Accepted', po_id))
+
+            cursor.execute("""
+                INSERT INTO "OrderStatusHistory" (
+                    purchase_order_id,
+                    supplier_id,
+                    status,
+                    previous_status,
+                    action,
+                    notes,
+                    changed_by,
+                    created_at
+                )
+                VALUES (%s, %s, 'Accepted', 'Delivered', 'PO_FULFILLMENT_IN_PROGRESS', %s, %s, NOW())
+            """, (
+                po_id,
+                supplier_id,
+                f"New shipment {shipment_number} created. Purchase order returned to Accepted status.",
+                username or supplier_name or "Supplier"
+            ))
 
         # 6. Insert OrderStatusHistory entry
         cursor.execute("""
@@ -951,6 +1082,8 @@ def create_shipment(data, user_id, role, username):
             "expected_delivery": str(expected_delivery) if expected_delivery else None,
             "shipped_at": shipped_at.isoformat() if shipped_at else None
         }
+        if validated_items:
+            result["items"] = [{"product_id": pid, "quantity": qty} for pid, qty in validated_items]
         return result, None
 
     except Exception as e:
@@ -1128,6 +1261,7 @@ def update_shipment_status(shipment_id, new_status, location=None, notes=None, u
             FROM "Shipments" shp
             JOIN "Suppliers" s ON shp.supplier_id = s.supplier_id
             WHERE shp.shipment_id = %s
+            FOR UPDATE OF shp
         """, (shipment_id,))
         row = cursor.fetchone()
 
@@ -1170,7 +1304,7 @@ def update_shipment_status(shipment_id, new_status, location=None, notes=None, u
         curr_lower = current_status.lower()
         new_lower = new_status.lower()
 
-        if curr_lower in allowed_transitions and new_lower not in allowed_transitions[curr_lower]:
+        if curr_lower not in allowed_transitions or new_lower not in allowed_transitions[curr_lower]:
             conn.rollback()
             return None, f"Invalid status transition from '{current_status}' to '{new_status}'"
 
@@ -1183,23 +1317,102 @@ def update_shipment_status(shipment_id, new_status, location=None, notes=None, u
         if new_status == "Delivered" and not existing_delivered_at:
             delivered_at = datetime.now()
 
-        # Update Shipment
+        # Update Shipment with conditional check on expected current_status
         cursor.execute("""
             UPDATE "Shipments"
             SET status = %s,
                 shipped_at = %s,
                 delivered_at = %s,
                 updated_at = NOW()
-            WHERE shipment_id = %s
-        """, (new_status, shipped_at, delivered_at, shipment_id))
+            WHERE shipment_id = %s AND status = %s
+        """, (new_status, shipped_at, delivered_at, shipment_id, current_status))
 
-        # If delivered, update PurchaseOrders status to Delivered
-        if new_status == "Delivered":
-            cursor.execute("""
-                UPDATE "PurchaseOrders"
-                SET status = 'Delivered'
-                WHERE purchase_order_id = %s
-            """, (po_id,))
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return None, f"Conflict: Shipment status was concurrently modified from '{current_status}'"
+
+        # Phase B: Recalculate Purchase Order status based on all linked shipments
+        # Acquire row-level lock on parent PurchaseOrder to serialize PO status aggregation across shipments
+        cursor.execute("""
+            SELECT purchase_order_id, status
+            FROM "PurchaseOrders"
+            WHERE purchase_order_id = %s
+            FOR UPDATE
+        """, (po_id,))
+        po_row = cursor.fetchone()
+
+        if po_row:
+            po_current_status = str(po_row[1] or "").strip()
+            # Only update PO status if the PO is in an active fulfillment lifecycle state ('Accepted' or 'Delivered')
+            # Preserves unrelated states like 'Pending' or 'Rejected'
+            if po_current_status in ('Accepted', 'Delivered'):
+                cursor.execute("""
+                    SELECT shipment_id, status
+                    FROM "Shipments"
+                    WHERE purchase_order_id = %s
+                """, (po_id,))
+                all_po_shipments = cursor.fetchall()
+
+                total_shipments = len(all_po_shipments)
+                delivered_shipments = [s for s in all_po_shipments if (s[1] or '').strip().lower() == 'delivered']
+
+                # Primary rule: PO is marked Delivered ONLY when:
+                # 1. At least one shipment exists (total_shipments > 0)
+                # 2. ALL shipments for this PO have reached 'Delivered' status
+                # Cancelled shipments do NOT count as delivered, keeping the PO in 'Accepted'
+                # Any outstanding shipment (Ready, Dispatched, In Transit, Delayed) keeps the PO in 'Accepted'
+                if total_shipments > 0 and len(delivered_shipments) == total_shipments:
+                    target_po_status = 'Delivered'
+                else:
+                    target_po_status = 'Accepted'
+
+                if target_po_status != po_current_status:
+                    cursor.execute("""
+                        UPDATE "PurchaseOrders"
+                        SET status = %s
+                        WHERE purchase_order_id = %s
+                    """, (target_po_status, po_id))
+
+                    po_action = "PO_DELIVERED" if target_po_status == "Delivered" else "PO_FULFILLMENT_IN_PROGRESS"
+                    po_notes = (
+                        f"All {total_shipments} shipment(s) delivered. Purchase order marked Delivered."
+                        if target_po_status == "Delivered"
+                        else f"Shipment status updated. Purchase order retained in Accepted status ({len(delivered_shipments)}/{total_shipments} delivered)."
+                    )
+
+                    cursor.execute("""
+                        INSERT INTO "OrderStatusHistory" (
+                            purchase_order_id,
+                            supplier_id,
+                            status,
+                            previous_status,
+                            action,
+                            notes,
+                            changed_by,
+                            created_at
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+                    """, (
+                        po_id,
+                        supplier_id,
+                        target_po_status,
+                        po_current_status,
+                        po_action,
+                        po_notes,
+                        username or supplier_name or role or "System"
+                    ))
+
+                    try:
+                        from app.services.team3.audit_service import log_audit_event
+                        log_audit_event(
+                            action='PO_STATUS_CHANGED',
+                            table_name='PurchaseOrders',
+                            record_id=po_id,
+                            user_id=int(user_id) if user_id else None,
+                            cursor=cursor
+                        )
+                    except Exception as audit_err:
+                        print(f"[AUDIT WARNING] Failed to record PO status change audit log: {audit_err}", flush=True)
 
         # Insert OrderStatusHistory entry
         action_name = f"SHIPMENT_{new_status.upper().replace(' ', '_')}"

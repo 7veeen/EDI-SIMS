@@ -558,8 +558,19 @@ App.pages['inventory'] = {
 
     async showAdjustModal(inventoryId = null) {
         let item = null;
+        let allItems = this.currentInventory || [];
+        if (allItems.length === 0 || (inventoryId && !allItems.find(i => i.inventory_id === inventoryId))) {
+            try {
+                const data = await Api.get('/inventory/?page=1&page_size=100');
+                allItems = data.inventory || [];
+                this.currentInventory = allItems;
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
         if (inventoryId) {
-            item = this.currentInventory.find(i => i.inventory_id === inventoryId);
+            item = allItems.find(i => i.inventory_id === inventoryId);
             if (!item) {
                 try {
                     const data = await Api.get(`/inventory/${inventoryId}`);
@@ -571,63 +582,264 @@ App.pages['inventory'] = {
             }
         }
 
+        const initialStock = item ? item.quantity_available : 0;
+
         const modalHtml = `
-            ${!item ? `
-            <div class="form-group">
-                <label>Select Product</label>
-                <select id="modal-adjust-item" class="input" required>
-                    <option value="">Choose item...</option>
-                    ${this.currentInventory.map(i => `<option value="${i.inventory_id}">${Utils.escapeHtml(i.product_name)} (${Utils.escapeHtml(i.sku)}) - Current: ${i.quantity_available}</option>`).join('')}
-                </select>
-            </div>
-            ` : `
-            <div style="background: #f8fafc; border: 1px solid var(--border); padding: 14px; border-radius: 8px; margin-bottom: 16px;">
-                <div style="font-weight: 600; font-size: 15px; color: var(--text);">${Utils.escapeHtml(item.product_name)}</div>
-                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">SKU: ${Utils.escapeHtml(item.sku)} • Category: ${Utils.escapeHtml(item.category_name)}</div>
-                <div style="margin-top: 8px; font-size: 14px;">Current Available Quantity: <strong style="color: var(--primary);">${item.quantity_available}</strong></div>
-            </div>
-            `}
-            <div class="form-group">
-                <label>New Available Quantity</label>
-                <input type="number" id="modal-adjust-qty" class="input" min="0" value="${item ? item.quantity_available : 0}" required placeholder="Enter new quantity">
-                <small style="color: var(--text-secondary); font-size: 11px;">Adjustment will automatically log a STOCK_IN / STOCK_OUT audit transaction.</small>
-            </div>
-            <div class="form-group">
-                <label>Adjustment Notes (Optional)</label>
-                <input type="text" id="modal-adjust-notes" class="input" placeholder="e.g. Physical inventory count reconciliation">
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+                ${!item ? `
+                    <div class="form-group">
+                        <label for="modal-adjust-item">SELECT PRODUCT TO ADJUST *</label>
+                        <select id="modal-adjust-item" class="input" required>
+                            <option value="">-- Choose inventory item --</option>
+                            ${allItems.map(i => `
+                                <option value="${i.inventory_id}" data-current="${i.quantity_available}" data-sku="${Utils.escapeHtml(i.sku)}" data-name="${Utils.escapeHtml(i.product_name)}" data-cat="${Utils.escapeHtml(i.category_name || 'N/A')}">
+                                    ${Utils.escapeHtml(i.product_name)} (${Utils.escapeHtml(i.sku)}) — Stock: ${i.quantity_available}
+                                </option>
+                            `).join('')}
+                        </select>
+                    </div>
+                    <div class="adjust-stock-product-card" id="adjust-product-summary" style="display: none;">
+                        <div class="card-title" id="adjust-summary-name"></div>
+                        <div class="card-meta">
+                            <span>SKU: <strong id="adjust-summary-sku" style="color: var(--text);"></strong></span>
+                            <span>•</span>
+                            <span>Category: <strong id="adjust-summary-cat" style="color: var(--text);"></strong></span>
+                            <span>•</span>
+                            <span>Current Stock: <strong id="adjust-current-stock-display" style="color: var(--primary); font-size: 14px;">0 units</strong></span>
+                        </div>
+                    </div>
+                ` : `
+                    <div class="adjust-stock-product-card" id="adjust-product-summary">
+                        <div class="card-title">${Utils.escapeHtml(item.product_name)}</div>
+                        <div class="card-meta">
+                            <span>SKU: <strong style="color: var(--text);">${Utils.escapeHtml(item.sku)}</strong></span>
+                            <span>•</span>
+                            <span>Category: <strong style="color: var(--text);">${Utils.escapeHtml(item.category_name || 'N/A')}</strong></span>
+                            <span>•</span>
+                            <span>Current Stock: <strong id="adjust-current-stock-display" style="color: var(--primary); font-size: 14px;">${item.quantity_available} units</strong></span>
+                        </div>
+                    </div>
+                `}
+
+                <div class="form-group">
+                    <label>ADJUSTMENT TYPE *</label>
+                    <div class="adjust-type-toggle" id="adjust-type-buttons">
+                        <button type="button" class="adjust-type-btn active" data-type="SET">
+                            <i class='bx bx-check-double'></i> Set Exact Count
+                        </button>
+                        <button type="button" class="adjust-type-btn" data-type="ADD">
+                            <i class='bx bx-plus-circle'></i> Add Stock (+)
+                        </button>
+                        <button type="button" class="adjust-type-btn" data-type="SUBTRACT">
+                            <i class='bx bx-minus-circle'></i> Reduce Stock (-)
+                        </button>
+                    </div>
+                    <input type="hidden" id="modal-adjust-type" value="SET">
+                </div>
+
+                <div class="form-group">
+                    <label for="modal-adjust-qty">
+                        <span id="adjust-qty-label">NEW PHYSICAL COUNT *</span>
+                        <span style="font-size: 11px; font-weight: normal; color: var(--text-secondary);">Whole units &gt;= 0</span>
+                    </label>
+                    <input type="number" id="modal-adjust-qty" class="input" min="0" step="1" value="${initialStock}" required placeholder="Enter count">
+
+                    <div class="adjust-calc-preview" id="adjust-calc-box">
+                        <div style="font-size: 12.5px; color: var(--text);">
+                            Current: <strong id="calc-current-val">${initialStock}</strong>
+                            <span id="calc-symbol" style="margin: 0 4px; color: var(--text-secondary);">&rarr;</span>
+                            Delta: <strong id="calc-delta-val">0</strong>
+                        </div>
+                        <div style="font-size: 13.5px; font-weight: 700;">
+                            Resulting Stock: <span id="calc-result-val" style="color: var(--primary);">${initialStock} units</span>
+                        </div>
+                    </div>
+                    <div id="adjust-error-alert" style="display: none; color: var(--danger, #ef4444); font-size: 12px; margin-top: 6px; font-weight: 600;">
+                        <i class='bx bx-error-circle'></i> <span id="adjust-error-msg"></span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="modal-adjust-reason">REASON FOR ADJUSTMENT *</label>
+                    <select id="modal-adjust-reason" class="input" required>
+                        <option value="Physical inventory count reconciliation">Physical inventory count reconciliation</option>
+                        <option value="Damaged / expired stock write-off">Damaged / expired stock write-off</option>
+                        <option value="Surplus / unrecorded stock found">Surplus / unrecorded stock found</option>
+                        <option value="Customer return / Restock">Customer return / Restock</option>
+                        <option value="Data entry correction">Data entry correction</option>
+                        <option value="Internal warehouse movement">Internal warehouse movement</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="modal-adjust-notes">AUDIT REMARKS / NOTES (OPTIONAL)</label>
+                    <textarea id="modal-adjust-notes" class="input" rows="2" placeholder="e.g. Verified by warehouse supervisor during cycle count..."></textarea>
+                    <small style="color: var(--text-secondary); font-size: 11.5px;">
+                        Adjustments will update inventory stock and automatically generate a STOCK_IN / STOCK_OUT audit transaction record.
+                    </small>
+                </div>
             </div>
         `;
 
         Modal.show({
-            title: item ? `Adjust Stock — ${Utils.escapeHtml(item.product_name)}` : 'Adjust Inventory Stock',
+            title: item ? `Adjust Stock — ${Utils.escapeHtml(item.product_name)} ⚖️` : 'Adjust Inventory Stock ⚖️',
             content: modalHtml,
+            saveText: 'Confirm Adjustment',
             onSave: async (container) => {
-                const targetInvId = item ? item.inventory_id : parseInt(container.querySelector('#modal-adjust-item').value);
-                const newQtyVal = container.querySelector('#modal-adjust-qty').value;
-                const notes = container.querySelector('#modal-adjust-notes').value;
+                const itemSelect = container.querySelector('#modal-adjust-item');
+                const targetInvId = item ? item.inventory_id : parseInt(itemSelect?.value || '0');
+                const type = container.querySelector('#modal-adjust-type')?.value || 'SET';
+                const qtyVal = container.querySelector('#modal-adjust-qty')?.value;
+                const reason = container.querySelector('#modal-adjust-reason')?.value || 'Stock Adjustment';
+                const notes = container.querySelector('#modal-adjust-notes')?.value?.trim() || '';
 
                 if (!targetInvId) {
-                    throw new Error("Please select an inventory item");
+                    throw new Error("Please select an inventory item to adjust.");
                 }
 
-                if (newQtyVal === '' || isNaN(newQtyVal)) {
-                    throw new Error("Please enter a valid quantity");
+                if (qtyVal === '' || isNaN(qtyVal) || parseInt(qtyVal) < 0) {
+                    throw new Error("Please enter a valid non-negative integer quantity.");
                 }
 
-                const newQty = parseInt(newQtyVal);
-                if (newQty < 0) {
-                    throw new Error("Quantity cannot be negative");
+                const currentStockVal = parseInt(container.querySelector('#calc-current-val')?.textContent || '0');
+                const enteredQty = parseInt(qtyVal);
+                let resultingQty = enteredQty;
+
+                if (type === 'ADD') {
+                    resultingQty = currentStockVal + enteredQty;
+                } else if (type === 'SUBTRACT') {
+                    resultingQty = currentStockVal - enteredQty;
                 }
+
+                if (resultingQty < 0) {
+                    throw new Error(`Inventory stock cannot be negative. Resulting quantity would be ${resultingQty} units.`);
+                }
+
+                const combinedNotes = notes ? `${reason} — ${notes}` : reason;
 
                 await Api.put(`/inventory/${targetInvId}`, {
-                    quantity_available: newQty,
-                    notes: notes
+                    quantity_available: resultingQty,
+                    notes: combinedNotes
                 });
 
-                Utils.showToast("Stock adjusted successfully", "success");
-                this.loadInventory(document.getElementById('inventory-search')?.value, document.getElementById('inventory-status-filter')?.value);
+                Utils.showToast(`Stock updated to ${resultingQty} units successfully!`, "success");
+                this.loadInventory(
+                    document.getElementById('inventory-search')?.value,
+                    document.getElementById('inventory-status-filter')?.value
+                );
             }
         });
+
+        // Initialize dynamic calculations and listeners after modal renders
+        setTimeout(() => {
+            const itemSelect = document.getElementById('modal-adjust-item');
+            const summaryCard = document.getElementById('adjust-product-summary');
+            const summaryName = document.getElementById('adjust-summary-name');
+            const summarySku = document.getElementById('adjust-summary-sku');
+            const summaryCat = document.getElementById('adjust-summary-cat');
+            const currentStockDisplay = document.getElementById('adjust-current-stock-display');
+            const currentValEl = document.getElementById('calc-current-val');
+            const deltaValEl = document.getElementById('calc-delta-val');
+            const resultValEl = document.getElementById('calc-result-val');
+            const qtyInput = document.getElementById('modal-adjust-qty');
+            const qtyLabel = document.getElementById('adjust-qty-label');
+            const typeInput = document.getElementById('modal-adjust-type');
+            const typeBtns = document.querySelectorAll('#adjust-type-buttons .adjust-type-btn');
+            const calcBox = document.getElementById('adjust-calc-box');
+            const errAlert = document.getElementById('adjust-error-alert');
+            const errMsg = document.getElementById('adjust-error-msg');
+
+            const recalculate = () => {
+                let currentStock = item ? item.quantity_available : 0;
+                if (!item && itemSelect) {
+                    const opt = itemSelect.options[itemSelect.selectedIndex];
+                    if (opt && opt.value) {
+                        currentStock = parseInt(opt.getAttribute('data-current') || '0');
+                        if (summaryCard) summaryCard.style.display = 'block';
+                        if (summaryName) summaryName.textContent = opt.getAttribute('data-name') || '';
+                        if (summarySku) summarySku.textContent = opt.getAttribute('data-sku') || '';
+                        if (summaryCat) summaryCat.textContent = opt.getAttribute('data-cat') || '';
+                        if (currentStockDisplay) currentStockDisplay.textContent = `${currentStock} units`;
+                    } else {
+                        if (summaryCard) summaryCard.style.display = 'none';
+                    }
+                }
+
+                if (currentValEl) currentValEl.textContent = currentStock;
+
+                const type = typeInput ? typeInput.value : 'SET';
+                const enteredVal = parseInt(qtyInput?.value || '0');
+                const validEntered = isNaN(enteredVal) ? 0 : Math.max(0, enteredVal);
+
+                let delta = 0;
+                let resulting = currentStock;
+
+                if (type === 'SET') {
+                    delta = validEntered - currentStock;
+                    resulting = validEntered;
+                } else if (type === 'ADD') {
+                    delta = validEntered;
+                    resulting = currentStock + validEntered;
+                } else if (type === 'SUBTRACT') {
+                    delta = -validEntered;
+                    resulting = currentStock - validEntered;
+                }
+
+                if (deltaValEl) {
+                    deltaValEl.textContent = delta >= 0 ? `+${delta}` : `${delta}`;
+                }
+
+                if (resultValEl) {
+                    resultValEl.textContent = `${resulting} units`;
+                }
+
+                if (resulting < 0) {
+                    if (calcBox) calcBox.classList.add('error');
+                    if (errAlert && errMsg) {
+                        errAlert.style.display = 'block';
+                        errMsg.textContent = `Resulting stock cannot be negative (would be ${resulting} units).`;
+                    }
+                    if (resultValEl) resultValEl.style.color = 'var(--danger, #ef4444)';
+                } else {
+                    if (calcBox) calcBox.classList.remove('error');
+                    if (errAlert) errAlert.style.display = 'none';
+                    if (resultValEl) resultValEl.style.color = 'var(--primary, #078f72)';
+                }
+            };
+
+            typeBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    typeBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    const selectedType = btn.getAttribute('data-type');
+                    if (typeInput) typeInput.value = selectedType;
+
+                    if (qtyLabel) {
+                        if (selectedType === 'SET') {
+                            qtyLabel.textContent = 'NEW PHYSICAL COUNT *';
+                            if (qtyInput) qtyInput.placeholder = 'Enter new total count';
+                        } else if (selectedType === 'ADD') {
+                            qtyLabel.textContent = 'QUANTITY TO ADD (+) *';
+                            if (qtyInput) qtyInput.placeholder = 'e.g. 50';
+                        } else if (selectedType === 'SUBTRACT') {
+                            qtyLabel.textContent = 'QUANTITY TO REDUCE (-) *';
+                            if (qtyInput) qtyInput.placeholder = 'e.g. 10';
+                        }
+                    }
+
+                    recalculate();
+                });
+            });
+
+            if (itemSelect) itemSelect.addEventListener('change', recalculate);
+            if (qtyInput) {
+                qtyInput.addEventListener('input', recalculate);
+                qtyInput.addEventListener('change', recalculate);
+            }
+
+            recalculate();
+        }, 50);
     }
 };
 

@@ -11,6 +11,7 @@ App.pages['purchase-orders'] = {
     search: '',
     status: '',
     requestId: 0,
+    pendingPoActionIds: new Set(),
 
     render() {
         const container = document.createElement('div');
@@ -114,24 +115,26 @@ App.pages['purchase-orders'] = {
             </div>
 
             <!-- PO Table -->
-            <div class="card table-responsive" style="margin-top: 10px;">
-                <table class="table" id="pos-table">
-                    <thead>
-                        <tr>
-                            <th>PO NUMBER</th>
-                            <th>SUPPLIER</th>
-                            <th>ORDER DATE</th>
-                            <th>EXPECTED DELIVERY</th>
-                            <th>ITEMS</th>
-                            <th>TOTAL AMOUNT</th>
-                            <th>STATUS</th>
-                            <th style="text-align: right;">ACTIONS</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr><td colspan="8" style="text-align: center; padding: 32px; color: var(--text-secondary);">Loading purchase orders...</td></tr>
-                    </tbody>
-                </table>
+            <div class="card" style="margin-top: 10px; padding: 0; overflow: hidden;">
+                <div class="table-responsive pos-table-container">
+                    <table class="table" id="pos-table">
+                        <thead>
+                            <tr>
+                                <th style="min-width: 110px;">PO NUMBER</th>
+                                <th style="min-width: 180px;">SUPPLIER</th>
+                                <th style="min-width: 110px;">ORDER DATE</th>
+                                <th style="min-width: 140px;">EXPECTED DELIVERY</th>
+                                <th style="min-width: 90px; text-align: center;">ITEMS</th>
+                                <th style="min-width: 120px;">TOTAL AMOUNT</th>
+                                <th style="min-width: 100px; text-align: center;">STATUS</th>
+                                <th class="col-actions cell-actions-right">ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td colspan="8" style="text-align: center; padding: 32px; color: var(--text-secondary);">Loading purchase orders...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
             <div id="po-pagination-container"></div>
         `;
@@ -271,27 +274,27 @@ App.pages['purchase-orders'] = {
                             </td>
                             <td style="font-size: 13px;">${formattedDate}</td>
                             <td style="font-size: 13px; color: var(--text-secondary);">${formattedDelivery}</td>
-                            <td>
+                            <td style="text-align: center;">
                                 <span class="badge" style="background: #f1f5f9; color: #334155; font-weight: 600;">
                                     ${po.total_items || 0} Items
                                 </span>
                             </td>
                             <td><strong style="font-size: 14px;">₹${(po.total_amount || 0).toFixed(2)}</strong></td>
-                            <td>
+                            <td style="text-align: center;">
                                 <span class="status-badge ${badgeClass}">
                                     ${po.status}
                                 </span>
                             </td>
-                            <td style="text-align: right;">
+                            <td class="col-actions cell-actions-right">
                                 <div class="action-buttons" style="justify-content: flex-end;">
-                                    <button class="btn-icon text-primary" onclick="App.pages['purchase-orders'].viewPODetails(${po.purchase_order_id})" title="View Details">
+                                    <button class="btn-icon btn-action-view text-primary" onclick="App.pages['purchase-orders'].viewPODetails(${po.purchase_order_id})" title="View Details" aria-label="View purchase order #${po.po_number || po.purchase_order_id} details">
                                         <i class='bx bx-show'></i>
                                     </button>
                                     ${canRespond ? `
-                                        <button class="btn-icon text-success" style="color: #059669;" onclick="App.pages['purchase-orders'].respondPO(${po.purchase_order_id}, 'Accepted')" title="Accept Order">
+                                        <button class="btn-icon btn-action-accept text-success" onclick="App.pages['purchase-orders'].respondPO(${po.purchase_order_id}, 'Accepted')" title="Accept Order" aria-label="Accept purchase order #${po.po_number || po.purchase_order_id}">
                                             <i class='bx bx-check-circle'></i>
                                         </button>
-                                        <button class="btn-icon text-danger" onclick="App.pages['purchase-orders'].promptRejectPO(${po.purchase_order_id})" title="Reject Order">
+                                        <button class="btn-icon btn-action-reject text-danger" onclick="App.pages['purchase-orders'].promptRejectPO(${po.purchase_order_id})" title="Reject Order" aria-label="Reject purchase order #${po.po_number || po.purchase_order_id}">
                                             <i class='bx bx-x-circle'></i>
                                         </button>
                                     ` : ''}
@@ -409,7 +412,7 @@ App.pages['purchase-orders'] = {
                     </div>
                 </div>
 
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 14px 0; padding: 12px 14px; background: #f8fafc; border-radius: 8px; border: 1px solid var(--border); font-size: 13px;">
+                <div class="po-detail-grid">
                     <div>
                         <span style="color: var(--text-secondary); font-size: 11px;">Contact Person:</span><br>
                         <strong>${Utils.escapeHtml(po.contact_person || '—')}</strong>
@@ -495,6 +498,9 @@ App.pages['purchase-orders'] = {
     },
 
     async respondPO(poId, action, rejectionReason = null) {
+        if (this.pendingPoActionIds.has(poId)) return;
+        this.pendingPoActionIds.add(poId);
+
         try {
             const payload = { response: action };
             if (action === 'Rejected') {
@@ -509,6 +515,8 @@ App.pages['purchase-orders'] = {
             );
         } catch (err) {
             Utils.showToast(err.message || "Failed to update order response", "error");
+        } finally {
+            this.pendingPoActionIds.delete(poId);
         }
     },
 

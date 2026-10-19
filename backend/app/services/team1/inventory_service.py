@@ -410,11 +410,12 @@ def stock_in(shipment_id, product_id, quantity, notes=None, user_id=None, role=N
         conn.autocommit = False
         cursor = conn.cursor()
 
-        # 1. Fetch Shipment
+        # 1. Fetch Shipment and acquire row-level lock to prevent concurrent double-receipt
         cursor.execute("""
             SELECT shipment_id, shipment_number, purchase_order_id, supplier_id, status, assigned_employee_id, COALESCE(receiving_status, 'Pending Receipt')
             FROM "Shipments"
             WHERE shipment_id = %s
+            FOR UPDATE
         """, (shipment_id,))
         shp = cursor.fetchone()
         if not shp:
@@ -454,44 +455,130 @@ def stock_in(shipment_id, product_id, quantity, notes=None, user_id=None, role=N
         prod_sku = prod[2] or ""
         reorder_level = prod[3] or 10
 
-        # 3. Verify product belongs to the shipment's PO
+        # 3. Determine shipment allocation for this product
         cursor.execute("""
-            SELECT quantity FROM "PurchaseOrderItems"
-            WHERE purchase_order_id = %s AND product_id = %s
-        """, (po_id, product_id))
-        poi_row = cursor.fetchone()
-        if not poi_row:
-            conn.rollback()
-            return None, "Product does not belong to this shipment's purchase order"
-
-        poi_qty = poi_row[0]
-
-        # Check approved quotation for exact approved quantity
-        cursor.execute("""
-            SELECT quantity FROM "SupplierQuotations"
-            WHERE purchase_order_id = %s AND product_id = %s AND status IN ('Approved', 'Accepted')
-            LIMIT 1
-        """, (po_id, product_id))
-        quote_row = cursor.fetchone()
-        expected_qty = quote_row[0] if quote_row else poi_qty
-
-        # 4. Check already received quantity for this shipment and product
-        cursor.execute("""
-            SELECT COALESCE(SUM(quantity), 0)
-            FROM "StockTransactions"
-            WHERE shipment_id = %s AND product_id = %s AND transaction_type = 'STOCK_IN'
+            SELECT quantity FROM "ShipmentItems"
+            WHERE shipment_id = %s AND product_id = %s
         """, (shipment_id, product_id))
-        already_received = cursor.fetchone()[0]
+        si_row = cursor.fetchone()
 
-        remaining_receivable = max(0, expected_qty - already_received)
+        if si_row:
+            # 1. Explicit Shipment Allocation Path
+            expected_qty = si_row[0]
 
-        if remaining_receivable <= 0:
-            conn.rollback()
-            return None, f"Product '{prod_name}' has already been fully received for this shipment"
+            # Check already received quantity for this shipment and product
+            cursor.execute("""
+                SELECT COALESCE(SUM(quantity), 0)
+                FROM "StockTransactions"
+                WHERE shipment_id = %s AND product_id = %s AND transaction_type = 'STOCK_IN'
+            """, (shipment_id, product_id))
+            already_received = cursor.fetchone()[0]
 
-        if quantity > remaining_receivable:
-            conn.rollback()
-            return None, f"Received quantity ({quantity}) exceeds remaining receivable quantity ({remaining_receivable})"
+            remaining_receivable = max(0, expected_qty - already_received)
+
+            if remaining_receivable <= 0:
+                conn.rollback()
+                return None, f"Product '{prod_name}' has already been fully received for this shipment"
+
+            if quantity > remaining_receivable:
+                conn.rollback()
+                return None, f"Received quantity ({quantity}) exceeds remaining receivable quantity ({remaining_receivable})"
+        else:
+            # Check if any ShipmentItems exist for this shipment
+            cursor.execute("""
+                SELECT COUNT(*) FROM "ShipmentItems"
+                WHERE shipment_id = %s
+            """, (shipment_id,))
+            si_cnt_row = cursor.fetchone()
+            si_cnt = si_cnt_row[0] if si_cnt_row else 0
+            if si_cnt and si_cnt > 0:
+                conn.rollback()
+                return None, f"Product '{prod_name}' is not allocated to this shipment"
+
+            # 2. Legacy Shipment Without ShipmentItems
+            # Case C check: Inconsistent shipment data if parent PO is missing
+            if not po_id:
+                conn.rollback()
+                return None, "Inconsistent shipment data: shipment is not associated with a valid purchase order"
+
+            # Serialize legacy PO-wide evaluation using parent PurchaseOrder row lock
+            cursor.execute("""
+                SELECT purchase_order_id, status
+                FROM "PurchaseOrders"
+                WHERE purchase_order_id = %s
+                FOR UPDATE
+            """, (po_id,))
+            po_lock_row = cursor.fetchone()
+            if not po_lock_row:
+                conn.rollback()
+                return None, "Inconsistent shipment data: parent purchase order not found"
+
+            # Inspect all non-cancelled shipments associated with this PO
+            cursor.execute("""
+                SELECT shipment_id, status
+                FROM "Shipments"
+                WHERE purchase_order_id = %s AND LOWER(status) != 'cancelled'
+            """, (po_id,))
+            active_shipments = cursor.fetchall()
+            active_shipment_count = len(active_shipments)
+
+            if active_shipment_count == 0:
+                # Case C: No eligible active shipments found
+                conn.rollback()
+                return None, "Inconsistent shipment data: no eligible active shipments found for this purchase order"
+
+            if active_shipment_count > 1:
+                # Case B: Multiple non-cancelled shipments and no explicit allocation
+                conn.rollback()
+                return None, "Ambiguous legacy multi-shipment Purchase Order. This PO has multiple shipments without line-item allocations. Please reconcile shipment allocations before receiving stock."
+
+            # Case A: Exactly one non-cancelled shipment
+            cursor.execute("""
+                SELECT quantity FROM "PurchaseOrderItems"
+                WHERE purchase_order_id = %s AND product_id = %s
+            """, (po_id, product_id))
+            poi_row = cursor.fetchone()
+            if not poi_row:
+                conn.rollback()
+                return None, "Product does not belong to this shipment's purchase order"
+
+            poi_qty = poi_row[0]
+
+            # Check approved quotation for exact approved quantity
+            cursor.execute("""
+                SELECT quantity FROM "SupplierQuotations"
+                WHERE purchase_order_id = %s AND product_id = %s AND status IN ('Approved', 'Accepted')
+                LIMIT 1
+            """, (po_id, product_id))
+            quote_row = cursor.fetchone()
+            approved_po_qty = quote_row[0] if quote_row else poi_qty
+
+            # Calculate total qualifying stock-in for this PO and product across all shipments
+            cursor.execute("""
+                SELECT COALESCE(SUM(st.quantity), 0)
+                FROM "StockTransactions" st
+                WHERE st.product_id = %s
+                  AND st.transaction_type = 'STOCK_IN'
+                  AND (
+                      st.purchase_order_id = %s
+                      OR st.shipment_id IN (
+                          SELECT s.shipment_id FROM "Shipments" s WHERE s.purchase_order_id = %s
+                      )
+                  )
+            """, (product_id, po_id, po_id))
+            total_po_received = cursor.fetchone()[0]
+            expected_qty = approved_po_qty
+            already_received = total_po_received
+
+            remaining_receivable = max(0, approved_po_qty - total_po_received)
+
+            if remaining_receivable <= 0:
+                conn.rollback()
+                return None, f"Product '{prod_name}' has already been fully received for this purchase order"
+
+            if quantity > remaining_receivable or (total_po_received + quantity > approved_po_qty):
+                conn.rollback()
+                return None, f"Received quantity ({quantity}) exceeds remaining purchase order receivable quantity ({remaining_receivable})"
 
         # 5. Atomic Update: Inventory quantity_available
         cursor.execute("""
@@ -551,41 +638,75 @@ def stock_in(shipment_id, product_id, quantity, notes=None, user_id=None, role=N
 
         # 7. Check overall shipment receiving progress and update Shipments.receiving_status
         cursor.execute("""
-            SELECT poi.product_id, poi.quantity
-            FROM "PurchaseOrderItems" poi
-            WHERE poi.purchase_order_id = %s
-        """, (po_id,))
-        all_poi = cursor.fetchall()
+            SELECT product_id, quantity
+            FROM "ShipmentItems"
+            WHERE shipment_id = %s
+        """, (shipment_id,))
+        allocated_items = cursor.fetchall()
 
         all_items_fully_received = True
         total_exp_all = 0
         total_rec_all = 0
 
-        for it in all_poi:
-            it_pid = it[0]
-            it_poi_qty = it[1]
+        if allocated_items and len(allocated_items) > 0:
+            for it in allocated_items:
+                it_pid = it[0]
+                it_exp = it[1]
 
+                cursor.execute("""
+                    SELECT COALESCE(SUM(quantity), 0)
+                    FROM "StockTransactions"
+                    WHERE shipment_id = %s AND product_id = %s AND transaction_type = 'STOCK_IN'
+                """, (shipment_id, it_pid))
+                st_rec_row = cursor.fetchone()
+                it_rec = st_rec_row[0] if st_rec_row else 0
+
+                total_exp_all += it_exp
+                total_rec_all += it_rec
+                if it_rec < it_exp:
+                    all_items_fully_received = False
+        else:
+            # Legacy fallback: evaluate against PurchaseOrderItems
             cursor.execute("""
-                SELECT quantity FROM "SupplierQuotations"
-                WHERE purchase_order_id = %s AND product_id = %s AND status IN ('Approved', 'Accepted')
-                LIMIT 1
-            """, (po_id, it_pid))
-            it_q = cursor.fetchone()
-            it_exp = it_q[0] if it_q else it_poi_qty
+                SELECT poi.product_id, poi.quantity
+                FROM "PurchaseOrderItems" poi
+                WHERE poi.purchase_order_id = %s
+            """, (po_id,))
+            all_poi = cursor.fetchall()
 
-            cursor.execute("""
-                SELECT COALESCE(SUM(quantity), 0)
-                FROM "StockTransactions"
-                WHERE shipment_id = %s AND product_id = %s AND transaction_type = 'STOCK_IN'
-            """, (shipment_id, it_pid))
-            it_rec = cursor.fetchone()[0]
+            for it in all_poi:
+                it_pid = it[0]
+                it_poi_qty = it[1]
 
-            total_exp_all += it_exp
-            total_rec_all += it_rec
-            if it_rec < it_exp:
-                all_items_fully_received = False
+                cursor.execute("""
+                    SELECT quantity FROM "SupplierQuotations"
+                    WHERE purchase_order_id = %s AND product_id = %s AND status IN ('Approved', 'Accepted')
+                    LIMIT 1
+                """, (po_id, it_pid))
+                it_q = cursor.fetchone()
+                it_exp = it_q[0] if it_q else it_poi_qty
 
-        if all_items_fully_received:
+                cursor.execute("""
+                    SELECT COALESCE(SUM(st.quantity), 0)
+                    FROM "StockTransactions" st
+                    WHERE st.product_id = %s
+                      AND st.transaction_type = 'STOCK_IN'
+                      AND (
+                          st.purchase_order_id = %s
+                          OR st.shipment_id IN (
+                              SELECT s.shipment_id FROM "Shipments" s WHERE s.purchase_order_id = %s
+                          )
+                      )
+                """, (it_pid, po_id, po_id))
+                st_rec_row = cursor.fetchone()
+                it_rec = st_rec_row[0] if st_rec_row else 0
+
+                total_exp_all += it_exp
+                total_rec_all += it_rec
+                if it_rec < it_exp:
+                    all_items_fully_received = False
+
+        if all_items_fully_received and total_exp_all > 0:
             new_rec_status = "Fully Received"
         elif total_rec_all > 0:
             new_rec_status = "Partially Received"
@@ -682,7 +803,7 @@ def stock_in(shipment_id, product_id, quantity, notes=None, user_id=None, role=N
                 "shipment_number": shipment_num,
                 "purchase_order_id": po_id,
                 "notes": tx_notes,
-                "transaction_date": tx_date.isoformat() if tx_date else datetime.now().isoformat()
+                "transaction_date": tx_date.isoformat() if hasattr(tx_date, 'isoformat') else (str(tx_date) if tx_date else datetime.now().isoformat())
             },
             "inventory": {
                 "inventory_id": inv_id,
@@ -1132,4 +1253,5 @@ def get_stock_transaction_by_id(transaction_id, role=None, auth_user_id=None):
         if conn:
             conn.close()
 
-
+# Service alias for shipment goods receipt
+stock_in_shipment = stock_in
