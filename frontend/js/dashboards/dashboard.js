@@ -832,10 +832,15 @@ App.pages['dashboard'] = {
                                                             ${o.status}
                                                         </span>
                                                     </td>
-                                                    <td style="padding: 12px 14px; text-align: right;">
-                                                        <button class="btn" style="background: var(--primary-light); color: var(--primary); padding: 4px 10px; font-size: 11px; font-weight: 600; border-radius: 4px; border: none; cursor: pointer;" onclick="App.navigate('purchase-orders')">
+                                                    <td style="padding: 12px 14px; text-align: right; white-space: nowrap;">
+                                                        <button class="btn" style="background: var(--primary-light); color: var(--primary); padding: 4px 10px; font-size: 11px; font-weight: 600; border-radius: 4px; border: none; cursor: pointer; margin-right: 6px;" onclick="App.navigate('purchase-orders')">
                                                             View
                                                         </button>
+                                                        ${(o.status === 'Accepted' || o.supplier_response === 'Accepted') ? `
+                                                            <button class="btn btn-action-dispatch" style="background: #2563eb; color: #ffffff; padding: 4px 10px; font-size: 11px; font-weight: 600; border-radius: 4px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" onclick="if(window.App && window.App.pages && window.App.pages['purchase-orders'] && typeof window.App.pages['purchase-orders'].dispatchPO === 'function') { window.App.pages['purchase-orders'].dispatchPO(${o.purchase_order_id}); } else { App.navigate('shipments'); const openWhenReady = (n = 0) => { if (App.pages['shipments'] && typeof App.pages['shipments'].openCreateShipmentModal === 'function') { App.pages['shipments'].openCreateShipmentModal(${o.purchase_order_id}); } else if (n < 15) { setTimeout(() => openWhenReady(n + 1), 50); } }; setTimeout(() => openWhenReady(0), 50); }" title="Dispatch Shipment for PO #${o.purchase_order_id}">
+                                                                <i class='bx bx-package'></i> Dispatch
+                                                            </button>
+                                                        ` : ''}
                                                     </td>
                                                 </tr>
                                             `).join('')

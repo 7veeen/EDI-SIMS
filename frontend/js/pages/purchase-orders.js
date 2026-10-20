@@ -262,6 +262,7 @@ App.pages['purchase-orders'] = {
                     const formattedDelivery = po.expected_delivery || 'Not specified';
                     const formattedDate = po.order_date || 'N/A';
                     const canRespond = isSupplier && (po.status === 'Pending' || po.supplier_response === 'Pending');
+                    const canDispatch = isSupplier && (po.status === 'Accepted' || po.supplier_response === 'Accepted') && po.status !== 'Delivered' && po.status !== 'Cancelled';
 
                     return `
                         <tr>
@@ -290,6 +291,11 @@ App.pages['purchase-orders'] = {
                                     <button class="btn-icon btn-action-view text-primary" onclick="App.pages['purchase-orders'].viewPODetails(${po.purchase_order_id})" title="View Details" aria-label="View purchase order #${po.po_number || po.purchase_order_id} details">
                                         <i class='bx bx-show'></i>
                                     </button>
+                                    ${canDispatch ? `
+                                        <button class="btn-icon btn-action-dispatch text-info" onclick="App.pages['purchase-orders'].dispatchPO(${po.purchase_order_id})" title="Dispatch Shipment" aria-label="Dispatch shipment for purchase order #${po.po_number || po.purchase_order_id}" style="color: #2563eb;">
+                                            <i class='bx bx-package'></i>
+                                        </button>
+                                    ` : ''}
                                     ${canRespond ? `
                                         <button class="btn-icon btn-action-accept text-success" onclick="App.pages['purchase-orders'].respondPO(${po.purchase_order_id}, 'Accepted')" title="Accept Order" aria-label="Accept purchase order #${po.po_number || po.purchase_order_id}">
                                             <i class='bx bx-check-circle'></i>
@@ -325,6 +331,18 @@ App.pages['purchase-orders'] = {
         }
     },
 
+    dispatchPO(poId) {
+        App.navigate('shipments');
+        const openWhenReady = (attempts = 0) => {
+            if (App.pages['shipments'] && typeof App.pages['shipments'].openCreateShipmentModal === 'function') {
+                App.pages['shipments'].openCreateShipmentModal(poId);
+            } else if (attempts < 15) {
+                setTimeout(() => openWhenReady(attempts + 1), 50);
+            }
+        };
+        setTimeout(() => openWhenReady(0), 50);
+    },
+
     async viewPODetails(poId) {
         try {
             const data = await Api.get(`/purchase-orders/${poId}`);
@@ -334,6 +352,7 @@ App.pages['purchase-orders'] = {
             const user = Auth.getUser();
             const isSupplier = user && user.role === 'Supplier';
             const canRespond = isSupplier && (po.status === 'Pending' || po.supplier_response === 'Pending');
+            const canDispatch = isSupplier && (po.status === 'Accepted' || po.supplier_response === 'Accepted') && po.status !== 'Delivered' && po.status !== 'Cancelled';
 
             let badgeClass = 'status-pending';
             if (po.status === 'Accepted' || po.status === 'Delivered') badgeClass = 'status-active';
@@ -346,27 +365,40 @@ App.pages['purchase-orders'] = {
                             <th>#</th>
                             <th>PRODUCT</th>
                             <th>SKU</th>
-                            <th>REQUIRED QTY</th>
-                            <th>UNIT PRICE</th>
-                            <th>SUBTOTAL</th>
+                            <th style="text-align: right;">ORDERED</th>
+                            <th style="text-align: right;">ALLOCATED</th>
+                            <th style="text-align: right;">REMAINING</th>
+                            <th style="text-align: right;">UNIT PRICE</th>
+                            <th style="text-align: right;">SUBTOTAL</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${po.items.map((it, idx) => `
-                            <tr>
-                                <td style="color: var(--text-secondary);">${idx + 1}</td>
-                                <td><strong>${Utils.escapeHtml(it.product_name)}</strong></td>
-                                <td><span class="badge" style="background: #e2e8f0; color: #334155;">${Utils.escapeHtml(it.sku)}</span></td>
-                                <td><strong>${it.quantity}</strong></td>
-                                <td>₹${it.unit_price.toFixed(2)}</td>
-                                <td><strong style="color: var(--primary);">₹${it.subtotal.toFixed(2)}</strong></td>
-                            </tr>
-                        `).join('')}
+                        ${po.items.map((it, idx) => {
+                            const reqQty = it.quantity || 0;
+                            const allocQty = it.allocated_quantity !== undefined ? it.allocated_quantity : 0;
+                            const remQty = it.remaining_quantity !== undefined ? it.remaining_quantity : Math.max(0, reqQty - allocQty);
+                            const isFullyAllocated = remQty <= 0;
+                            return `
+                                <tr>
+                                    <td style="color: var(--text-secondary);">${idx + 1}</td>
+                                    <td><strong>${Utils.escapeHtml(it.product_name)}</strong></td>
+                                    <td><span class="badge" style="background: #e2e8f0; color: #334155;">${Utils.escapeHtml(it.sku)}</span></td>
+                                    <td style="text-align: right;"><strong>${reqQty}</strong></td>
+                                    <td style="text-align: right; color: var(--text-secondary);">${allocQty}</td>
+                                    <td style="text-align: right; font-weight: 700; color: ${isFullyAllocated ? '#64748b' : '#059669'};">
+                                        ${remQty}
+                                        ${isFullyAllocated ? ' <span style="font-size: 10px; padding: 1px 4px; border-radius: 4px; background: rgba(100, 116, 139, 0.12); color: #64748b;">Full</span>' : ''}
+                                    </td>
+                                    <td style="text-align: right;">₹${(it.unit_price || 0).toFixed(2)}</td>
+                                    <td style="text-align: right;"><strong style="color: var(--primary);">₹${(it.subtotal || 0).toFixed(2)}</strong></td>
+                                </tr>
+                            `;
+                        }).join('')}
                     </tbody>
                     <tfoot>
                         <tr style="border-top: 2px solid var(--border); background: #f8fafc;">
-                            <td colspan="5" style="text-align: right; font-weight: 700; font-size: 14px;">Total PO Amount:</td>
-                            <td style="font-weight: 800; font-size: 15px; color: var(--primary);">₹${po.total_amount.toFixed(2)}</td>
+                            <td colspan="7" style="text-align: right; font-weight: 700; font-size: 14px;">Total PO Amount:</td>
+                            <td style="font-weight: 800; font-size: 15px; color: var(--primary);">₹${(po.total_amount || 0).toFixed(2)}</td>
                         </tr>
                     </tfoot>
                 </table>
@@ -452,13 +484,18 @@ App.pages['purchase-orders'] = {
 
             const footerHtml = `
                 <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                    <div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
                         ${canRespond ? `
                             <button type="button" class="btn text-danger" style="border: 1px solid rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.05); color: #dc2626; padding: 8px 14px; border-radius: 6px; font-weight: 600;" id="modal-btn-reject">
                                 <i class='bx bx-x-circle'></i> Reject Order
                             </button>
                             <button type="button" class="btn text-success" style="border: 1px solid rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.08); color: #059669; padding: 8px 14px; border-radius: 6px; font-weight: 600; margin-left: 8px;" id="modal-btn-accept">
                                 <i class='bx bx-check-circle'></i> Accept Order
+                            </button>
+                        ` : ''}
+                        ${canDispatch ? `
+                            <button type="button" class="btn btn-primary" style="background: #2563eb; color: #ffffff; padding: 8px 14px; border-radius: 6px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; border: none; cursor: pointer;" id="modal-btn-dispatch">
+                                <i class='bx bx-package'></i> Dispatch Shipment
                             </button>
                         ` : ''}
                     </div>
@@ -486,6 +523,16 @@ App.pages['purchase-orders'] = {
                             rejectBtn.addEventListener('click', () => {
                                 closeModal();
                                 this.promptRejectPO(poId);
+                            });
+                        }
+                    }
+
+                    if (canDispatch) {
+                        const dispatchBtn = modalEl.querySelector('#modal-btn-dispatch');
+                        if (dispatchBtn) {
+                            dispatchBtn.addEventListener('click', () => {
+                                closeModal();
+                                this.dispatchPO(poId);
                             });
                         }
                     }

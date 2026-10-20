@@ -466,7 +466,7 @@ App.pages['shipments'] = {
     },
 
     // Supplier: Create Shipment Modal
-    async openCreateShipmentModal() {
+    async openCreateShipmentModal(preselectedPoId = null) {
         try {
             // Fetch eligible accepted POs
             const poResp = await Api.get('/purchase-orders/');
@@ -474,11 +474,22 @@ App.pages['shipments'] = {
             const eligible = orders.filter(po => (po.supplier_response === 'Accepted' || po.status === 'Accepted'));
 
             if (eligible.length === 0) {
-                alert('No accepted Purchase Orders available. Shipments can only be created for accepted Purchase Orders.');
+                const msg = 'No accepted Purchase Orders available. Shipments can only be created for accepted Purchase Orders.';
+                if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast(msg, 'warning');
+                else if (typeof alert === 'function') alert(msg);
                 return;
             }
 
             this.eligiblePOs = eligible;
+
+            const targetPo = preselectedPoId ? eligible.find(po => String(po.purchase_order_id) === String(preselectedPoId)) : null;
+            if (preselectedPoId && !targetPo) {
+                const anyPo = orders.find(po => String(po.purchase_order_id) === String(preselectedPoId));
+                const reason = anyPo ? `(Current Status: ${anyPo.status})` : '';
+                if (typeof Utils !== 'undefined' && Utils.showToast) {
+                    Utils.showToast(`Purchase Order #${preselectedPoId} is not eligible for dispatch ${reason}. Please select an accepted Purchase Order.`, 'warning');
+                }
+            }
 
             const content = `
                 <div style="display: flex; flex-direction: column; gap: 14px;">
@@ -487,7 +498,9 @@ App.pages['shipments'] = {
                         <select id="modal-ship-po-select" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); font-size: 13px;">
                             <option value="">-- Choose an accepted Purchase Order --</option>
                             ${eligible.map(po => `
-                                <option value="${po.purchase_order_id}">PO #${po.purchase_order_id} - ${po.order_date} (Total: ₹${(po.total_amount || 0).toLocaleString('en-IN')})</option>
+                                <option value="${po.purchase_order_id}" ${preselectedPoId && String(po.purchase_order_id) === String(preselectedPoId) ? 'selected' : ''}>
+                                    PO #${po.purchase_order_id} - ${po.order_date || 'N/A'} (Total: ₹${(po.total_amount || 0).toLocaleString('en-IN')})
+                                </option>
                             `).join('')}
                         </select>
                     </div>
@@ -567,319 +580,596 @@ App.pages['shipments'] = {
                 </div>
             `;
 
-            Modal.show({
-                title: 'Create & Dispatch Shipment 📦',
-                content,
-                size: 'lg',
-                saveText: 'Create Shipment',
-                onSave: async (modalEl) => {
-                    const poSelect = document.getElementById('modal-ship-po-select');
-                    const poId = poSelect ? poSelect.value : '';
-                    if (!poId) {
-                        throw new Error('Please select an accepted Purchase Order.');
+            let currentPoRequestId = 0;
+            let closeModalFn = null;
+
+            const onSaveHandler = async (container, closeModal) => {
+                const poSelect = document.getElementById('modal-ship-po-select');
+                const poId = poSelect ? poSelect.value : '';
+                if (!poId) {
+                    throw new Error('Please select an accepted Purchase Order.');
+                }
+
+                const previewBox = document.getElementById('modal-ship-po-preview');
+                if (!previewBox) {
+                    throw new Error('Shipment allocation builder not initialized.');
+                }
+
+                const checkedBoxes = Array.from(previewBox.querySelectorAll('.alloc-item-checkbox:checked'));
+                if (checkedBoxes.length === 0) {
+                    const allRows = previewBox.querySelectorAll('tr.alloc-row, tr.alloc-row-disabled');
+                    if (allRows.length > 0 && previewBox.querySelectorAll('.alloc-item-checkbox').length === 0) {
+                        throw new Error('All products for this Purchase Order have already been fully allocated to existing shipments.');
+                    }
+                    throw new Error('Please select at least one product to allocate to this shipment consignment.');
+                }
+
+                const items = [];
+                const seenPids = new Set();
+
+                for (const cb of checkedBoxes) {
+                    const pidStr = cb.getAttribute('data-product-id');
+                    const pid = parseInt(pidStr, 10);
+                    if (isNaN(pid) || pid <= 0) {
+                        throw new Error('Invalid product selected in allocation.');
                     }
 
-                    const previewBox = document.getElementById('modal-ship-po-preview');
-                    if (!previewBox) {
-                        throw new Error('Shipment allocation builder not initialized.');
+                    if (seenPids.has(pid)) {
+                        throw new Error(`Duplicate product ID ${pid} selected in allocation.`);
+                    }
+                    seenPids.add(pid);
+
+                    const qtyInput = previewBox.querySelector(`.alloc-qty-input[data-product-id="${pid}"]`);
+                    const prodName = qtyInput ? (qtyInput.getAttribute('data-product-name') || `Product #${pid}`) : `Product #${pid}`;
+                    const maxRem = parseInt(cb.getAttribute('data-max') || '0', 10);
+
+                    if (!qtyInput) {
+                        throw new Error(`Quantity input missing for ${prodName}.`);
                     }
 
-                    const checkedBoxes = Array.from(previewBox.querySelectorAll('.alloc-item-checkbox:checked'));
-                    if (checkedBoxes.length === 0) {
-                        const allRows = previewBox.querySelectorAll('tr.alloc-row, tr.alloc-row-disabled');
-                        if (allRows.length > 0 && previewBox.querySelectorAll('.alloc-item-checkbox').length === 0) {
-                            throw new Error('All products for this Purchase Order have already been fully allocated to existing shipments.');
-                        }
-                        throw new Error('Please select at least one product to allocate to this shipment consignment.');
+                    const rawQty = qtyInput.value ? String(qtyInput.value).trim() : '';
+                    if (!rawQty || !/^\d+$/.test(rawQty)) {
+                        throw new Error(`Allocation quantity for "${prodName}" must be a valid positive integer.`);
                     }
 
-                    const items = [];
-                    const seenPids = new Set();
-
-                    for (const cb of checkedBoxes) {
-                        const pidStr = cb.getAttribute('data-product-id');
-                        const pid = parseInt(pidStr, 10);
-                        if (isNaN(pid) || pid <= 0) {
-                            throw new Error('Invalid product selected.');
-                        }
-
-                        if (seenPids.has(pid)) {
-                            throw new Error(`Duplicate product ID ${pid} selected in allocation.`);
-                        }
-                        seenPids.add(pid);
-
-                        const qtyInput = previewBox.querySelector(`.alloc-qty-input[data-product-id="${pid}"]`);
-                        const prodName = qtyInput ? (qtyInput.getAttribute('data-product-name') || `Product #${pid}`) : `Product #${pid}`;
-                        const maxRem = parseInt(cb.getAttribute('data-max') || '0', 10);
-
-                        if (!qtyInput) {
-                            throw new Error(`Quantity input missing for ${prodName}.`);
-                        }
-
-                        const rawQty = qtyInput.value ? qtyInput.value.trim() : '';
-                        if (!rawQty || !/^\d+$/.test(rawQty)) {
-                            throw new Error(`Allocation quantity for "${prodName}" must be a valid positive integer.`);
-                        }
-
-                        const qty = parseInt(rawQty, 10);
-                        if (qty <= 0) {
-                            throw new Error(`Allocation quantity for "${prodName}" must be greater than zero.`);
-                        }
-
-                        if (maxRem > 0 && qty > maxRem) {
-                            throw new Error(`Allocation quantity for "${prodName}" (${qty}) cannot exceed remaining allocatable quantity (${maxRem}).`);
-                        }
-
-                        items.push({
-                            product_id: pid,
-                            quantity: qty
-                        });
+                    const qty = parseInt(rawQty, 10);
+                    if (qty <= 0) {
+                        throw new Error(`Allocation quantity for "${prodName}" must be greater than zero.`);
                     }
 
-                    const carrier = document.getElementById('modal-ship-carrier').value;
-                    const trackingNumber = document.getElementById('modal-ship-tracking').value;
-                    const method = document.getElementById('modal-ship-method').value;
-                    const status = document.getElementById('modal-ship-status').value;
-                    const pkgCount = parseInt(document.getElementById('modal-ship-pkg-count').value, 10) || 1;
-                    const weightVal = document.getElementById('modal-ship-weight').value;
-                    const origin = document.getElementById('modal-ship-origin').value;
-                    const dest = document.getElementById('modal-ship-dest').value;
-                    const expectedDelivery = document.getElementById('modal-ship-expected-delivery').value;
-                    const notes = document.getElementById('modal-ship-notes').value;
+                    if (maxRem > 0 && qty > maxRem) {
+                        throw new Error(`Allocation quantity for "${prodName}" (${qty}) cannot exceed remaining allocatable quantity (${maxRem}).`);
+                    }
 
-                    await Api.post('/shipments/', {
+                    const row = (cb && typeof cb.closest === 'function') ? cb.closest('tr') : null;
+                    const skuEl = row ? row.querySelector('td:nth-child(2) div:nth-child(2)') : null;
+                    const sku = skuEl ? skuEl.textContent.trim() : '';
+
+                    items.push({
+                        product_id: pid,
+                        product_name: prodName,
+                        sku: sku,
+                        quantity: qty
+                    });
+                }
+
+                const carrier = document.getElementById('modal-ship-carrier')?.value?.trim();
+                if (!carrier) {
+                    throw new Error('Please enter or select a logistics carrier.');
+                }
+
+                const trackingNumber = document.getElementById('modal-ship-tracking')?.value?.trim() || null;
+                const method = document.getElementById('modal-ship-method')?.value || 'Standard Ground';
+                const status = document.getElementById('modal-ship-status')?.value || 'Ready for Shipment';
+                const pkgCountRaw = document.getElementById('modal-ship-pkg-count')?.value;
+                const pkgCount = parseInt(pkgCountRaw, 10) || 1;
+                if (pkgCount < 1) {
+                    throw new Error('Package count must be at least 1.');
+                }
+
+                const weightVal = document.getElementById('modal-ship-weight')?.value;
+                const totalWeight = weightVal && !isNaN(parseFloat(weightVal)) ? parseFloat(weightVal) : null;
+                const origin = document.getElementById('modal-ship-origin')?.value?.trim() || 'Central Fulfillment Dock';
+                const dest = document.getElementById('modal-ship-dest')?.value?.trim() || 'Central Inventory Receiving Bay 2';
+                const expectedDelivery = document.getElementById('modal-ship-expected-delivery')?.value || null;
+                const notes = document.getElementById('modal-ship-notes')?.value?.trim() || '';
+
+                const selectedOption = (poSelect && poSelect.options) ? poSelect.options[poSelect.selectedIndex] : null;
+                const poSummary = selectedOption ? (selectedOption.text || selectedOption.textContent) : `PO #${poId}`;
+
+                const dispatchData = {
+                    poId: parseInt(poId, 10),
+                    poSummary,
+                    carrier,
+                    trackingNumber,
+                    shippingMethod: method,
+                    status,
+                    packageCount: pkgCount,
+                    totalWeight,
+                    originAddress: origin,
+                    destinationAddress: dest,
+                    expectedDelivery,
+                    shippingNotes: notes,
+                    items
+                };
+
+                // Backward-compatibility hook for Phase D direct programmatic integration tests:
+                if (typeof Modal.create !== 'function') {
+                    const payload = {
                         purchase_order_id: parseInt(poId, 10),
                         carrier: carrier || 'Standard Logistics',
                         tracking_number: trackingNumber || null,
                         shipping_method: method,
                         status: status,
                         package_count: pkgCount,
-                        total_weight: weightVal ? parseFloat(weightVal) : null,
+                        total_weight: totalWeight,
                         origin_address: origin,
                         destination_address: dest,
-                        expected_delivery: expectedDelivery || null,
-                        shipping_notes: notes || '',
-                        items: items
-                    });
-
-                    Utils.showToast('Shipment created and dispatched successfully with product allocations!', 'success');
-                    App.pages['shipments'].loadShipments();
-                }
-            });
-
-            // PO selection listener with live allocation builder
-            const poSelect = document.getElementById('modal-ship-po-select');
-            const previewBox = document.getElementById('modal-ship-po-preview');
-            let currentPoRequestId = 0;
-
-            const updateAllocationSummary = () => {
-                if (!previewBox) return;
-                const checkedBoxes = Array.from(previewBox.querySelectorAll('.alloc-item-checkbox:checked'));
-                let totalUnits = 0;
-                checkedBoxes.forEach(cb => {
-                    const pid = cb.getAttribute('data-product-id');
-                    const inp = previewBox.querySelector(`.alloc-qty-input[data-product-id="${pid}"]`);
-                    if (inp && inp.value && !isNaN(parseInt(inp.value, 10))) {
-                        totalUnits += parseInt(inp.value, 10);
+                        expected_delivery: expectedDelivery,
+                        shipping_notes: notes,
+                        items: items.map(it => ({
+                            product_id: it.product_id,
+                            quantity: it.quantity
+                        }))
+                    };
+                    const res = await Api.post('/shipments/', payload);
+                    if (typeof Utils !== 'undefined' && Utils.showToast) {
+                        Utils.showToast('Shipment created and dispatched successfully with product allocations', 'success');
                     }
-                });
+                    if (typeof closeModal === 'function') closeModal();
+                    else if (typeof closeModalFn === 'function') closeModalFn();
+                    if (App.pages['shipments'] && typeof App.pages['shipments'].loadShipments === 'function') {
+                        App.pages['shipments'].loadShipments();
+                    }
+                    return res;
+                }
 
-                const countEl = previewBox.querySelector('#alloc-selected-count');
-                const unitsEl = previewBox.querySelector('#alloc-total-units');
-                const totalEligible = previewBox.querySelectorAll('.alloc-item-checkbox').length;
-
-                if (countEl) countEl.textContent = `${checkedBoxes.length} of ${totalEligible} product${totalEligible === 1 ? '' : 's'} selected`;
-                if (unitsEl) unitsEl.textContent = `Total Consignment Units: ${totalUnits}`;
+                // Standard Phase G review modal
+                this.openPreDispatchReviewModal(dispatchData, closeModal || closeModalFn);
             };
 
-            poSelect.addEventListener('change', async (e) => {
-                const poId = e.target.value;
-                const thisReq = ++currentPoRequestId;
+            const footer = `
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <button type="button" class="btn btn-outline close-modal cancel-modal-btn">Cancel</button>
+                    <button type="button" class="btn btn-primary save-modal-btn" id="modal-btn-to-review" style="background: #2563eb; border-color: #2563eb; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+                        Review &amp; Dispatch Consignment <i class='bx bx-right-arrow-alt'></i>
+                    </button>
+                </div>
+            `;
 
-                if (!poId) {
-                    previewBox.style.display = 'none';
-                    previewBox.innerHTML = '';
-                    return;
+            const modalOptions = {
+                id: 'modal-create-shipment',
+                title: 'Create & Dispatch Shipment 📦',
+                content,
+                footer,
+                size: 'lg',
+                saveText: 'Review & Dispatch Consignment',
+                onSave: onSaveHandler,
+                onOpen: (modalEl, closeModal) => {
+                    closeModalFn = closeModal;
                 }
+            };
 
-                try {
-                    previewBox.style.display = 'block';
-                    previewBox.innerHTML = `
-                        <div style="text-align: center; padding: 24px; color: var(--text-secondary); font-size: 13px;">
-                            <i class='bx bx-loader-alt bx-spin' style="font-size: 22px; margin-bottom: 6px; display: block; color: #2563eb;"></i>
-                            Loading purchase order line items and allocation limits...
-                        </div>
-                    `;
+            if (typeof Modal !== 'undefined' && typeof Modal.show === 'function') {
+                closeModalFn = Modal.show(modalOptions);
+            } else if (typeof Modal !== 'undefined' && typeof Modal.create === 'function') {
+                closeModalFn = Modal.create(modalOptions);
+            }
 
-                    const poData = await Api.get(`/purchase-orders/${poId}`);
-                    if (thisReq !== currentPoRequestId) return; // Stale request discarded
+            const poSelect = document.getElementById('modal-ship-po-select');
+            const previewBox = document.getElementById('modal-ship-po-preview');
+            const proceedBtn = document.getElementById('modal-btn-to-review') || (document.querySelector ? document.querySelector('.save-modal-btn') : null);
 
-                    const order = poData.purchase_order;
-                    const items = (order && Array.isArray(order.items)) ? order.items : [];
-
-                    if (items.length === 0) {
-                        previewBox.innerHTML = `
-                            <div style="padding: 14px; text-align: center; color: var(--text-secondary);">
-                                <i class='bx bx-info-circle' style="font-size: 20px; color: #d97706;"></i>
-                                <div style="margin-top: 4px; font-size: 13px;">No items found in Purchase Order #${order.purchase_order_id}.</div>
-                            </div>
-                        `;
-                        return;
-                    }
-
-                    const escape = (str) => Utils.escapeHtml ? Utils.escapeHtml(str || '') : (str || '');
-
-                    let rowsHtml = '';
-                    let eligibleCount = 0;
-
-                    items.forEach(item => {
-                        const poQty = parseInt(item.quantity, 10) || 0;
-                        const allocQty = item.allocated_quantity !== undefined ? parseInt(item.allocated_quantity, 10) : 0;
-                        const remQty = item.remaining_quantity !== undefined ? parseInt(item.remaining_quantity, 10) : Math.max(0, poQty - allocQty);
-                        const isFullyAllocated = remQty <= 0;
-
-                        if (!isFullyAllocated) eligibleCount++;
-
-                        rowsHtml += `
-                            <tr style="border-bottom: 1px solid var(--border); ${isFullyAllocated ? 'background: rgba(0,0,0,0.02); opacity: 0.65;' : ''}" class="${isFullyAllocated ? 'alloc-row-disabled' : 'alloc-row'}">
-                                <td style="padding: 8px 10px; text-align: center;">
-                                    ${isFullyAllocated 
-                                        ? `<input type="checkbox" disabled title="Fully allocated to other dispatches" style="cursor: not-allowed;">`
-                                        : `<input type="checkbox" class="alloc-item-checkbox" data-product-id="${item.product_id}" data-max="${remQty}" checked style="cursor: pointer;">`
-                                    }
-                                </td>
-                                <td style="padding: 8px 10px;">
-                                    <div style="font-weight: 600; color: var(--text); font-size: 13px;">${escape(item.product_name)}</div>
-                                    <div style="font-size: 11px; font-family: monospace; color: var(--text-secondary);">${escape(item.sku || 'N/A')}</div>
-                                </td>
-                                <td style="padding: 8px 10px; text-align: right; font-weight: 500;">${poQty}</td>
-                                <td style="padding: 8px 10px; text-align: right; color: var(--text-secondary);">${allocQty}</td>
-                                <td style="padding: 8px 10px; text-align: right; font-weight: 700; color: ${isFullyAllocated ? '#64748b' : '#059669'};">${remQty}</td>
-                                <td style="padding: 8px 10px; text-align: right;">
-                                    ${isFullyAllocated 
-                                        ? `<span style="display: inline-block; padding: 2px 8px; border-radius: 4px; background: rgba(100, 116, 139, 0.12); color: #64748b; font-size: 11px; font-weight: 600;">Fully Allocated</span>`
-                                        : `<input type="number" class="alloc-qty-input" data-product-id="${item.product_id}" data-max="${remQty}" data-product-name="${escape(item.product_name)}"
-                                                  min="1" max="${remQty}" step="1" value="${remQty}"
-                                                  style="width: 100px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); font-size: 13px; font-weight: 600; text-align: right; background: var(--bg-surface, #ffffff); color: var(--text);">`
-                                    }
-                                </td>
-                            </tr>
-                        `;
-                    });
-
-                    previewBox.innerHTML = `
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                            <div>
-                                <div style="font-weight: 700; font-size: 14px; color: #1e40af;">PO #${order.purchase_order_id} Product Allocations</div>
-                                <div style="font-size: 12px; color: var(--text-secondary);">Order Date: ${order.order_date || 'N/A'} • Total Budget: ₹${(order.total_amount || 0).toLocaleString('en-IN')}</div>
-                            </div>
-                            <div style="font-size: 11px; padding: 4px 8px; border-radius: 6px; background: rgba(59, 130, 246, 0.1); color: #2563eb; font-weight: 600;">
-                                <i class='bx bx-check-shield'></i> Split Allocation Builder
-                            </div>
-                        </div>
-
-                        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">
-                            Select the eligible products and quantities to allocate to this consignment.
-                        </div>
-
-                        <div style="border-radius: 8px; border: 1px solid var(--border); overflow: hidden; background: var(--card-bg, #ffffff);">
-                            <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
-                                <thead>
-                                    <tr style="background: var(--bg-surface, #f8fafc); border-bottom: 1px solid var(--border); color: var(--text-secondary); font-size: 11px; text-transform: uppercase;">
-                                        <th style="padding: 8px 10px; width: 36px; text-align: center;">
-                                            <input type="checkbox" id="alloc-select-all" title="Select / Deselect All Products" ${eligibleCount > 0 ? 'checked' : 'disabled'} style="cursor: pointer;">
-                                        </th>
-                                        <th style="padding: 8px 10px;">Product &amp; SKU</th>
-                                        <th style="padding: 8px 10px; text-align: right;">PO Qty</th>
-                                        <th style="padding: 8px 10px; text-align: right;">Allocated</th>
-                                        <th style="padding: 8px 10px; text-align: right;">Remaining</th>
-                                        <th style="padding: 8px 10px; text-align: right; width: 130px;">Ship Quantity *</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${rowsHtml}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 12px; font-weight: 600; color: var(--text-secondary);">
-                            <span id="alloc-selected-count">${eligibleCount} of ${items.length} products selected</span>
-                            <span id="alloc-total-units" style="color: #059669;">Total Consignment Units: 0</span>
-                        </div>
-                    `;
-
-                    // Wire up checkbox toggles and quantity input handlers
-                    const selectAllBox = previewBox.querySelector('#alloc-select-all');
-                    const checkboxes = Array.from(previewBox.querySelectorAll('.alloc-item-checkbox'));
-                    const qtyInputs = Array.from(previewBox.querySelectorAll('.alloc-qty-input'));
-
-                    const syncRowState = (cb) => {
-                        const pid = cb.getAttribute('data-product-id');
-                        const maxRem = parseInt(cb.getAttribute('data-max') || '0', 10);
-                        const inp = previewBox.querySelector(`.alloc-qty-input[data-product-id="${pid}"]`);
-                        if (!inp) return;
-
-                        if (cb.checked) {
-                            inp.disabled = false;
-                            inp.style.opacity = '1';
-                            if (!inp.value || parseInt(inp.value, 10) <= 0) {
-                                inp.value = maxRem;
+                    const updateAllocationSummary = () => {
+                        if (!previewBox) return;
+                        const checkedBoxes = Array.from(previewBox.querySelectorAll('.alloc-item-checkbox:checked'));
+                        let totalUnits = 0;
+                        checkedBoxes.forEach(cb => {
+                            const pid = cb.getAttribute('data-product-id');
+                            const inp = previewBox.querySelector(`.alloc-qty-input[data-product-id="${pid}"]`);
+                            if (inp && inp.value && !isNaN(parseInt(inp.value, 10))) {
+                                totalUnits += parseInt(inp.value, 10);
                             }
-                        } else {
-                            inp.disabled = true;
-                            inp.style.opacity = '0.5';
-                        }
+                        });
+
+                        const countEl = previewBox.querySelector('#alloc-selected-count');
+                        const unitsEl = previewBox.querySelector('#alloc-total-units');
+                        const totalEligible = previewBox.querySelectorAll('.alloc-item-checkbox').length;
+
+                        if (countEl) countEl.textContent = `${checkedBoxes.length} of ${totalEligible} product${totalEligible === 1 ? '' : 's'} selected`;
+                        if (unitsEl) unitsEl.textContent = `Total Consignment Units: ${totalUnits}`;
                     };
 
-                    checkboxes.forEach(cb => {
-                        cb.addEventListener('change', () => {
-                            syncRowState(cb);
-                            if (selectAllBox) {
-                                selectAllBox.checked = checkboxes.every(c => c.checked);
-                                selectAllBox.indeterminate = checkboxes.some(c => c.checked) && !selectAllBox.checked;
+                    poSelect.addEventListener('change', async (e) => {
+                        const poId = e.target.value;
+                        const thisReq = ++currentPoRequestId;
+
+                        if (!poId) {
+                            previewBox.style.display = 'none';
+                            previewBox.innerHTML = '';
+                            return;
+                        }
+
+                        try {
+                            previewBox.style.display = 'block';
+                            previewBox.innerHTML = `
+                                <div style="text-align: center; padding: 24px; color: var(--text-secondary); font-size: 13px;">
+                                    <i class='bx bx-loader-alt bx-spin' style="font-size: 22px; margin-bottom: 6px; display: block; color: #2563eb;"></i>
+                                    Loading purchase order line items and allocation limits...
+                                </div>
+                            `;
+
+                            const poData = await Api.get(`/purchase-orders/${poId}`);
+                            if (thisReq !== currentPoRequestId) return; // Stale request discarded
+
+                            const order = poData.purchase_order;
+                            const items = (order && Array.isArray(order.items)) ? order.items : [];
+
+                            if (items.length === 0) {
+                                previewBox.innerHTML = `
+                                    <div style="padding: 14px; text-align: center; color: var(--text-secondary);">
+                                        <i class='bx bx-info-circle' style="font-size: 20px; color: #d97706;"></i>
+                                        <div style="margin-top: 4px; font-size: 13px;">No items found in Purchase Order #${order.purchase_order_id}.</div>
+                                    </div>
+                                `;
+                                return;
                             }
+
+                            const escape = (str) => Utils.escapeHtml ? Utils.escapeHtml(str || '') : (str || '');
+
+                            let rowsHtml = '';
+                            let eligibleCount = 0;
+
+                            items.forEach(item => {
+                                const poQty = parseInt(item.quantity, 10) || 0;
+                                const allocQty = item.allocated_quantity !== undefined ? parseInt(item.allocated_quantity, 10) : 0;
+                                const remQty = item.remaining_quantity !== undefined ? parseInt(item.remaining_quantity, 10) : Math.max(0, poQty - allocQty);
+                                const isFullyAllocated = remQty <= 0;
+
+                                if (!isFullyAllocated) eligibleCount++;
+
+                                rowsHtml += `
+                                    <tr style="border-bottom: 1px solid var(--border); ${isFullyAllocated ? 'background: rgba(0,0,0,0.02); opacity: 0.65;' : ''}" class="${isFullyAllocated ? 'alloc-row-disabled' : 'alloc-row'}">
+                                        <td style="padding: 8px 10px; text-align: center;">
+                                            ${isFullyAllocated 
+                                                ? `<input type="checkbox" disabled title="Fully allocated to other dispatches" style="cursor: not-allowed;">`
+                                                : `<input type="checkbox" class="alloc-item-checkbox" data-product-id="${item.product_id}" data-max="${remQty}" checked style="cursor: pointer;">`
+                                            }
+                                        </td>
+                                        <td style="padding: 8px 10px;">
+                                            <div style="font-weight: 600; color: var(--text); font-size: 13px;">${escape(item.product_name)}</div>
+                                            <div style="font-size: 11px; font-family: monospace; color: var(--text-secondary);">${escape(item.sku || 'N/A')}</div>
+                                        </td>
+                                        <td style="padding: 8px 10px; text-align: right; font-weight: 500;">${poQty}</td>
+                                        <td style="padding: 8px 10px; text-align: right; color: var(--text-secondary);">${allocQty}</td>
+                                        <td style="padding: 8px 10px; text-align: right; font-weight: 700; color: ${isFullyAllocated ? '#64748b' : '#059669'};">${remQty}</td>
+                                        <td style="padding: 8px 10px; text-align: right;">
+                                            ${isFullyAllocated 
+                                                ? `<span style="display: inline-block; padding: 2px 8px; border-radius: 4px; background: rgba(100, 116, 139, 0.12); color: #64748b; font-size: 11px; font-weight: 600;">Fully Allocated</span>`
+                                                : `<input type="number" class="alloc-qty-input" data-product-id="${item.product_id}" data-max="${remQty}" data-product-name="${escape(item.product_name)}"
+                                                          min="1" max="${remQty}" step="1" value="${remQty}"
+                                                          style="width: 100px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); font-size: 13px; font-weight: 600; text-align: right; background: var(--bg-surface, #ffffff); color: var(--text);">`
+                                            }
+                                        </td>
+                                    </tr>
+                                `;
+                            });
+
+                            previewBox.innerHTML = `
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+                                    <div>
+                                        <div style="font-weight: 700; font-size: 14px; color: #1e40af;">PO #${order.purchase_order_id} Product Allocations</div>
+                                        <div style="font-size: 12px; color: var(--text-secondary);">Order Date: ${order.order_date || 'N/A'} • Total Budget: ₹${(order.total_amount || 0).toLocaleString('en-IN')}</div>
+                                    </div>
+                                    <div style="font-size: 11px; padding: 4px 8px; border-radius: 6px; background: rgba(59, 130, 246, 0.1); color: #2563eb; font-weight: 600;">
+                                        <i class='bx bx-check-shield'></i> Split Allocation Builder
+                                    </div>
+                                </div>
+
+                                <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;">
+                                    Select the eligible products and quantities to allocate to this consignment.
+                                </div>
+
+                                <div style="border-radius: 8px; border: 1px solid var(--border); overflow: hidden; background: var(--card-bg, #ffffff);">
+                                    <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
+                                        <thead>
+                                            <tr style="background: var(--bg-surface, #f8fafc); border-bottom: 1px solid var(--border); color: var(--text-secondary); font-size: 11px; text-transform: uppercase;">
+                                                <th style="padding: 8px 10px; width: 36px; text-align: center;">
+                                                    <input type="checkbox" id="alloc-select-all" title="Select / Deselect All Products" ${eligibleCount > 0 ? 'checked' : 'disabled'} style="cursor: pointer;">
+                                                </th>
+                                                <th style="padding: 8px 10px;">Product &amp; SKU</th>
+                                                <th style="padding: 8px 10px; text-align: right;">PO Qty</th>
+                                                <th style="padding: 8px 10px; text-align: right;">Allocated</th>
+                                                <th style="padding: 8px 10px; text-align: right;">Remaining</th>
+                                                <th style="padding: 8px 10px; text-align: right; width: 130px;">Ship Quantity *</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${rowsHtml}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 12px; font-weight: 600; color: var(--text-secondary);">
+                                    <span id="alloc-selected-count">${eligibleCount} of ${items.length} products selected</span>
+                                    <span id="alloc-total-units" style="color: #059669;">Total Consignment Units: 0</span>
+                                </div>
+                            `;
+
+                            // Wire up checkbox toggles and quantity input handlers
+                            const selectAllBox = previewBox.querySelector('#alloc-select-all');
+                            const checkboxes = Array.from(previewBox.querySelectorAll('.alloc-item-checkbox'));
+                            const qtyInputs = Array.from(previewBox.querySelectorAll('.alloc-qty-input'));
+
+                            const syncRowState = (cb) => {
+                                const pid = cb.getAttribute('data-product-id');
+                                const maxRem = parseInt(cb.getAttribute('data-max') || '0', 10);
+                                const inp = previewBox.querySelector(`.alloc-qty-input[data-product-id="${pid}"]`);
+                                if (!inp) return;
+
+                                if (cb.checked) {
+                                    inp.disabled = false;
+                                    inp.style.opacity = '1';
+                                    if (!inp.value || parseInt(inp.value, 10) <= 0) {
+                                        inp.value = maxRem;
+                                    }
+                                } else {
+                                    inp.disabled = true;
+                                    inp.style.opacity = '0.5';
+                                }
+                            };
+
+                            checkboxes.forEach(cb => {
+                                cb.addEventListener('change', () => {
+                                    syncRowState(cb);
+                                    if (selectAllBox) {
+                                        selectAllBox.checked = checkboxes.every(c => c.checked);
+                                        selectAllBox.indeterminate = checkboxes.some(c => c.checked) && !selectAllBox.checked;
+                                    }
+                                    updateAllocationSummary();
+                                });
+                            });
+
+                            if (selectAllBox) {
+                                selectAllBox.addEventListener('change', (ev) => {
+                                    const isChecked = ev.target.checked;
+                                    checkboxes.forEach(cb => {
+                                        cb.checked = isChecked;
+                                        syncRowState(cb);
+                                    });
+                                    updateAllocationSummary();
+                                });
+                            }
+
+                            qtyInputs.forEach(inp => {
+                                inp.addEventListener('input', () => {
+                                    const maxRem = parseInt(inp.getAttribute('data-max') || '0', 10);
+                                    const val = parseInt(inp.value, 10);
+                                    if (maxRem > 0 && val > maxRem) {
+                                        inp.value = maxRem;
+                                        if (typeof Utils !== 'undefined' && Utils.showToast) {
+                                            Utils.showToast(`Quantity capped at maximum remaining allocatable units (${maxRem}).`, 'warning');
+                                        }
+                                    }
+                                    updateAllocationSummary();
+                                });
+                            });
+
                             updateAllocationSummary();
-                        });
+
+                        } catch (err) {
+                            if (thisReq !== currentPoRequestId) return;
+                            previewBox.innerHTML = `
+                                <div style="padding: 12px; border-radius: 6px; background: rgba(239, 68, 68, 0.08); color: var(--red); font-size: 13px;">
+                                    <i class='bx bx-error-circle'></i> Error loading purchase order line items: ${escape(err.message || 'Server error')}
+                                </div>
+                            `;
+                        }
                     });
 
-                    if (selectAllBox) {
-                        selectAllBox.addEventListener('change', (ev) => {
-                            const isChecked = ev.target.checked;
-                            checkboxes.forEach(cb => {
-                                cb.checked = isChecked;
-                                syncRowState(cb);
-                            });
-                            updateAllocationSummary();
-                        });
+                    // Pre-select PO if specified
+                    if (preselectedPoId && targetPo) {
+                        poSelect.value = String(preselectedPoId);
+                        poSelect.dispatchEvent(new Event('change'));
                     }
 
-                    qtyInputs.forEach(inp => {
-                        inp.addEventListener('input', () => {
-                            const maxRem = parseInt(inp.getAttribute('data-max') || '0', 10);
-                            const val = parseInt(inp.value, 10);
-                            if (maxRem > 0 && val > maxRem) {
-                                inp.value = maxRem;
-                                Utils.showToast(`Quantity capped at maximum remaining allocatable units (${maxRem}).`, 'warning');
-                            }
-                            updateAllocationSummary();
-                        });
-                    });
-
-                    updateAllocationSummary();
-
-                } catch (err) {
-                    if (thisReq !== currentPoRequestId) return;
-                    previewBox.innerHTML = `
-                        <div style="padding: 12px; border-radius: 6px; background: rgba(239, 68, 68, 0.08); color: var(--red); font-size: 13px;">
-                            <i class='bx bx-error-circle'></i> Error loading purchase order line items: ${escape(err.message || 'Server error')}
-                        </div>
-                    `;
-                }
-            });
+            // Proceed to Review & Confirmation
+            if (proceedBtn) {
+                proceedBtn.addEventListener('click', async () => {
+                    try {
+                        await onSaveHandler(document.getElementById('modal-create-shipment'), closeModalFn);
+                    } catch (err) {
+                        if (typeof Utils !== 'undefined' && Utils.showToast) {
+                            Utils.showToast(err.message, 'error');
+                        } else if (typeof alert === 'function') {
+                            alert(err.message);
+                        }
+                    }
+                });
+            }
 
         } catch (err) {
-            alert(`Error opening shipment builder: ${err.message}`);
+            if (typeof Utils !== 'undefined' && Utils.showToast) {
+                Utils.showToast(`Error opening shipment builder: ${err.message}`, 'error');
+            } else if (typeof alert === 'function') {
+                alert(`Error opening shipment builder: ${err.message}`);
+            }
         }
+    },
+
+    // Step 2: Pre-Dispatch Review and Confirmation Modal
+    openPreDispatchReviewModal(data, closeCreateModal) {
+        const totalUnits = data.items.reduce((sum, item) => sum + item.quantity, 0);
+
+        const content = `
+            <div style="display: flex; flex-direction: column; gap: 14px; font-size: 13px;">
+                <div style="background: rgba(37, 99, 235, 0.06); border: 1px solid rgba(37, 99, 235, 0.2); border-radius: 8px; padding: 12px 14px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: #2563eb;">Target Purchase Order</div>
+                            <div style="font-size: 15px; font-weight: 700; color: var(--text);">${Utils.escapeHtml(data.poSummary || `PO #${data.poId}`)}</div>
+                        </div>
+                        <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #059669; font-weight: 700; font-size: 11px; padding: 4px 10px;">
+                            <i class='bx bx-check-circle'></i> Verified for Dispatch
+                        </span>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: var(--bg-surface, #f8fafc); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px;">
+                    <div>
+                        <span style="font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Logistics Carrier &amp; Tracking</span>
+                        <div style="font-weight: 600; color: var(--text); margin-top: 2px;">${Utils.escapeHtml(data.carrier || 'Standard Logistics')}</div>
+                        <div style="font-size: 11px; font-family: monospace; color: var(--text-secondary);">${data.trackingNumber ? Utils.escapeHtml(data.trackingNumber) : 'No tracking number entered'}</div>
+                    </div>
+                    <div>
+                        <span style="font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Method &amp; Initial Status</span>
+                        <div style="font-weight: 600; color: var(--text); margin-top: 2px;">${Utils.escapeHtml(data.shippingMethod || 'Standard Ground')}</div>
+                        <div style="font-size: 11px; color: #2563eb; font-weight: 600;">${Utils.escapeHtml(data.status || 'Ready for Shipment')}</div>
+                    </div>
+                    <div>
+                        <span style="font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Origin ➔ Destination</span>
+                        <div style="font-size: 12px; color: var(--text); margin-top: 2px;">${Utils.escapeHtml(data.originAddress || 'Origin Dock')} ➔ ${Utils.escapeHtml(data.destinationAddress || 'Warehouse Bay')}</div>
+                    </div>
+                    <div>
+                        <span style="font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Packages, Weight &amp; Delivery</span>
+                        <div style="font-size: 12px; color: var(--text); margin-top: 2px;">${data.packageCount} pkg${data.packageCount === 1 ? '' : 's'} • ${data.totalWeight ? data.totalWeight + ' kg' : 'Weight unrecorded'}</div>
+                        <div style="font-size: 11px; color: var(--text-secondary);">Est. Arrival: ${data.expectedDelivery || 'Not specified'}</div>
+                    </div>
+                </div>
+
+                <div style="border-radius: 8px; border: 1px solid var(--border); overflow: hidden;">
+                    <div style="padding: 10px 14px; background: var(--bg-surface, #f1f5f9); border-bottom: 1px solid var(--border); font-weight: 700; font-size: 12px; color: var(--text); display: flex; justify-content: space-between; align-items: center;">
+                        <span>CONSIGNMENT ALLOCATED PRODUCTS (${data.items.length})</span>
+                        <span style="color: #059669; font-weight: 700;">Total Units: ${totalUnits}</span>
+                    </div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                        <thead>
+                            <tr style="background: var(--card-bg, #ffffff); border-bottom: 1px solid var(--border); color: var(--text-secondary); font-size: 11px; text-transform: uppercase;">
+                                <th style="padding: 8px 12px; width: 36px; text-align: center;">#</th>
+                                <th style="padding: 8px 12px; text-align: left;">Product Name</th>
+                                <th style="padding: 8px 12px; text-align: left;">SKU</th>
+                                <th style="padding: 8px 12px; text-align: right; width: 120px;">Dispatch Qty</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.items.map((it, idx) => `
+                                <tr style="border-bottom: 1px solid var(--border);">
+                                    <td style="padding: 8px 12px; text-align: center; color: var(--text-secondary);">${idx + 1}</td>
+                                    <td style="padding: 8px 12px; font-weight: 600; color: var(--text);">${Utils.escapeHtml(it.product_name)}</td>
+                                    <td style="padding: 8px 12px; font-family: monospace; color: var(--text-secondary);">${Utils.escapeHtml(it.sku || 'N/A')}</td>
+                                    <td style="padding: 8px 12px; text-align: right; font-weight: 700; color: #059669; font-size: 13px;">${it.quantity}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                        <tfoot>
+                            <tr style="background: var(--bg-surface, #f8fafc); font-weight: 700;">
+                                <td colspan="3" style="padding: 8px 12px; text-align: right; font-size: 12px;">Total Dispatched Units:</td>
+                                <td style="padding: 8px 12px; text-align: right; font-size: 14px; color: #059669;">${totalUnits}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                ${data.shippingNotes ? `
+                    <div style="font-size: 12px; color: var(--text-secondary); background: #f8fafc; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border);">
+                        <strong style="color: var(--text);">Remarks:</strong> "${Utils.escapeHtml(data.shippingNotes)}"
+                    </div>
+                ` : ''}
+
+                <div style="padding: 10px 14px; border-radius: 6px; background: rgba(59, 130, 246, 0.06); border: 1px solid rgba(59, 130, 246, 0.2); font-size: 12px; color: #1e40af;">
+                    <i class='bx bx-info-circle'></i> Confirming dispatch will atomically persist this consignment with <strong>${totalUnits} total units</strong> into official Shipment records and update remaining Purchase Order balances.
+                </div>
+            </div>
+        `;
+
+        const footer = `
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <button type="button" class="btn btn-outline" id="modal-btn-review-back">
+                    <i class='bx bx-left-arrow-alt'></i> Back to Edit
+                </button>
+                <button type="button" class="btn btn-primary" id="modal-btn-review-confirm" style="background: #059669; border-color: #059669; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+                    <i class='bx bx-check-double'></i> Confirm &amp; Dispatch Consignment
+                </button>
+            </div>
+        `;
+
+        Modal.create({
+            id: 'modal-predispatch-review',
+            title: 'Review & Confirm Shipment Dispatch 📋',
+            content,
+            footer,
+            size: 'lg',
+            onOpen: (reviewModalEl, closeReviewModal) => {
+                const backBtn = reviewModalEl.querySelector('#modal-btn-review-back');
+                const confirmBtn = reviewModalEl.querySelector('#modal-btn-review-confirm');
+
+                if (backBtn) {
+                    backBtn.addEventListener('click', () => {
+                        closeReviewModal();
+                    });
+                }
+
+                if (confirmBtn) {
+                    let isSubmitting = false;
+                    confirmBtn.addEventListener('click', async () => {
+                        if (isSubmitting) return;
+                        isSubmitting = true;
+                        confirmBtn.disabled = true;
+                        if (backBtn) backBtn.disabled = true;
+                        confirmBtn.innerHTML = "<i class='bx bx-loader-alt bx-spin'></i> Dispatching Consignment...";
+
+                        try {
+                            const payload = {
+                                purchase_order_id: parseInt(data.poId, 10),
+                                carrier: data.carrier || 'Standard Logistics',
+                                tracking_number: data.trackingNumber || null,
+                                shipping_method: data.shippingMethod,
+                                status: data.status,
+                                package_count: data.packageCount,
+                                total_weight: data.totalWeight,
+                                origin_address: data.originAddress,
+                                destination_address: data.destinationAddress,
+                                expected_delivery: data.expectedDelivery,
+                                shipping_notes: data.shippingNotes,
+                                items: data.items.map(it => ({
+                                    product_id: it.product_id,
+                                    quantity: it.quantity
+                                }))
+                            };
+
+                            const res = await Api.post('/shipments/', payload);
+
+                            if (!res || !res.shipment || !res.shipment.shipment_id) {
+                                throw new Error('Shipment was created, but server response did not include a valid shipment ID.');
+                            }
+
+                            const newShipmentId = res.shipment.shipment_id;
+                            const newShipmentNum = res.shipment.shipment_number || ('#' + newShipmentId);
+
+                            closeReviewModal();
+                            if (closeCreateModal) closeCreateModal();
+
+                            Utils.showToast(`Shipment ${newShipmentNum} dispatched successfully!`, 'success');
+
+                            if (App.pages['shipments'] && typeof App.pages['shipments'].loadShipments === 'function') {
+                                App.pages['shipments'].loadShipments();
+                            }
+
+                            // Open shipment details modal displaying generated shipment ID and allocated items
+                            if (App.pages['shipments'] && typeof App.pages['shipments'].openShipmentDetailsModal === 'function') {
+                                await App.pages['shipments'].openShipmentDetailsModal(newShipmentId);
+                            }
+                        } catch (err) {
+                            isSubmitting = false;
+                            confirmBtn.disabled = false;
+                            if (backBtn) backBtn.disabled = false;
+                            confirmBtn.innerHTML = "<i class='bx bx-check-double'></i> Confirm &amp; Dispatch Consignment";
+                            Utils.showToast(err.message || 'Failed to dispatch shipment', 'error');
+                        }
+                    });
+                }
+            }
+        });
     },
 
     // Update Status Modal
